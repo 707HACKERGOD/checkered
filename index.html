@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkered - PS1 Style RPG</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div class="loading-content">
+            <h1 class="glitch" data-text="CHECKERED">CHECKERED</h1>
+            <div class="loading-bar">
+                <div class="loading-progress"></div>
+            </div>
+            <p class="loading-text">Loading...</p>
+        </div>
+    </div>
+
+    <!-- Title Screen -->
+    <div id="title-screen" class="hidden">
+        <div class="title-content">
+            <h1 class="glitch" data-text="CHECKERED">CHECKERED</h1>
+            <p class="subtitle">An Open World Psychological Horror RPG</p>
+            <div class="menu-options">
+                <button id="start-game" class="menu-btn">New Game</button>
+                <button id="continue-game" class="menu-btn" disabled>Continue</button>
+                <button id="options-btn" class="menu-btn">Options</button>
+            </div>
+            <p class="controls-hint">WASD to move | Mouse to look | C to toggle camera | Tab for inventory</p>
+        </div>
+    </div>
+
+    <!-- Game Container -->
+    <div id="game-container" class="hidden">
+        <canvas id="game-canvas"></canvas>
+        
+        <!-- HUD Overlay -->
+        <div id="hud">
+            <!-- Top Left - Time & Calendar -->
+            <div id="time-display">
+                <div class="calendar-mini">
+                    <span id="current-day">Day 1</span>
+                    <span id="current-week">Week 1</span>
+                </div>
+                <div class="time-period" id="time-period">Morning</div>
+            </div>
+            
+            <!-- Top Right - Sanity & Health -->
+            <div id="status-bars">
+                <div class="status-bar sanity-bar">
+                    <label>SANITY</label>
+                    <div class="bar-container">
+                        <div class="bar-fill" id="sanity-fill"></div>
+                    </div>
+                    <span class="bar-value" id="sanity-value">100</span>
+                </div>
+                <div class="status-bar comfort-bar">
+                    <label>COMFORT</label>
+                    <div class="bar-container">
+                        <div class="bar-fill" id="comfort-fill"></div>
+                    </div>
+                    <span class="bar-value" id="comfort-value">0</span>
+                </div>
+            </div>
+            
+            <!-- Bottom Left - Quick Inventory -->
+            <div id="quick-inventory">
+                <div class="quick-slot" data-slot="1">1</div>
+                <div class="quick-slot" data-slot="2">2</div>
+                <div class="quick-slot" data-slot="3">3</div>
+                <div class="quick-slot" data-slot="4">4</div>
+                <div class="quick-slot" data-slot="5">5</div>
+            </div>
+            
+            <!-- Bottom Center - Interaction Prompt -->
+            <div id="interaction-prompt" class="hidden">
+                <span class="key">E</span>
+                <span class="action" id="interaction-text">Interact</span>
+            </div>
+            
+            <!-- Camera Mode Indicator -->
+            <div id="camera-mode">
+                <span id="camera-mode-text">Third Person</span>
+            </div>
+            
+            <!-- Possession Warning -->
+            <div id="possession-warning" class="hidden">
+                <div class="warning-text">LOSING CONTROL</div>
+                <div class="warning-bar">
+                    <div class="warning-progress" id="possession-progress"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Full Inventory Panel -->
+        <div id="inventory-panel" class="panel hidden">
+            <div class="panel-header">
+                <h2>INVENTORY</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="panel-content">
+                <div id="inventory-grid"></div>
+                <div id="item-details">
+                    <h3 id="item-name">Select an item</h3>
+                    <p id="item-description"></p>
+                    <div id="item-attributes"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Crafting Panel -->
+        <div id="crafting-panel" class="panel hidden">
+            <div class="panel-header">
+                <h2>CRAFTING</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="panel-content">
+                <div class="crafting-slots">
+                    <div class="craft-slot" id="craft-slot-1">
+                        <span class="slot-label">Item 1</span>
+                    </div>
+                    <span class="craft-symbol">+</span>
+                    <div class="craft-slot" id="craft-slot-2">
+                        <span class="slot-label">Item 2</span>
+                    </div>
+                    <span class="craft-symbol">=</span>
+                    <div class="craft-result" id="craft-result">
+                        <span class="slot-label">Result</span>
+                    </div>
+                </div>
+                <button id="craft-btn" class="action-btn" disabled>CRAFT</button>
+                <div id="craft-preview"></div>
+            </div>
+        </div>
+        
+        <!-- Health/Body Panel -->
+        <div id="health-panel" class="panel hidden">
+            <div class="panel-header">
+                <h2>BODY STATUS</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="panel-content">
+                <div id="body-diagram">
+                    <svg viewBox="0 0 200 400" id="body-svg">
+                        <!-- Head -->
+                        <ellipse cx="100" cy="40" rx="30" ry="35" class="body-part" data-part="head"/>
+                        <!-- Left Eye (missing) -->
+                        <circle cx="88" cy="35" r="5" class="body-part missing" data-part="left-eye"/>
+                        <!-- Right Eye -->
+                        <circle cx="112" cy="35" r="5" class="body-part" data-part="right-eye"/>
+                        <!-- Torso -->
+                        <rect x="70" y="80" width="60" height="100" rx="10" class="body-part" data-part="torso"/>
+                        <!-- Left Arm -->
+                        <rect x="40" y="85" width="25" height="80" rx="5" class="body-part" data-part="left-arm"/>
+                        <!-- Right Arm -->
+                        <rect x="135" y="85" width="25" height="80" rx="5" class="body-part" data-part="right-arm"/>
+                        <!-- Left Leg -->
+                        <rect x="72" y="185" width="25" height="100" rx="5" class="body-part" data-part="left-leg"/>
+                        <!-- Right Leg -->
+                        <rect x="103" y="185" width="25" height="100" rx="5" class="body-part" data-part="right-leg"/>
+                    </svg>
+                </div>
+                <div id="part-status">
+                    <h3 id="part-name">Select body part</h3>
+                    <div class="health-bar">
+                        <div class="bar-fill" id="part-health-fill"></div>
+                    </div>
+                    <p id="part-condition"></p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Calendar Panel -->
+        <div id="calendar-panel" class="panel hidden">
+            <div class="panel-header">
+                <h2>CALENDAR - <span id="weeks-remaining">10</span> WEEKS REMAINING</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="panel-content">
+                <div id="calendar-grid"></div>
+                <div id="day-details">
+                    <h3 id="selected-day-title">Day 1</h3>
+                    <div id="day-events"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Dialogue Panel -->
+        <div id="dialogue-panel" class="hidden">
+            <div id="dialogue-portrait"></div>
+            <div id="dialogue-content">
+                <h3 id="dialogue-speaker">???</h3>
+                <p id="dialogue-text"></p>
+                <div id="dialogue-choices"></div>
+            </div>
+        </div>
+        
+        <!-- Narrative Text Overlay -->
+        <div id="narrative-overlay" class="hidden">
+            <div id="narrative-text"></div>
+            <button id="narrative-continue" class="hidden">Continue</button>
+        </div>
+        
+        <!-- Possession Combat UI -->
+        <div id="possession-ui" class="hidden">
+            <div id="phantom-counter">
+                <span>PHANTOMS: </span>
+                <span id="phantom-count">0</span>
+            </div>
+            <div id="possession-timer">
+                <div class="timer-fill" id="possession-timer-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Options Panel -->
+    <div id="options-panel" class="panel hidden">
+        <div class="panel-header">
+            <h2>OPTIONS</h2>
+            <button class="close-btn">&times;</button>
+        </div>
+        <div class="panel-content">
+            <div class="option-group">
+                <label>Master Volume</label>
+                <input type="range" id="master-volume" min="0" max="100" value="70">
+            </div>
+            <div class="option-group">
+                <label>Mouse Sensitivity</label>
+                <input type="range" id="mouse-sensitivity" min="1" max="10" value="5">
+            </div>
+            <div class="option-group">
+                <label>PS1 Effects Intensity</label>
+                <input type="range" id="ps1-intensity" min="0" max="100" value="80">
+            </div>
+            <div class="option-group">
+                <label>Screen Shake</label>
+                <input type="checkbox" id="screen-shake" checked>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Maps for ES Modules -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    
+    <!-- Main Game Script -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
