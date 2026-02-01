@@ -1,0 +1,7 @@
+.godot/
+.vs/
+*.sln
+*.csproj
+*.tmp
+logs/
+Export/
