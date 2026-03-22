@@ -1,0 +1,15 @@
+[gd_scene load_steps=4 format=3 uid="uid://biknkaio3btvv"]
+
+[ext_resource type="Script" uid="uid://i241qusdnyuv" path="res://Scripts/World/WorldGenerator.cs" id="1_kln2b"]
+[ext_resource type="PackedScene" uid="uid://3s82rtv51ye2" path="res://Scenes/Player.tscn" id="2_rgh2o"]
+[ext_resource type="PackedScene" uid="uid://d3r85210kwu82" path="res://Scenes/HUD.tscn" id="3_pbw6q"]
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_kln2b")
+
+[node name="Player" parent="." instance=ExtResource("2_rgh2o")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4019182, 0)
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="HUD" parent="CanvasLayer" instance=ExtResource("3_pbw6q")]

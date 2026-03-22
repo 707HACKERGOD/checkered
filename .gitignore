@@ -1,7 +1,31 @@
+# Godot generated files
 .godot/
-.vs/
-*.sln
-*.csproj
+.import/
+.mono/
+*.mono_*
+*.godot*
+*.uid
+*.gen.*
 *.tmp
-logs/
-Export/
+*.log
+*.pid
+
+# Compiled C# files
+bin/
+obj/
+*.dll
+*.pdb
+
+# OS specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor specific
+*.sln
+*.csproj.user
+*.suo
+*.user
+*.userosscache
+*.usertasks
+*.vshost.*

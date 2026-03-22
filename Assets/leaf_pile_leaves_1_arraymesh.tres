@@ -1,0 +1,35 @@
+[gd_resource type="ArrayMesh" format=4 uid="uid://kehnlnekp6q0"]
+
+[ext_resource type="Material" uid="uid://b3kca457leb8j" path="res://Shaders/Mat_LeafGround.tres" id="1_emawu"]
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_go2kq"]
+_surfaces = [{
+"aabb": AABB(-0.81615317, 0.063516244, -1.0649309, 1.825144, 0.24144025, 2.062997),
+"format": 34896613377,
+"index_count": 24,
+"index_data": PackedByteArray("AAABAAIAAAADAAEABAAAAAIABAACAAUABgAAAAQABgAHAAAABwADAAAABwAIAAMA"),
+"name": "Material.002",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 9,
+"vertex_data": PackedByteArray("dGKyF2GcAAD//5h1AAAAABv0AAATdQAAX3EZzrIYAACLef////8AAHv1UjQa5AAAYALnT1H1AAAAAEjG0W0AACYK8opNEwAA")
+}]
+blend_shape_mode = 0
+
+[resource]
+resource_name = "leaf_pile_Plane_001"
+_surfaces = [{
+"aabb": AABB(-0.81615317, 0.063516244, -1.0649309, 1.825144, 0.24144025, 2.062997),
+"attribute_data": PackedByteArray("loP/f///AAD1/BaOC6AAAAAA/38LoAAAloP/fwAAAACPGMDoloP/f2qZ//8AAP9/apn///X8Fo7/////loP/fw=="),
+"format": 34896613399,
+"index_count": 24,
+"index_data": PackedByteArray("AAABAAIAAAADAAEABAAFAAYABAAHAAUACAAJAAoACAALAAkADAANAA4ADAAPAA0A"),
+"material": ExtResource("1_emawu"),
+"name": "Material.002",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 16,
+"vertex_data": PackedByteArray("dGKyF2GcZbr//5h1AABruhv0AAATdfe6X3EZzrIYGLoAAEjG0W2pvl9xGc6yGE2+dGKyF2GcUsAmCvKKTRNEvWAC509R9cHCdGKyF2GcCsOLef////9jwgAASMbRba7Ei3n/////OMcb9AAAE3Uux3v1UjQa5PzGdGKyF2GccMei7Y5idu0lYlLqmlr18Ixqo98ljWHjPYsQ1AmTe/n6f4XsJ4kL5wSMNvuReObWc5Su7LZhBe1fYvDuIGYT65Je")
+}]
+blend_shape_mode = 0
+shadow_mesh = SubResource("ArrayMesh_go2kq")

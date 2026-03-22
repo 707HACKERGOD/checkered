@@ -1,0 +1,86 @@
+[gd_scene format=3 uid="uid://bj7m52qir620q"]
+
+[ext_resource type="Script" uid="uid://d346ljtl4sjgd" path="res://Scripts/Characters/NpcController.cs" id="1_0wweb"]
+[ext_resource type="PackedScene" uid="uid://uy0gt5bh27sb" path="res://Assets/syl_base_5.glb" id="1_neahk"]
+[ext_resource type="Script" uid="uid://wrff3vt2t7lk" path="res://Scripts/Characters/NpcEyeTracker.cs" id="1_w88vc"]
+[ext_resource type="Texture2D" uid="uid://ulx78hwquplr" path="res://Assets/syl_base_5_256x256_Grid3.png" id="3_sip5m"]
+[ext_resource type="Shape3D" uid="uid://bxbfyrklnhn7" path="res://Scripts/Characters/interest_area_npc.tres" id="4_j56hr"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_j56hr"]
+resource_local_to_scene = true
+resource_name = "Eye_Mat"
+cull_mode = 2
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("3_sip5m")
+texture_filter = 2
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_w88vc"]
+radius = 0.3
+height = 1.652874
+
+[node name="NPC" type="CharacterBody3D" unique_id=1191281047 groups=["NPC"]]
+process_priority = 1
+collision_layer = 4
+collision_mask = 3
+script = ExtResource("1_0wweb")
+
+[node name="syl_base_5" parent="." unique_id=1709044986 instance=ExtResource("1_neahk")]
+
+[node name="Skeleton3D" parent="syl_base_5/metarig" parent_id_path=PackedInt32Array(1709044986, 939957713) index="0" unique_id=1078351443]
+bones/0/position = Vector3(-0.012013366, 0.8348043, 0.032115523)
+bones/0/rotation = Quaternion(0.16563182, 7.9136875e-08, 1.3291164e-08, 0.9861877)
+bones/1/rotation = Quaternion(-0.18164173, -1.6633932e-08, -2.607924e-08, 0.9833648)
+bones/2/rotation = Quaternion(-0.06385426, -3.3459195e-08, -5.9468936e-09, 0.99795926)
+bones/3/rotation = Quaternion(-0.06238186, 0.0017864987, -8.5452775e-06, 0.99805075)
+bones/4/rotation = Quaternion(0.12464627, 2.9115326e-06, 5.7531634e-05, 0.99220127)
+bones/5/rotation = Quaternion(0.023930106, 1.7533196e-08, 1.2729309e-09, 0.9997137)
+bones/6/rotation = Quaternion(0.012781154, -8.914852e-08, -2.712775e-10, 0.99991834)
+bones/7/rotation = Quaternion(0.003346608, 0.2045822, -0.7822588, 0.588393)
+bones/8/position = Vector3(0.0084037855, 0.10204093, 0.0012207034)
+bones/8/rotation = Quaternion(0.035320576, 0.11817148, -0.49783376, 0.85845757)
+bones/9/rotation = Quaternion(0.18507957, -0.014332647, -0.027846182, 0.9822244)
+bones/11/rotation = Quaternion(0.0033465335, -0.20458223, 0.78225875, 0.58839285)
+bones/12/position = Vector3(-0.008403519, 0.10204095, 0.0012207029)
+bones/12/rotation = Quaternion(0.03532062, -0.118171535, 0.49783382, 0.85845757)
+bones/13/rotation = Quaternion(0.18507953, 0.014332607, 0.02784625, 0.9822244)
+bones/17/rotation = Quaternion(0.97753084, 0.024095578, -0.0027364772, 0.20939305)
+bones/18/rotation = Quaternion(0.1208426, 0.0005474408, 0.0031975242, 0.99266636)
+bones/22/rotation = Quaternion(0.97689, -0.012995977, 0.0018639195, 0.21333906)
+bones/23/rotation = Quaternion(0.12779234, 0.00015649115, -0.010599636, 0.99174434)
+
+[node name="eyepatch_002" parent="syl_base_5/metarig/Skeleton3D" index="0" unique_id=511818000]
+visible = false
+layers = 4
+
+[node name="MESH_001" parent="syl_base_5/metarig/Skeleton3D" index="1" unique_id=889350891]
+layers = 4
+
+[node name="MESH_002" parent="syl_base_5/metarig/Skeleton3D" index="2" unique_id=2126420105]
+layers = 4
+surface_material_override/1 = SubResource("StandardMaterial3D_j56hr")
+
+[node name="AnimationPlayer" parent="syl_base_5" index="1" unique_id=1771080825]
+speed_scale = 0.3
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=813895122]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+shape = SubResource("CapsuleShape3D_w88vc")
+
+[node name="VisionArea" type="Area3D" parent="." unique_id=285309370]
+collision_layer = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="VisionArea" unique_id=1170269770]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8944702, 1.6525831)
+shape = ExtResource("4_j56hr")
+
+[node name="EyeTrackerComponent" type="Node" parent="." unique_id=258634334 node_paths=PackedStringArray("CharacterSkeleton", "FaceMesh")]
+process_priority = 1
+script = ExtResource("1_w88vc")
+TargetOffset = Vector3(0, 1.5, 0)
+CharacterSkeleton = NodePath("../syl_base_5/metarig/Skeleton3D")
+FaceMesh = NodePath("../syl_base_5/metarig/Skeleton3D/MESH_002")
+EyeMaterialSurfaceIndex = 1
+MinBlinkInterval = 1.0
+MaxBlinkInterval = 4.0
+
+[editable path="syl_base_5"]

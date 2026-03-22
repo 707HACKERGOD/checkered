@@ -1,0 +1,30 @@
+[gd_scene format=3 uid="uid://dgs8umc1mdf6g"]
+
+[ext_resource type="PackedScene" uid="uid://bj7m52qir620q" path="res://Assets/npc.tscn" id="1_6ilw1"]
+[ext_resource type="Texture2D" uid="uid://ulx78hwquplr" path="res://Assets/syl_base_5_256x256_Grid3.png" id="2_7th65"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_7th65"]
+resource_local_to_scene = true
+resource_name = "Eye_Mat"
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_7th65")
+texture_filter = 2
+
+[node name="Node3D" type="Node3D" unique_id=545820848]
+
+[node name="NPC" parent="." unique_id=1191281047 instance=ExtResource("1_6ilw1")]
+collision_mask = 1
+
+[node name="Skeleton3D" parent="NPC/syl_base_5/metarig" parent_id_path=PackedInt32Array(1191281047, 251242617, 842685453) index="0" unique_id=1849654415]
+bones/6/rotation = Quaternion(-0.012781149, 8.91669e-08, 2.648504e-10, -0.99991834)
+
+[node name="MESH_002" parent="NPC/syl_base_5/metarig/Skeleton3D" index="2" unique_id=1954804983]
+surface_material_override/1 = SubResource("StandardMaterial3D_7th65")
+
+[node name="Marker3D" type="Marker3D" parent="." unique_id=1141197641]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.49281374, 1.3089075, 0.6034311)
+
+[editable path="NPC"]
+[editable path="NPC/syl_base_5"]

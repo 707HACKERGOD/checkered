@@ -1,0 +1,48 @@
+[gd_scene format=3 uid="uid://brc5bdp6nellb"]
+
+[ext_resource type="PackedScene" uid="uid://unaxv7jrosk4" path="res://Assets/streetlamp.glb" id="1_3xhfv"]
+[ext_resource type="Texture2D" uid="uid://cwb0kq77blp6d" path="res://Assets/streetlamp_lamp_uv_color.png" id="2_apix1"]
+[ext_resource type="Texture2D" uid="uid://dpaeehxaw2kx4" path="res://Assets/streetlamp_lamp_uv_metal-lamp_uv_roughness.png" id="3_t7kdj"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ch1f5"]
+blend_mode = 1
+depth_draw_mode = 2
+disable_ambient_light = true
+disable_specular_occlusion = true
+albedo_texture = ExtResource("2_apix1")
+albedo_texture_force_srgb = true
+roughness_texture = ExtResource("3_t7kdj")
+emission_enabled = true
+emission = Color(0.83999676, 0.59499377, 0.16168064, 1)
+rim_enabled = true
+disable_receive_shadows = true
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_3xhfv"]
+height = 4.0
+radius = 0.1953125
+
+[node name="streetlamp" unique_id=865006800 instance=ExtResource("1_3xhfv")]
+
+[node name="Lamp" parent="." index="1" unique_id=1790116567]
+layers = 2
+surface_material_override/1 = SubResource("StandardMaterial3D_ch1f5")
+
+[node name="SpotLight3D" type="SpotLight3D" parent="." index="2" unique_id=61653053]
+transform = Transform3D(-1, 0, 0, 0, 4.371139e-08, 1, 0, -1, 4.371139e-08, 0, 3.6658356, 0)
+layers = 2
+light_color = Color(0.99999994, 0.73536247, 0.3750936, 1)
+light_energy = 3.0
+light_volumetric_fog_energy = 5.0
+light_bake_mode = 1
+distance_fade_enabled = true
+distance_fade_begin = 10.0
+distance_fade_shadow = 10.0
+spot_range = 6.2264633
+spot_angle = 47.525585
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." index="3" unique_id=2147014711]
+collision_layer = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D" index="0" unique_id=1061243738]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+shape = SubResource("CylinderShape3D_3xhfv")

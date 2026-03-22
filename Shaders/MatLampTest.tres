@@ -1,0 +1,16 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://da2cyqw2loype"]
+
+[ext_resource type="Shader" uid="uid://hprqcyqh2hfb" path="res://Shaders/MasterWorld.gdshader" id="1_w7h3x"]
+[ext_resource type="Texture2D" uid="uid://cwb0kq77blp6d" path="res://Assets/streetlamp_lamp_uv_color.png" id="2_w7h3x"]
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_8rqkl"]
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_jamxe"]
+noise = SubResource("FastNoiseLite_8rqkl")
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_w7h3x")
+shader_parameter/texture_albedo = ExtResource("2_w7h3x")
+shader_parameter/noise_texture = SubResource("NoiseTexture2D_jamxe")
+shader_parameter/noise_scale = 12.0

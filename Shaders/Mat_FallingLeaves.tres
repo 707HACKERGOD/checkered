@@ -1,0 +1,16 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://dq0jxwxxq20be"]
+
+[ext_resource type="Shader" uid="uid://bybv0fiappyvm" path="res://Shaders/LeafFalling.gdshader" id="1_tpo1a"]
+[ext_resource type="Texture2D" uid="uid://blr0xx1wcqnpo" path="res://Assets/leaf_1.png" id="2_xk2kj"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_tpo1a")
+shader_parameter/leaf_texture = ExtResource("2_xk2kj")
+shader_parameter/leaf_color = Color(0.8, 0.4, 0.1, 1)
+shader_parameter/drop_speed = 2.0
+shader_parameter/max_life_seconds = 10.0
+shader_parameter/shrink_duration = 1.0
+shader_parameter/visibility_progress = 1.0
+shader_parameter/leaf_scale_multiplier = 0.70000002999012
+shader_parameter/ground_height = 0.0

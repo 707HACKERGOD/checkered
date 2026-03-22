@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasonPalette" format=3 uid="uid://byqmfdqvakg77"]
+
+[ext_resource type="Script" uid="uid://beketmea06yvt" path="res://Scripts/Systems/SeasonPalette.cs" id="1_ncqsx"]
+
+[sub_resource type="Gradient" id="Gradient_ncqsx"]
+offsets = PackedFloat32Array(0.10220995, 0.20718232, 0.27071825, 0.31491712, 0.66574585, 0.68508285, 0.7209945, 0.76519334, 0.9364641, 1)
+colors = PackedColorArray(0, 0, 0, 1, 1, 0.40926918, 0.27197692, 1, 0.9999998, 0.79582053, 0.31880277, 0.57254905, 0.2509804, 0.627451, 1, 1, 0.2509804, 0.627451, 1, 1, 0.9, 0.66, 0, 0.42745098, 0.86466813, 0.29903784, 0, 0.6627451, 0.90794694, 0.392126, 0.20816663, 1, 0.22201332, 0.11086633, 0.07467323, 1, 0, 0, 0, 1)
+metadata/_snap_count = 4
+
+[sub_resource type="Gradient" id="Gradient_tc1oa"]
+offsets = PackedFloat32Array(0.19390582, 0.30470914, 0.68508285, 0.7679558)
+colors = PackedColorArray(0.85490197, 0.23921569, 0, 1, 1, 0.8536996, 0.5332225, 1, 1, 0.8536996, 0.5332225, 1, 0.9607522, 0.3898447, 0, 1)
+metadata/_snap_count = 4
+
+[sub_resource type="Gradient" id="Gradient_no5m2"]
+offsets = PackedFloat32Array(0, 0.19113573, 0.2797784, 0.33518004, 0.5, 0.6961326, 0.73480666, 0.91436464)
+colors = PackedColorArray(0.039215688, 0.039215688, 0.1254902, 1, 0.2627451, 0.09019608, 0.08627451, 1, 0.50219995, 0.66618997, 0.93, 1, 0.091596216, 0.61956716, 0.86459124, 1, 0, 0.6091667, 0.85, 1, 0.12231681, 0.2919247, 0.69166756, 1, 0.2609355, 0.0912418, 0.0876539, 1, 0.08902902, 0.04567714, 0.13536835, 1)
+metadata/_snap_count = 4
+
+[resource]
+script = ExtResource("1_ncqsx")
+TopColor = SubResource("Gradient_no5m2")
+HorizonColor = SubResource("Gradient_ncqsx")
+SunColor = SubResource("Gradient_tc1oa")
+metadata/_custom_type_script = "uid://beketmea06yvt"

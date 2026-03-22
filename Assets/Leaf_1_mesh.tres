@@ -1,0 +1,6 @@
+[gd_resource type="QuadMesh" format=3 uid="uid://cxygfn82cbf3i"]
+
+[ext_resource type="Material" uid="uid://da5d2jbxktfvq" path="res://Shaders/Mat_Leaf_1.tres" id="1_ibss3"]
+
+[resource]
+material = ExtResource("1_ibss3")

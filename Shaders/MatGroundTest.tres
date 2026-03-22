@@ -1,0 +1,17 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://dafev8ari8qeg"]
+
+[ext_resource type="Shader" uid="uid://hprqcyqh2hfb" path="res://Shaders/MasterWorld.gdshader" id="1_qm7o8"]
+[ext_resource type="Texture2D" uid="uid://blbyy4cd5comc" path="res://Assets/Asphalt019_1K-JPG_Color.jpg" id="2_waryu"]
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_qm7o8"]
+frequency = 0.02
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_waryu"]
+noise = SubResource("FastNoiseLite_qm7o8")
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_qm7o8")
+shader_parameter/texture_albedo = ExtResource("2_waryu")
+shader_parameter/noise_texture = SubResource("NoiseTexture2D_waryu")
+shader_parameter/noise_scale = 12.0

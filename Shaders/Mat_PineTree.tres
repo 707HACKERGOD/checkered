@@ -1,0 +1,11 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://4fbbes88suyf"]
+
+[ext_resource type="Shader" uid="uid://dgtxmwutjprn0" path="res://Shaders/TreeMaster.gdshader" id="1_101wb"]
+[ext_resource type="Texture2D" uid="uid://dmi358la8f5bo" path="res://Assets/pine1_Plane4.png" id="2_4fqq0"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_101wb")
+shader_parameter/albedo_texture = ExtResource("2_4fqq0")
+shader_parameter/sway_speed = 1.0
+shader_parameter/sway_intensity = 0.5
