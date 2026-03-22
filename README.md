@@ -13,8 +13,8 @@ You'll be stuck in the same city for a full in-game year, so your every action w
 Currently the game is just a walking simulator - you can use the debug console with "~" key and check out how every season and weather type looks like.
 
 
-========
 Roadmap:
+========
 
 Demo:
 
