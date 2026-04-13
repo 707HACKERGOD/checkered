@@ -43,7 +43,8 @@ public partial class TimeManager : Node
     {
         if (Mathf.IsZeroApprox(TimeScale)) return;
 
-        _timer += delta * TimeScale;
+        float dt = (float)delta * TimeScale * GameState.Instance.GameSpeed;
+        _timer += dt * TimeScale;
 
         if (_timer >= _realSecondsPerGameMinute)
         {

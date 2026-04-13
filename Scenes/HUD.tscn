@@ -1,17 +1,19 @@
 [gd_scene format=3 uid="uid://d3r85210kwu82"]
 
+[ext_resource type="Theme" uid="uid://cvqanmwjxleoy" path="res://Scenes/UI/CheckeredTheme.tres" id="1_jo1ms"]
 [ext_resource type="Script" uid="uid://0ajgre01p3f1" path="res://Scripts/UI/HUD.cs" id="1_sd512"]
 
-[node name="HUD" type="Control" unique_id=2008112816 node_paths=PackedStringArray("_sanityBar", "_timeLabel", "_pauseMenu", "_debugContainer", "_debugList")]
+[node name="HUD" type="Control" unique_id=2008112816 node_paths=PackedStringArray("_timeLabel", "_sanityBar", "_pauseMenu", "_debugContainer", "_debugList")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme = ExtResource("1_jo1ms")
 script = ExtResource("1_sd512")
-_sanityBar = NodePath("SanityBar")
 _timeLabel = NodePath("TimeLabel")
+_sanityBar = NodePath("SanityBar")
 _pauseMenu = NodePath("PauseMenu")
 _debugContainer = NodePath("DebugContainer")
 _debugList = NodePath("DebugContainer/DebugList")
@@ -33,19 +35,6 @@ anchor_right = 0.18400002
 anchor_bottom = 0.07700001
 offset_right = 0.031982422
 offset_bottom = 0.10399628
-
-[node name="InventoryPanel" type="PanelContainer" parent="." unique_id=1497846510]
-layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.38700002
-anchor_top = 0.938
-anchor_right = 0.609
-anchor_bottom = 1.0
-offset_left = 0.17596436
-offset_top = 0.17596436
-offset_right = 0.4319458
-grow_horizontal = 2
-grow_vertical = 0
 
 [node name="PauseMenu" type="Control" parent="." unique_id=1155846475]
 layout_mode = 1

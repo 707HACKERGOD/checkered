@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://btcx64ri22spp" path="res://Scripts/Characters/Player.cs" id="1_rpqav"]
 [ext_resource type="Shader" uid="uid://chaogs8wspvnb" path="res://Shaders/PlayerLeaves.gdshader" id="2_dewec"]
+[ext_resource type="Script" uid="uid://bbu7nycd2okjf" path="res://Scripts/Inventory.cs" id="2_utwlt"]
 [ext_resource type="ArrayMesh" uid="uid://kehnlnekp6q0" path="res://Assets/leaf_pile_leaves_1_arraymesh.tres" id="3_dewec"]
 [ext_resource type="Script" uid="uid://bu8h0ob5u5t0f" path="res://Shaders/PlayerFoliage.cs" id="4_5ixxa"]
 [ext_resource type="PackedScene" uid="uid://dj05w43q5i6w6" path="res://Scenes/PlayerCapsule.glb" id="5_5ixxa"]
@@ -42,7 +43,7 @@ shader_parameter/ground_height = 0.0
 [sub_resource type="SphereShape3D" id="SphereShape3D_5ixxa"]
 radius = 0.2
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8flut"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kih0c"]
 resource_local_to_scene = true
 resource_name = "Eye_Mat"
 cull_mode = 2
@@ -633,6 +634,9 @@ collision_mask = 6
 script = ExtResource("1_rpqav")
 PlayerCamera = NodePath("CameraGimbal/InnerGimbal/SpringArm/Camera")
 
+[node name="Inventory" type="Node" parent="." unique_id=731108639]
+script = ExtResource("2_utwlt")
+
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1455333951]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 shape = SubResource("CapsuleShape3D_kyqiw")
@@ -660,15 +664,37 @@ shape = SubResource("SphereShape3D_5ixxa")
 [node name="syl_base_5" parent="." unique_id=607563459 instance=ExtResource("6_nn08x")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
 
-[node name="eyepatch_002" parent="syl_base_5/metarig/Skeleton3D" parent_id_path=PackedInt32Array(607563459, 1078351443) index="0" unique_id=511818000]
+[node name="Skeleton3D" parent="syl_base_5/metarig" parent_id_path=PackedInt32Array(607563459, 939957713) index="0" unique_id=1078351443]
+bones/0/position = Vector3(-0.0095884465, 0.8352084, 0.032115526)
+bones/0/rotation = Quaternion(0.16563182, 7.9136875e-08, 1.3291164e-08, 0.9861877)
+bones/1/rotation = Quaternion(-0.18164173, -1.6633932e-08, -2.607924e-08, 0.9833648)
+bones/2/rotation = Quaternion(-0.06385426, -3.3459195e-08, -5.9468936e-09, 0.99795926)
+bones/3/rotation = Quaternion(-0.055261206, 0.001786514, 4.198428e-06, 0.99847037)
+bones/4/rotation = Quaternion(0.12144385, 2.3216003e-06, 4.6017853e-05, 0.9925983)
+bones/5/rotation = Quaternion(0.023930106, 1.7533196e-08, 1.2729309e-09, 0.9997137)
+bones/6/rotation = Quaternion(0.012781154, -8.9148685e-08, -2.71219e-10, 0.99991834)
+bones/7/rotation = Quaternion(0.003346608, 0.2045822, -0.7822588, 0.588393)
+bones/8/position = Vector3(0.0084037855, 0.10204093, 0.0012207034)
+bones/8/rotation = Quaternion(0.035320576, 0.11817148, -0.49783376, 0.85845757)
+bones/9/rotation = Quaternion(0.18507957, -0.014332647, -0.027846182, 0.9822244)
+bones/11/rotation = Quaternion(0.0033465335, -0.20458223, 0.78225875, 0.58839285)
+bones/12/position = Vector3(-0.008403519, 0.10204095, 0.0012207029)
+bones/12/rotation = Quaternion(0.03532062, -0.118171535, 0.49783382, 0.85845757)
+bones/13/rotation = Quaternion(0.18507953, 0.014332607, 0.02784625, 0.9822244)
+bones/17/rotation = Quaternion(0.97794867, 0.02286059, -0.0026726092, 0.20757319)
+bones/18/rotation = Quaternion(0.11762389, 0.00047636335, 0.003768398, 0.99305093)
+bones/22/rotation = Quaternion(0.97741747, -0.01393318, 0.0019422978, 0.21084887)
+bones/23/rotation = Quaternion(0.12337155, 8.5609434e-05, -0.009556191, 0.99231464)
+
+[node name="eyepatch_002" parent="syl_base_5/metarig/Skeleton3D" index="0" unique_id=511818000]
 layers = 8
 
-[node name="MESH_001" parent="syl_base_5/metarig/Skeleton3D" parent_id_path=PackedInt32Array(607563459, 1078351443) index="1" unique_id=889350891]
+[node name="MESH_001" parent="syl_base_5/metarig/Skeleton3D" index="1" unique_id=889350891]
 layers = 8
 
-[node name="MESH_002" parent="syl_base_5/metarig/Skeleton3D" parent_id_path=PackedInt32Array(607563459, 1078351443) index="2" unique_id=2126420105]
+[node name="MESH_002" parent="syl_base_5/metarig/Skeleton3D" index="2" unique_id=2126420105]
 layers = 8
-surface_material_override/1 = SubResource("StandardMaterial3D_8flut")
+surface_material_override/1 = SubResource("StandardMaterial3D_kih0c")
 
 [node name="AnimationPlayer" parent="syl_base_5" index="1" unique_id=1771080825]
 libraries/ = SubResource("AnimationLibrary_lyrkg")

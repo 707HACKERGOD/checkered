@@ -51,7 +51,6 @@ public partial class Player : CharacterBody3D
 
     public override void _Ready()
     {
-        // In Player._Ready()
         Input.MouseMode = Input.MouseModeEnum.Captured;
 
         _cameraGimbal = GetNode<Node3D>("CameraGimbal");
@@ -116,6 +115,10 @@ public partial class Player : CharacterBody3D
             _innerGimbal.Rotation = rot;
         }
 
+        // If inventory is open, ignore other input (movement keys are handled via auto‑run)
+        if (HUD.Instance != null && HUD.Instance.IsInventoryOpen)
+            return;
+
         // 2. TOGGLE 1ST/3RD PERSON
         if (@event.IsActionPressed("toggle_camera"))
         {
@@ -139,18 +142,32 @@ public partial class Player : CharacterBody3D
 
     public override void _PhysicsProcess(double delta)
     {
+        float dt = (float)delta * GameState.Instance.GameSpeed;
         _cameraGimbal.GlobalPosition = this.GlobalPosition + new Vector3(0, 1.5f, 0);
 
         Vector3 velocity = Velocity;
 
         if (!IsOnFloor())
-            velocity.Y -= Gravity * (float)delta;
+            velocity.Y -= Gravity * dt;
 
         if (Input.IsActionJustPressed("jump") && IsOnFloor())
             velocity.Y = JumpVelocity;
 
         // --- CAMERA-RELATIVE MOVEMENT ---
-        Vector2 inputDir = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
+        Vector2 inputDir;
+        bool inventoryOpen = HUD.Instance != null && HUD.Instance.IsInventoryOpen;
+
+        if (inventoryOpen)
+        {
+            // Use the stored auto‑run direction captured when inventory opened
+            inputDir = GameState.Instance.AutoRunDirection;
+        }
+        else
+        {
+            // Normal input
+            inputDir = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
+        }
+
         Vector3 direction = (_cameraGimbal.Transform.Basis * new Vector3(inputDir.X, 0, inputDir.Y)).Normalized();
         float speed = Input.IsActionPressed("sprint") ? RunSpeed : WalkSpeed;
 
@@ -162,12 +179,11 @@ public partial class Player : CharacterBody3D
             velocity.X = direction.X * speed;
             velocity.Z = direction.Z * speed;
 
-            // Only apply manual rotation if we are NOT in the turn animation (which uses root motion)
             bool isTurning = _stateMachine != null && _stateMachine.GetCurrentNode() == "Turn";
             if (!isTurning)
             {
                 float targetAngle = Mathf.Atan2(-direction.X, -direction.Z);
-                Rotation = new Vector3(0, Mathf.LerpAngle(Rotation.Y, targetAngle, TurnSpeed * (float)delta), 0);
+                Rotation = new Vector3(0, Mathf.LerpAngle(Rotation.Y, targetAngle, TurnSpeed * dt), 0);
             }
         }
         else
@@ -176,23 +192,23 @@ public partial class Player : CharacterBody3D
             velocity.Z = Mathf.MoveToward(Velocity.Z, 0, speed);
         }
 
+        // --- Slow down horizontal movement when inventory is open ---
+        velocity.X *= GameState.Instance.GameSpeed;
+        velocity.Z *= GameState.Instance.GameSpeed;
+
         Velocity = velocity;
         MoveAndSlide();
 
         // --- ANIMATION UPDATE ---
         if (_animTree != null)
         {
-            // Update speed parameter for locomotion blending
             _animTree.Set($"parameters/{_speedParam}", currentSpeed);
 
-            // Check for 180° turn while standing still
             bool isStandingStill = currentSpeed < 0.1f && IsOnFloor();
             if (isStandingStill && Input.IsActionJustPressed("turn_180"))
             {
-                // Trigger the turn animation (set boolean true)
                 _animTree.Set($"parameters/{_turnParam}", true);
 
-                // Get the length of the turn animation to reset the trigger later
                 if (_animPlayer != null && _animPlayer.HasAnimation("Turn180Right"))
                 {
                     float turnLength = _animPlayer.GetAnimation("Turn180Right").Length;
@@ -200,29 +216,28 @@ public partial class Player : CharacterBody3D
                 }
                 else
                 {
-                    _turnResetTimer.Start(0.5f); // fallback
+                    _turnResetTimer.Start(0.5f);
                 }
             }
         }
 
         // Camera transitions
-        UpdateCameraTransitions(delta);
-        UpdateLockOn(delta);
-        
+        UpdateCameraTransitions(dt);
+        UpdateLockOn(dt);
+
         // Eye tracking
         UpdateEyeTracker();
 
-
-        // Interaction raycast
+        // Interaction raycast (unchanged)
         if (PlayerCamera != null)
         {
             var spaceState = GetWorld3D().DirectSpaceState;
             Vector3 origin = PlayerCamera.GlobalPosition;
             Vector3 end = origin - PlayerCamera.GlobalTransform.Basis.Z * _interactDistance;
             var query = PhysicsRayQueryParameters3D.Create(origin, end);
-            query.CollisionMask = 2; // Items layer
-            query.CollideWithAreas = true;  // Allows hitting the InteractableItem (Area3D)
-            query.CollideWithBodies = true; // Allows hitting walls/floors (blocks line of sight)
+            query.CollisionMask = 2;
+            query.CollideWithAreas = true;
+            query.CollideWithBodies = true;
 
             var result = spaceState.IntersectRay(query);
 
@@ -231,10 +246,7 @@ public partial class Player : CharacterBody3D
             {
                 var collider = result["collider"].AsGodotObject();
                 if (collider is InteractableItem item)
-                {
                     newTarget = item;
-                    GD.Print($"Raycast hit: {item.Data.Name}");
-                }
             }
 
             if (newTarget != _currentInteractable)
@@ -243,16 +255,9 @@ public partial class Player : CharacterBody3D
                 if (_hud != null)
                 {
                     if (_currentInteractable != null)
-                    {
-                        // Use the world position tooltip
                         _hud.ShowTooltipAtWorldPosition($"Pick up {_currentInteractable.Data.Name}", _currentInteractable.GlobalPosition, "E");
-                        GD.Print($"Showing tooltip for {_currentInteractable.Data.Name}");
-                    }
                     else
-                    {
                         _hud.HideTooltip();
-                        GD.Print("Hiding tooltip");
-                    }
                 }
             }
 
@@ -265,10 +270,10 @@ public partial class Player : CharacterBody3D
         }
     }
 
-    private void UpdateCameraTransitions(double delta)
+    private void UpdateCameraTransitions(float dt)
     {
         float desiredLength = _isFirstPerson ? 0.0f : _targetZoom;
-        _springArm.SpringLength = Mathf.Lerp(_springArm.SpringLength, desiredLength, (float)delta * 8.0f);
+        _springArm.SpringLength = Mathf.Lerp(_springArm.SpringLength, desiredLength, dt * 8.0f);
 
         if (PlayerCamera != null)
         {
@@ -277,7 +282,7 @@ public partial class Player : CharacterBody3D
         }
     }
 
-    private void UpdateLockOn(double delta)
+    private void UpdateLockOn(float dt)
     {
         if (_isLockedOn && LockOnTarget != null)
         {
@@ -286,10 +291,10 @@ public partial class Player : CharacterBody3D
             float targetRotationY = Mathf.Atan2(-lookDirection.X, -lookDirection.Z);
             
             Vector3 currentRot = _cameraGimbal.Rotation;
-            currentRot.Y = Mathf.LerpAngle(currentRot.Y, targetRotationY, (float)delta * 8.0f);
+            currentRot.Y = Mathf.LerpAngle(currentRot.Y, targetRotationY, dt * 8.0f);
             _cameraGimbal.Rotation = currentRot;
             
-            _innerGimbal.Rotation = new Vector3(Mathf.LerpAngle(_innerGimbal.Rotation.X, 0, (float)delta * 3.0f), 0, 0);
+            _innerGimbal.Rotation = new Vector3(Mathf.LerpAngle(_innerGimbal.Rotation.X, 0, dt * 3.0f), 0, 0);
         }
     }
 

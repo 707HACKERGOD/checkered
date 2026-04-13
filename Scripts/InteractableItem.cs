@@ -45,7 +45,7 @@ public partial class InteractableItem : Area3D
         CollisionLayer = 2;  
         CollisionMask = 0;   // Not needed to detect other objects
 
-        GD.Print($"[Item] {Data.Name} spawned at {GlobalPosition} with layer {CollisionLayer}");
+        //GD.Print($"[Item] {Data.Name} spawned at {GlobalPosition} with layer {CollisionLayer}");
     }
 
     public override void _Process(double delta)
@@ -61,7 +61,11 @@ public partial class InteractableItem : Area3D
     public void Pickup()
     {
         GD.Print($"Picked up: {Data.Name}");
-        // TODO: Add to inventory
-        QueueFree();
+        var player = GetTree().Root.FindChild("Player", true, false);
+        var inventory = player?.GetNode<Inventory>("Inventory");
+        if (inventory != null && inventory.AddItem(Data))
+            QueueFree();
+        else
+            GD.PrintErr("Could not add item to inventory (maybe full)");
     }
 }

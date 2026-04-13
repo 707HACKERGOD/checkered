@@ -1,0 +1,34 @@
+[gd_scene format=3 uid="uid://d2wo6sobbk6du"]
+
+[ext_resource type="Theme" uid="uid://cvqanmwjxleoy" path="res://Scenes/UI/CheckeredTheme.tres" id="1_owa7q"]
+
+[node name="InventorySlot" type="Panel" unique_id=2025649404]
+custom_minimum_size = Vector2(60, 60)
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -30.0
+offset_top = -30.0
+offset_right = 30.0
+offset_bottom = 30.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_owa7q")
+
+[node name="CountLabel" type="Label" parent="." unique_id=1599729930]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="AbbreviationLabel" type="Label" parent="." unique_id=13075360]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2

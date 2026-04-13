@@ -1,0 +1,11 @@
+[gd_resource type="Theme" format=3 uid="uid://cvqanmwjxleoy"]
+
+[ext_resource type="FontFile" uid="uid://bjank7cbwgvfb" path="res://Assets/UI/PublicPixel-rv0pA.ttf" id="1_21lsk"]
+[ext_resource type="StyleBox" uid="uid://j12rm8fevqf4" path="res://Assets/UI/button_stylebox_flat.tres" id="1_mcbjh"]
+[ext_resource type="StyleBox" uid="uid://dkn44e1or56bo" path="res://Assets/UI/panel_stylebox_flat.tres" id="2_357bu"]
+
+[resource]
+default_font = ExtResource("1_21lsk")
+default_font_size = 25
+Button/styles/normal = ExtResource("1_mcbjh")
+Panel/styles/panel = ExtResource("2_357bu")

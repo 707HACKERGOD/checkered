@@ -7,6 +7,44 @@ public partial class WeatherManager : Node
     public WeatherState CurrentState { get; private set; } = WeatherState.Clear;
     public float GetRainAmount() => _currentRainVal;
 
+    // --- StringName cache (prevents GC allocations) ---
+    private static readonly StringName ParamGlobalTime          = "global_time";
+    private static readonly StringName ParamRainAmount          = "rain_amount";
+    private static readonly StringName ParamSnowAmount          = "snow_amount";
+    private static readonly StringName ParamIceAmount           = "ice_amount";
+    private static readonly StringName ParamWindDirection       = "wind_direction";
+    private static readonly StringName ParamWindStrength        = "wind_strength";
+    private static readonly StringName ParamPlayerPos           = "player_position";
+    private static readonly StringName ParamPlayerSpeed         = "player_speed";
+    private static readonly StringName ParamPlayerOnFloor       = "player_on_floor";
+    private static readonly StringName ParamLastFloorPos        = "last_floor_position";
+    private static readonly StringName ParamLastFloorTime       = "last_floor_time";
+    private static readonly StringName ParamGustMode            = "gust_mode";
+    private static readonly StringName ParamSpawnProgress       = "spawn_progress";
+    private static readonly StringName ParamDespawnProgress     = "despawn_progress";
+    private static readonly StringName ParamWindHistory         = "wind_history";
+    private static readonly StringName ParamWindHistoryDuration = "wind_history_duration";
+    private static readonly StringName ParamGroundHeight        = "ground_height";
+    private static readonly StringName ParamDoRecycle           = "do_recycle";
+    private static readonly StringName ParamIsSnow              = "is_snow";
+    private static readonly StringName ParamVisibilityProgress  = "visibility_progress";
+    private static readonly StringName ParamLeafTexture         = "leaf_texture";
+
+    // --- Cached materials (avoid per-frame interop) ---
+    private StandardMaterial3D _rainMaterialPass;
+    private ShaderMaterial     _rainProcessMaterial;
+    private StandardMaterial3D _rainSplashMaterialPass;
+    private ShaderMaterial     _rainSplashProcessMaterial;
+    private StandardMaterial3D _snowMaterialPass;
+    private ShaderMaterial     _snowProcessMaterial;
+    private ShaderMaterial     _canopyOverrideMaterial;
+    private ShaderMaterial     _canopySurfaceMaterial;
+
+    // --- Retry cooldown for ResolveReferences ---
+    private float _resolveRetryTimer = 0f;
+    private const float RESOLVE_RETRY_INTERVAL = 2.0f;
+
+    // --- Other ---
     [Export] private AudioStreamPlayer _thunderPlayer;      // Assign in inspector
     [Export] private AudioStream[] _thunderSounds;          // Array of thunder sounds
     [Export] private float _thunderDelayMin = 0.2f;         // Min delay after lightning
@@ -121,6 +159,9 @@ public partial class WeatherManager : Node
     private bool _isWindFrozenForTransition = false;
     private Vector3 _frozenWindDir;
 
+    // Optional: dictionary to track per-particle disable tweens (to fix timer accumulation)
+    //private Dictionary<GpuParticles3D, Tween> _disableTweens = new();
+
     public override void _EnterTree()
     {
         if (!_subscribed && TimeManager.Instance != null)
@@ -132,37 +173,33 @@ public partial class WeatherManager : Node
     public override void _Ready()
     {
         ResolveReferences();
+        CacheMaterials(); // <-- NEW: Cache materials once
+
         _rng.Randomize();
 
-        if (GustMaterial != null) GustMaterial = (ShaderMaterial)GustMaterial.Duplicate();
-
-        if (_rainParticles != null && _rainParticles.ProcessMaterial is ParticleProcessMaterial rainMat)
-            rainMat.CollisionMode = ParticleProcessMaterial.CollisionModeEnum.Disabled;
-        if (_snowParticles != null && _snowParticles.ProcessMaterial is ParticleProcessMaterial snowMat)
-            snowMat.CollisionMode = ParticleProcessMaterial.CollisionModeEnum.Disabled;
-
-        RenderingServer.GlobalShaderParameterSet("rain_amount", 0.0f);
-        RenderingServer.GlobalShaderParameterSet("snow_amount", 0.0f);
-        RenderingServer.GlobalShaderParameterSet("ice_amount", 0.0f);
-        RenderingServer.GlobalShaderParameterSet("wind_direction", new Vector3(0, 0, 0));
-        RenderingServer.GlobalShaderParameterSet("wind_strength", 0.0f);
-        RenderingServer.GlobalShaderParameterSet("player_on_floor", 1.0f);
-        RenderingServer.GlobalShaderParameterSet("last_floor_position", Vector3.Zero);
-        RenderingServer.GlobalShaderParameterSet("last_floor_time", 0.0f);
-        RenderingServer.GlobalShaderParameterSet("gust_mode", 0.0f);
+        // Use cached StringNames for initial shader sets
+        RenderingServer.GlobalShaderParameterSet(ParamRainAmount, 0.0f);
+        RenderingServer.GlobalShaderParameterSet(ParamSnowAmount, 0.0f);
+        RenderingServer.GlobalShaderParameterSet(ParamIceAmount, 0.0f);
+        RenderingServer.GlobalShaderParameterSet(ParamWindDirection, Vector3.Zero);
+        RenderingServer.GlobalShaderParameterSet(ParamWindStrength, 0.0f);
+        RenderingServer.GlobalShaderParameterSet(ParamPlayerOnFloor, 1.0f);
+        RenderingServer.GlobalShaderParameterSet(ParamLastFloorPos, Vector3.Zero);
+        RenderingServer.GlobalShaderParameterSet(ParamLastFloorTime, 0.0f);
+        RenderingServer.GlobalShaderParameterSet(ParamGustMode, 0.0f);
 
         if (TimeManager.Instance != null)
         {
             _currentSeason = TimeManager.Instance.CurrentSeason;
             _isAutumn = _currentSeason == Season.AUTUMN;
             float targetSpawn = _isAutumn ? 1.0f : 0.0f;
-            RenderingServer.GlobalShaderParameterSet("spawn_progress", targetSpawn);
+            RenderingServer.GlobalShaderParameterSet(ParamSpawnProgress, targetSpawn);
         }
         else
         {
-            RenderingServer.GlobalShaderParameterSet("spawn_progress", 0.0f);
+            RenderingServer.GlobalShaderParameterSet(ParamSpawnProgress, 0.0f);
         }
-        RenderingServer.GlobalShaderParameterSet("despawn_progress", 0.0f);
+        RenderingServer.GlobalShaderParameterSet(ParamDespawnProgress, 0.0f);
 
         SetManualWind(Vector3.Zero);
 
@@ -198,28 +235,53 @@ public partial class WeatherManager : Node
         ChangeWeather(WeatherState.Clear, true);
         UpdateCanopyLeavesState();
 
-        // Initialize wind direction with a random angle and set target accordingly
         _targetWindAngle = (float)GD.RandRange(0, Mathf.Tau);
         _currentWindAngle = _targetWindAngle;
         _targetWindVelocity = new Vector3(Mathf.Cos(_targetWindAngle), 0, Mathf.Sin(_targetWindAngle)) * 0.0f;
         _currentWindVelocity = _targetWindVelocity;
 
-        // Schedule first angle change
         ScheduleNextAngleChange();
 
-        // --- NEW: Initialize wind history texture ---
         _windHistoryImage = Image.CreateEmpty(_windHistorySize, 1, false, Image.Format.Rgbaf);
         _windHistoryTexture = ImageTexture.CreateFromImage(_windHistoryImage);
 
-        // Fill with initial calm values
         for (int i = 0; i < _windHistorySize; i++)
         {
             _windHistoryImage.SetPixel(i, 0, new Color(0, 0, 0, 0));
         }
         _windHistoryTexture.Update(_windHistoryImage);
 
-        RenderingServer.GlobalShaderParameterSet("wind_history", _windHistoryTexture);
-        RenderingServer.GlobalShaderParameterSet("wind_history_duration", _windHistoryDuration);
+        RenderingServer.GlobalShaderParameterSet(ParamWindHistory, _windHistoryTexture);
+        RenderingServer.GlobalShaderParameterSet(ParamWindHistoryDuration, _windHistoryDuration);
+    }
+
+    // -------------------------------------------------------------------------
+    // NEW: Cache materials to avoid per-frame interop
+    // -------------------------------------------------------------------------
+    private void CacheMaterials()
+    {
+        if (_rainParticles != null)
+        {
+            _rainMaterialPass = _rainParticles.DrawPass1?.SurfaceGetMaterial(0) as StandardMaterial3D;
+            _rainProcessMaterial = _rainParticles.ProcessMaterial as ShaderMaterial;
+        }
+        if (_rainSplashParticles != null)
+        {
+            _rainSplashMaterialPass = _rainSplashParticles.DrawPass1?.SurfaceGetMaterial(0) as StandardMaterial3D;
+            _rainSplashProcessMaterial = _rainSplashParticles.ProcessMaterial as ShaderMaterial;
+        }
+        if (_snowParticles != null)
+        {
+            _snowMaterialPass = _snowParticles.DrawPass1?.SurfaceGetMaterial(0) as StandardMaterial3D;
+            _snowProcessMaterial = _snowParticles.ProcessMaterial as ShaderMaterial;
+        }
+
+        // Cache canopy materials
+        if (_canopyLeaves != null)
+        {
+            _canopyOverrideMaterial = _canopyLeaves.MaterialOverride as ShaderMaterial;
+            _canopySurfaceMaterial = _canopyLeaves.Multimesh?.Mesh?.SurfaceGetMaterial(0) as ShaderMaterial;
+        }
     }
 
     private void ScheduleNextAngleChange()
@@ -234,24 +296,39 @@ public partial class WeatherManager : Node
         _isAutumn = _currentSeason == Season.AUTUMN;
 
         float targetSpawn = _isAutumn ? 1.0f : 0.0f;
-        RenderingServer.GlobalShaderParameterSet("spawn_progress", targetSpawn);
+        RenderingServer.GlobalShaderParameterSet(ParamSpawnProgress, targetSpawn);
 
         UpdateSeasonalLeafTexture();
         _subscribed = true;
-        GD.Print("WeatherManager subscribed to TimeManager");
+        //GD.Print("WeatherManager subscribed to TimeManager");
     }
 
+    // -------------------------------------------------------------------------
+    // OPTIMIZED: ResolveReferences only retries every few seconds if SkyMaterial missing
+    // -------------------------------------------------------------------------
     public override void _Process(double delta)
     {
+        float dt = (float)delta * GameState.Instance.GameSpeed;
         if (!_subscribed && TimeManager.Instance != null)
         {
             SubscribeToTimeManager();
         }
 
-        if (SkyMaterial == null) { ResolveReferences(); if (SkyMaterial == null) return; }
+        // FIXED: Only attempt resolve periodically, not every frame
+        if (SkyMaterial == null)
+        {
+            _resolveRetryTimer -= dt;
+            if (_resolveRetryTimer <= 0f)
+            {
+                ResolveReferences();
+                CacheMaterials(); // Re-cache materials after resolve
+                _resolveRetryTimer = RESOLVE_RETRY_INTERVAL;
+            }
+            return;
+        }
 
-        _internalTime += (float)delta;
-        RenderingServer.GlobalShaderParameterSet("global_time", _internalTime);
+        _internalTime += dt;
+        RenderingServer.GlobalShaderParameterSet(ParamGlobalTime, _internalTime);
 
         float sunProgress = 0.5f;
         if (TimeManager.Instance != null)
@@ -264,38 +341,32 @@ public partial class WeatherManager : Node
             dayFactor = Mathf.Sin(t * Mathf.Pi);
         }
 
-        // --- WIND SCHEDULE (only if not manually overridden and not frozen) ---
         if (!_manualWindOverride && !_isWindFrozenForTransition)
-            UpdateWindSchedule((float)delta);
+            UpdateWindSchedule(dt);
 
-        // --- SMOOTH WIND ANGLE ---
         if (!_isWindFrozenForTransition)
         {
-            _currentWindAngle = Mathf.LerpAngle(_currentWindAngle, _targetWindAngle, (float)delta * _windAngleSmoothSpeed);
-            // Reconstruct wind vector using the smoothed angle and target strength (which is already smoothed in velocity)
+            _currentWindAngle = Mathf.LerpAngle(_currentWindAngle, _targetWindAngle, dt * _windAngleSmoothSpeed);
             float targetStrength = _targetWindVelocity.Length();
             Vector3 windVec = new Vector3(Mathf.Cos(_currentWindAngle), 0, Mathf.Sin(_currentWindAngle)) * targetStrength;
-            _targetWindVelocity = windVec; // Keep magnitude, but ensure direction matches smoothed angle
+            _targetWindVelocity = windVec;
         }
 
-        // --- SMOOTH WIND VELOCITY ---
-        _currentWindVelocity = _currentWindVelocity.Lerp(_targetWindVelocity, (float)delta * _windSmoothSpeed);
-        RenderingServer.GlobalShaderParameterSet("wind_direction", _currentWindVelocity);
-        RenderingServer.GlobalShaderParameterSet("wind_strength", _currentWindVelocity.Length());
+        _currentWindVelocity = _currentWindVelocity.Lerp(_targetWindVelocity, dt * _windSmoothSpeed);
+        RenderingServer.GlobalShaderParameterSet(ParamWindDirection, _currentWindVelocity);
+        RenderingServer.GlobalShaderParameterSet(ParamWindStrength, _currentWindVelocity.Length());
 
-        // --- WIND FREEZE OVERRIDE ---
         if (_isWindFrozenForTransition)
         {
             _currentWindVelocity = _frozenWindDir;
             _targetWindVelocity = _frozenWindDir;
-            RenderingServer.GlobalShaderParameterSet("wind_direction", _currentWindVelocity);
-            RenderingServer.GlobalShaderParameterSet("wind_strength", _currentWindVelocity.Length());
+            RenderingServer.GlobalShaderParameterSet(ParamWindDirection, _currentWindVelocity);
+            RenderingServer.GlobalShaderParameterSet(ParamWindStrength, _currentWindVelocity.Length());
         }
 
-        // --- PERIODIC WIND ANGLE CHANGE ---
         if (!_manualWindOverride && !_isWindFrozenForTransition)
         {
-            _nextAngleChangeTimer -= (float)delta;
+            _nextAngleChangeTimer -= dt;
             while (_nextAngleChangeTimer <= 0)
             {
                 UpdateTargetWindAngle();
@@ -303,26 +374,22 @@ public partial class WeatherManager : Node
             }
         }
 
-        // --- NEW: Update wind history texture ---
-        _windHistoryTimer += (float)delta;
+        _windHistoryTimer += dt;
         while (_windHistoryTimer >= _windHistoryInterval)
         {
             _windHistoryTimer -= _windHistoryInterval;
             WriteWindSample();
         }
 
-        // --- UPDATE CANOPY LEAVES BASED ON CURRENT WIND ---
         UpdateCanopyLeavesState();
 
-        // Update gust mode globally
         float targetGust = (CurrentState == WeatherState.Storm || _currentWindVelocity.Length() > 10.0f) ? 1.0f : 0.0f;
-        _currentGustMode = Mathf.Lerp(_currentGustMode, targetGust, (float)delta * 2.0f);
-        RenderingServer.GlobalShaderParameterSet("gust_mode", _currentGustMode);
+        _currentGustMode = Mathf.Lerp(_currentGustMode, targetGust, dt * 2.0f);
+        RenderingServer.GlobalShaderParameterSet(ParamGustMode, _currentGustMode);
 
-        // --- LIGHTNING ---
         if (CurrentState == WeatherState.Storm)
         {
-            _lightningTimer -= (float)delta;
+            _lightningTimer -= dt;
             if (_lightningTimer <= 0.0f)
             {
                 TriggerLightning();
@@ -332,19 +399,18 @@ public partial class WeatherManager : Node
 
         if (_skyFlashIntensity > 0.0f)
         {
-            _skyFlashIntensity -= (float)delta * 5.0f;
+            _skyFlashIntensity -= dt * 5.0f;
             if (_skyFlashIntensity < 0.0f) _skyFlashIntensity = 0.0f;
             if (IsInstanceValid(SkyMaterial))
                 SkyMaterial.SetShaderParameter("lightning_strength", _skyFlashIntensity);
         }
 
-        // --- PARTICLE TINT ---
         float brightness = Mathf.Lerp(0.1f, 1.0f, dayFactor);
 
         if (IsInstanceValid(_player))
         {
             float groundY = _player.GlobalPosition.Y;
-            RenderingServer.GlobalShaderParameterSet("player_position", _player.GlobalPosition);
+            RenderingServer.GlobalShaderParameterSet(ParamPlayerPos, _player.GlobalPosition);
 
             float speed = 0.0f;
             bool onFloor = false;
@@ -368,22 +434,23 @@ public partial class WeatherManager : Node
                 onFloor = true;
             }
 
-            RenderingServer.GlobalShaderParameterSet("player_speed", speed);
-            RenderingServer.GlobalShaderParameterSet("player_on_floor", onFloor ? 1.0f : 0.0f);
+            RenderingServer.GlobalShaderParameterSet(ParamPlayerSpeed, speed);
+            RenderingServer.GlobalShaderParameterSet(ParamPlayerOnFloor, onFloor ? 1.0f : 0.0f);
 
-            SetShaderParam(_rainParticles, "ground_height", groundY);
-            SetShaderParam(_rainSplashParticles, "ground_height", groundY);
-            SetShaderParam(_snowParticles, "ground_height", groundY);
+            // Optimized helpers using cached materials
+            SetShaderParameter(_rainParticles, _rainProcessMaterial, ParamGroundHeight, groundY);
+            SetShaderParameter(_rainSplashParticles, _rainSplashProcessMaterial, ParamGroundHeight, groundY);
+            SetShaderParameter(_snowParticles, _snowProcessMaterial, ParamGroundHeight, groundY);
 
             if (IsInstanceValid(_rainParticles))
             {
                 float rainBright = Mathf.Max(brightness, 0.2f);
-                SetMaterialAlbedo(_rainParticles, new Color(rainBright, rainBright, rainBright, 1.0f));
+                SetMaterialAlbedo(_rainParticles, _rainMaterialPass, new Color(rainBright, rainBright, rainBright, 1.0f));
             }
             if (IsInstanceValid(_rainSplashParticles))
-                SetMaterialAlbedo(_rainSplashParticles, new Color(brightness, brightness, brightness, 1.0f));
+                SetMaterialAlbedo(_rainSplashParticles, _rainSplashMaterialPass, new Color(brightness, brightness, brightness, 1.0f));
             if (IsInstanceValid(_snowParticles))
-                SetMaterialAlbedo(_snowParticles, new Color(brightness, brightness, brightness, 1.0f));
+                SetMaterialAlbedo(_snowParticles, _snowMaterialPass, new Color(brightness, brightness, brightness, 1.0f));
 
             if (cb != null)
             {
@@ -391,14 +458,13 @@ public partial class WeatherManager : Node
                 if (!currentOnFloor && _lastPlayerOnFloor)
                 {
                     _lastFloorPos = cb.GlobalPosition;
-                    RenderingServer.GlobalShaderParameterSet("last_floor_position", _lastFloorPos);
-                    RenderingServer.GlobalShaderParameterSet("last_floor_time", _internalTime);
+                    RenderingServer.GlobalShaderParameterSet(ParamLastFloorPos, _lastFloorPos);
+                    RenderingServer.GlobalShaderParameterSet(ParamLastFloorTime, _internalTime);
                 }
                 _lastPlayerOnFloor = currentOnFloor;
             }
         }
 
-        // --- SKY COLORS ---
         if (IsInstanceValid(SkyMaterial) && TimeManager.Instance != null)
         {
             SeasonPalette activePalette = _springSky;
@@ -430,7 +496,6 @@ public partial class WeatherManager : Node
             }
         }
 
-        // --- FOG LIGHTING ---
         if (IsInstanceValid(_worldEnv) && _worldEnv.Environment != null)
         {
             float minNightBrightness = 0.02f;
@@ -440,14 +505,13 @@ public partial class WeatherManager : Node
             _worldEnv.Environment.VolumetricFogAlbedo = _currentFogBaseColor * finalBrightness;
         }
 
-        // --- CLOUD MOVEMENT (uses smoothed wind) ---
         if (IsInstanceValid(SkyMaterial))
         {
             Vector3 windForClouds = _currentWindVelocity;
             Vector2 baseWind = new Vector2(windForClouds.X, windForClouds.Z) * 0.5f;
             Vector2 driftWind = new Vector2(2.0f, 0.0f);
             Vector2 finalCloudVelocity = baseWind + driftWind;
-            Vector2 windDelta = finalCloudVelocity * (float)delta * 0.0125f;
+            Vector2 windDelta = finalCloudVelocity * dt * 0.0125f;
 
             _currentCloudOffset += windDelta;
             if (_currentCloudOffset.X > 100.0f) _currentCloudOffset.X -= 100.0f;
@@ -460,8 +524,21 @@ public partial class WeatherManager : Node
     }
 
     // -------------------------------------------------------------------------
-    // NEW: Determine target wind angle based on season, time of day, randomness
+    // OPTIMIZED HELPERS (use cached materials)
     // -------------------------------------------------------------------------
+    private void SetShaderParameter(GpuParticles3D particles, ShaderMaterial cachedMat, StringName param, Variant val)
+    {
+        if (cachedMat != null)
+            cachedMat.SetShaderParameter(param, val);
+    }
+
+    private void SetMaterialAlbedo(GpuParticles3D particles, StandardMaterial3D cachedMat, Color color)
+    {
+        if (cachedMat != null)
+            cachedMat.AlbedoColor = color;
+    }
+
+    // --- Determine target wind angle based on season, time of day, randomness ---
     private void UpdateTargetWindAngle()
     {
         float baseAngle;
@@ -718,7 +795,7 @@ public partial class WeatherManager : Node
     private void SetCanopyVisibilityProgress(float v)
     {
         if (!IsInstanceValid(_canopyLeaves)) return;
-        SetMultiMeshShaderParam(_canopyLeaves, "visibility_progress", v);
+        SetMultiMeshShaderParam(ParamVisibilityProgress, v);
     }
 
     private float GetCanopyVisibilityProgress()
@@ -766,15 +843,15 @@ public partial class WeatherManager : Node
         // If a transition is already in progress, ignore this call completely
         if (_isTransitioning)
         {
-            GD.Print("WeatherManager: Ignoring season change because transition in progress");
+            //GD.Print("WeatherManager: Ignoring season change because transition in progress");
             return;
         }
 
-        GD.Print($"WeatherManager.OnDayChanged: newSeason={seasonVal}, currentSeason={_currentSeason}");
+        //GD.Print($"WeatherManager.OnDayChanged: newSeason={seasonVal}, currentSeason={_currentSeason}");
 
         if (newSeason == Season.AUTUMN && _currentSeason == Season.SUMMER)
         {
-            GD.Print("  --> Summer -> Autumn: AnimateLeavesIn()");
+            //GD.Print("  --> Summer -> Autumn: AnimateLeavesIn()");
             _isAutumn = true;
             // Reset autumn cycle counters so the pattern repeats every year
             _autumnCycleCount = 0;
@@ -784,7 +861,7 @@ public partial class WeatherManager : Node
         }
         else if (newSeason == Season.WINTER && _currentSeason == Season.AUTUMN)
         {
-            GD.Print("  --> Autumn -> Winter: AnimateLeavesOut()");
+            //GD.Print("  --> Autumn -> Winter: AnimateLeavesOut()");
             _isAutumn = false;
             AnimateLeavesOut();
         }
@@ -858,7 +935,7 @@ public partial class WeatherManager : Node
         _isTransitioning = true;
         _currentTransitionTween = CreateTween();
         _currentTransitionTween.TweenMethod(
-            Callable.From<float>(v => RenderingServer.GlobalShaderParameterSet("spawn_progress", v)),
+            Callable.From<float>(v => RenderingServer.GlobalShaderParameterSet(ParamSpawnProgress, v)),
             0.0f, 1.0f, 5.0f
         );
         _currentTransitionTween.TweenCallback(Callable.From(() =>
@@ -890,13 +967,13 @@ public partial class WeatherManager : Node
         _isTransitioning = true;
         _currentTransitionTween = CreateTween();
         _currentTransitionTween.TweenMethod(
-            Callable.From<float>(v => RenderingServer.GlobalShaderParameterSet("despawn_progress", v)),
+            Callable.From<float>(v => RenderingServer.GlobalShaderParameterSet(ParamDespawnProgress, v)),
             0.0f, 1.0f, 5.0f
         );
         _currentTransitionTween.TweenCallback(Callable.From(() =>
         {
-            RenderingServer.GlobalShaderParameterSet("spawn_progress", 0.0f);
-            RenderingServer.GlobalShaderParameterSet("despawn_progress", 0.0f);
+            RenderingServer.GlobalShaderParameterSet(ParamSpawnProgress, 0.0f);
+            RenderingServer.GlobalShaderParameterSet(ParamDespawnProgress, 0.0f);
             _isTransitioning = false;
             _isWindFrozenForTransition = false;
             if (wasAuto)
@@ -994,15 +1071,15 @@ public partial class WeatherManager : Node
         if (IsInstanceValid(_rainParticles))
         {
             SetParticlesActive(_rainParticles, isRaining);
-            SetShaderParam(_rainParticles, "do_recycle", isRaining ? 1.0f : 0.0f);
+            SetShaderParameter(_rainParticles, _rainProcessMaterial, ParamDoRecycle, isRaining ? 1.0f : 0.0f);
         }
         if (IsInstanceValid(_rainSplashParticles))
             SetParticlesActive(_rainSplashParticles, isRaining);
         if (IsInstanceValid(_snowParticles))
         {
             SetParticlesActive(_snowParticles, isSnowing);
-            SetShaderParam(_snowParticles, "is_snow", 1.0f);
-            SetShaderParam(_snowParticles, "do_recycle", isSnowing ? 1.0f : 0.0f);
+            SetShaderParameter(_snowParticles, _snowProcessMaterial, ParamIsSnow, 1.0f);
+            SetShaderParameter(_snowParticles, _snowProcessMaterial, ParamDoRecycle, isSnowing ? 1.0f : 0.0f);
         }
 
         if (_activeTween != null && _activeTween.IsValid()) _activeTween.Kill();
@@ -1010,11 +1087,11 @@ public partial class WeatherManager : Node
         if (immediate)
         {
             _currentRainVal = targetRain;
-            RenderingServer.GlobalShaderParameterSet("rain_amount", targetRain);
+            RenderingServer.GlobalShaderParameterSet(ParamRainAmount, targetRain);
             _currentSnowVal = targetSnow;
-            RenderingServer.GlobalShaderParameterSet("snow_amount", targetSnow);
+            RenderingServer.GlobalShaderParameterSet(ParamSnowAmount, targetSnow);
             _currentIceVal = targetIce;
-            RenderingServer.GlobalShaderParameterSet("ice_amount", targetIce);
+            RenderingServer.GlobalShaderParameterSet(ParamIceAmount, targetIce);
             _currentGreySkyTint = targetGreyTint;
             _currentFogBaseColor = targetFogColor;
 
@@ -1037,13 +1114,13 @@ public partial class WeatherManager : Node
             _activeTween = CreateTween();
             _activeTween.SetParallel(true);
             _activeTween.TweenMethod(
-                Callable.From<float>(v => { _currentRainVal = v; RenderingServer.GlobalShaderParameterSet("rain_amount", v); }),
+                Callable.From<float>(v => { _currentRainVal = v; RenderingServer.GlobalShaderParameterSet(ParamRainAmount, v); }),
                 _currentRainVal, targetRain, 8.0f);
             _activeTween.TweenMethod(
-                Callable.From<float>(v => { _currentSnowVal = v; RenderingServer.GlobalShaderParameterSet("snow_amount", v); }),
+                Callable.From<float>(v => { _currentSnowVal = v; RenderingServer.GlobalShaderParameterSet(ParamSnowAmount, v); }),
                 _currentSnowVal, targetSnow, 8.0f);
             _activeTween.TweenMethod(
-                Callable.From<float>(v => { _currentIceVal = v; RenderingServer.GlobalShaderParameterSet("ice_amount", v); }),
+                Callable.From<float>(v => { _currentIceVal = v; RenderingServer.GlobalShaderParameterSet(ParamIceAmount, v); }),
                 _currentIceVal, targetIce, 8.0f);
             _activeTween.TweenMethod(
                 Callable.From<float>(v => _currentGreySkyTint = v),
@@ -1110,26 +1187,12 @@ public partial class WeatherManager : Node
         }
     }
 
-    private void SetShaderParam(Node node, string param, Variant val)
+    private void SetMultiMeshShaderParam(StringName param, Variant val)
     {
-        if (node is GpuParticles3D p && p.ProcessMaterial is ShaderMaterial sm)
-            sm.SetShaderParameter(param, val);
-    }
-
-    private void SetMultiMeshShaderParam(MultiMeshInstance3D mm, string param, Variant val)
-    {
-        if (mm.MaterialOverride is ShaderMaterial overrideMat)
-            overrideMat.SetShaderParameter(param, val);
-        else if (mm.Multimesh?.Mesh?.SurfaceGetMaterial(0) is ShaderMaterial surfaceMat)
-            surfaceMat.SetShaderParameter(param, val);
-    }
-
-    private void SetMaterialAlbedo(GpuParticles3D particles, Color color)
-    {
-        if (particles.DrawPass1?.SurfaceGetMaterial(0) is StandardMaterial3D stdMat)
-        { stdMat.AlbedoColor = color; return; }
-        if (particles.MaterialOverride is StandardMaterial3D overrideMat)
-            overrideMat.AlbedoColor = color;
+        if (_canopyOverrideMaterial != null)
+            _canopyOverrideMaterial.SetShaderParameter(param, val);
+        else if (_canopySurfaceMaterial != null)
+            _canopySurfaceMaterial.SetShaderParameter(param, val);
     }
 
     private void ResolveReferences()

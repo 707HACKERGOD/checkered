@@ -40,12 +40,24 @@ public partial class FoliageGenerator : Node3D
     
     [Export] private float _maxFallHeight = 50.0f;
 
+    // Chunk visibility distance (hard pop at this range)
+    [Export] private float _chunkVisibilityRange = 40.0f;
+
     [ExportCategory("Editor Actions")]
     [Export] private bool _generateVisuals = false;
     [Export] private bool _clearVisuals = false;
 
+    private struct LeafData
+    {
+        public Transform3D Transform;
+        public Color Color;
+    }
+
+    private Dictionary<Vector2I, List<LeafData>> leafChunks = new();
+    private float chunkSize = 30.0f;
+
     private Rid _staticBodyRid;
-    private List<float> _successfulGroundHeights = new List<float>();
+    private List<float> _successfulGroundHeights = new();
 
     public override void _Ready()
     {
@@ -101,22 +113,18 @@ public partial class FoliageGenerator : Node3D
     private void ClearFoliage()
     {
         GD.Print("--- FoliageGenerator: ClearFoliage() called ---");
-        if (_groundLeafTarget != null)
-        {
-            _groundLeafTarget.Multimesh = null;
-            GD.Print("  Cleared Ground layer");
-        }
-        if (_gustLeafTarget != null)
-        {
-            _gustLeafTarget.Multimesh = null;
-            GD.Print("  Cleared Gust layer");
-        }
-        if (_canopyLeafTarget != null)
-        {
-            _canopyLeafTarget.Multimesh = null;
-            GD.Print("  Cleared Canopy layer");
-        }
+        ClearLayerChildren(_groundLeafTarget);
+        ClearLayerChildren(_gustLeafTarget);
+        ClearLayerChildren(_canopyLeafTarget);
         GD.Print("FoliageGenerator: Foliage Cleared.");
+    }
+
+    private void ClearLayerChildren(MultiMeshInstance3D target)
+    {
+        if (target == null) return;
+        foreach (Node child in target.GetChildren())
+            child.QueueFree();
+        target.Multimesh = null;
     }
 
     private void GenerateFoliage()
@@ -164,7 +172,7 @@ public partial class FoliageGenerator : Node3D
             return;
         }
 
-        // --- SAFE MATERIAL HANDLING: duplicate and set as override ---
+        // Duplicate the material so each chunk gets its own instance (no cross‑chunk interference)
         ShaderMaterial materialToUse = null;
         Material meshMaterial = mesh.SurfaceGetMaterial(0);
         if (meshMaterial is ShaderMaterial sm)
@@ -178,25 +186,20 @@ public partial class FoliageGenerator : Node3D
             return;
         }
 
-        target.MaterialOverride = materialToUse;
+        // Clear any existing chunk children
+        foreach (Node child in target.GetChildren())
+            child.QueueFree();
+        
+        leafChunks.Clear();
 
-        // --- Build the MultiMesh ---
-        MultiMesh newMM = new MultiMesh();
-        newMM.TransformFormat = MultiMesh.TransformFormatEnum.Transform3D;
-        newMM.UseColors = true; 
-        newMM.Mesh = mesh;
-        newMM.InstanceCount = treeMM.InstanceCount * countPerTree;
-        newMM.VisibleInstanceCount = -1;
-
-        int idx = 0;
-        RandomNumberGenerator rng = new RandomNumberGenerator();
+        RandomNumberGenerator rng = new();
         rng.Randomize();
         var spaceState = GetWorld3D().DirectSpaceState;
 
         int hitCount = 0, missCount = 0, upHitCount = 0;
         _successfulGroundHeights.Clear();
 
-        // First pass: collect all successful ground heights to compute average
+        // First pass: average ground height (for misses)
         for (int i = 0; i < treeMM.InstanceCount; i++)
         {
             Transform3D treeTrans = treeMM.GetInstanceTransform(i);
@@ -214,11 +217,10 @@ public partial class FoliageGenerator : Node3D
                 offset += manualOffset;
                 Vector3 worldPos = treeWorldPos + offset; 
 
-                // Raycast
                 Vector3 rayFrom = new Vector3(worldPos.X, worldPos.Y + 50.0f, worldPos.Z); 
                 Vector3 rayTo = new Vector3(worldPos.X, worldPos.Y - 100.0f, worldPos.Z);
                 var query = PhysicsRayQueryParameters3D.Create(rayFrom, rayTo);
-                query.CollisionMask = 2; // ground layer
+                query.CollisionMask = 2;
 
                 float groundY;
                 var result = spaceState.IntersectRay(query);
@@ -243,13 +245,11 @@ public partial class FoliageGenerator : Node3D
                     else
                     {
                         missCount++;
-                        // Do not add to successful list; will handle later
                     }
                 }
             }
         }
 
-        // Compute average ground height from successful hits
         float avgGroundY = 0f;
         if (_successfulGroundHeights.Count > 0)
         {
@@ -260,13 +260,12 @@ public partial class FoliageGenerator : Node3D
         }
         else
         {
-            avgGroundY = 0f; // fallback
+            avgGroundY = 0f;
             GD.Print("  No successful raycasts – using fallback height 0");
         }
 
-        // Second pass: actually place instances, using average for misses
+        // Second pass: create transforms and store by chunk
         hitCount = 0; missCount = 0; upHitCount = 0;
-        int sampleIdx = 0;
         for (int i = 0; i < treeMM.InstanceCount; i++)
         {
             Transform3D treeTrans = treeMM.GetInstanceTransform(i);
@@ -284,11 +283,10 @@ public partial class FoliageGenerator : Node3D
                 offset += manualOffset;
                 Vector3 worldPos = treeWorldPos + offset; 
 
-                // Raycast
                 Vector3 rayFrom = new Vector3(worldPos.X, worldPos.Y + 50.0f, worldPos.Z); 
                 Vector3 rayTo = new Vector3(worldPos.X, worldPos.Y - 100.0f, worldPos.Z);
                 var query = PhysicsRayQueryParameters3D.Create(rayFrom, rayTo);
-                query.CollisionMask = 2; // ground layer
+                query.CollisionMask = 2;
 
                 float groundY;
                 var result = spaceState.IntersectRay(query);
@@ -311,7 +309,6 @@ public partial class FoliageGenerator : Node3D
                     else
                     {
                         missCount++;
-                        // Use average ground height as fallback
                         groundY = avgGroundY;
                     }
                 }
@@ -320,35 +317,67 @@ public partial class FoliageGenerator : Node3D
                 if (snapToGround) worldPos.Y = groundY;
                 if (fallDistance < 0) fallDistance = 0;
 
-                // Pack fall distance into color
                 float normalizedHeight = Mathf.Clamp(fallDistance / _maxFallHeight, 0.0f, 1.0f);
                 float r = Mathf.Floor(normalizedHeight * 255.0f) / 255.0f;
                 float g = (normalizedHeight - r) * 255.0f;
-                newMM.SetInstanceColor(idx, new Color(r, g, 0, 1));
+                Color leafColor = new Color(r, g, 0, 1);
 
-                Transform3D t = new Transform3D(Basis.Identity, Vector3.Zero);
-                t = t.Rotated(Vector3.Up, rng.RandfRange(0, Mathf.Tau));
-                if (!fullRotation) t = t.Rotated(Vector3.Right, rng.RandfRange(-0.1f, 0.1f));
-                
+                Transform3D leafTransform = new Transform3D(Basis.Identity, Vector3.Zero);
+                leafTransform = leafTransform.Rotated(Vector3.Up, rng.RandfRange(0, Mathf.Tau));
+                if (!fullRotation) leafTransform = leafTransform.Rotated(Vector3.Right, rng.RandfRange(-0.1f, 0.1f));
                 float s = rng.RandfRange(scaleBase * 0.8f, scaleBase * 1.2f);
-                t = t.Scaled(Vector3.One * s);
-                Vector3 localPos = target.ToLocal(worldPos);
-                t.Origin = localPos;
-                
-                newMM.SetInstanceTransform(idx, t);
+                leafTransform = leafTransform.Scaled(Vector3.One * s);
+                leafTransform.Origin = worldPos;
 
-                if (sampleIdx < 3 && i < 2 && j < 2)
-                {
-                    GD.Print($"    Sample leaf {idx}: worldPos={worldPos:F2}, groundY={groundY:F2}, snap={snapToGround}, localPos={localPos:F2}, scale={s:F2}");
-                    sampleIdx++;
-                }
+                int gridX = Mathf.FloorToInt(worldPos.X / chunkSize);
+                int gridZ = Mathf.FloorToInt(worldPos.Z / chunkSize);
+                Vector2I gridKey = new Vector2I(gridX, gridZ);
 
-                idx++;
+                if (!leafChunks.ContainsKey(gridKey))
+                    leafChunks[gridKey] = new List<LeafData>();
+
+                leafChunks[gridKey].Add(new LeafData { Transform = leafTransform, Color = leafColor });
             }
         }
 
-        target.Multimesh = newMM;
-        
-        GD.Print($"  << SpawnLayer finished: total={idx}, hits={hitCount}, upHits={upHitCount}, misses={missCount}");
+        // Build chunk nodes
+        foreach (var kvp in leafChunks)
+        {
+            Vector2I gridKey = kvp.Key;
+            var leafDataList = kvp.Value;
+
+            MultiMeshInstance3D chunkNode = new MultiMeshInstance3D();
+            chunkNode.Name = $"Chunk_{gridKey.X}_{gridKey.Y}";
+
+            // Hard pop – no fade
+            chunkNode.VisibilityRangeBegin = 0.0f;
+            chunkNode.VisibilityRangeEnd = _chunkVisibilityRange;
+            chunkNode.VisibilityRangeFadeMode = GeometryInstance3D.VisibilityRangeFadeModeEnum.Disabled;
+
+            target.AddChild(chunkNode);
+            if (Engine.IsEditorHint())
+                chunkNode.Owner = GetTree().EditedSceneRoot;
+
+            chunkNode.MaterialOverride = materialToUse;
+
+            MultiMesh mm = new MultiMesh();
+            mm.TransformFormat = MultiMesh.TransformFormatEnum.Transform3D;
+            mm.UseColors = true;
+            mm.Mesh = mesh;
+            mm.InstanceCount = leafDataList.Count;
+
+            for (int k = 0; k < leafDataList.Count; k++)
+            {
+                LeafData data = leafDataList[k];
+                Transform3D t = data.Transform;
+                t.Origin = chunkNode.ToLocal(t.Origin);
+                mm.SetInstanceTransform(k, t);
+                mm.SetInstanceColor(k, data.Color);
+            }
+
+            chunkNode.Multimesh = mm;
+        }
+
+        GD.Print($"  << SpawnLayer finished: trees={treeMM.InstanceCount}, chunks={leafChunks.Count}, hits={hitCount}, upHits={upHitCount}, misses={missCount}");
     }
 }
