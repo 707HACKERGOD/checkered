@@ -1,3 +1,5 @@
+![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-19%20153814.png)
+
 [![Download Latest Release](https://img.shields.io/badge/Download-Latest%20Release-blue?style=for-the-badge)](https://github.com/707HACKERGOD/checkered/releases/latest)
 
 Checkered (wip title) is a Godot 3d open world game where you are an immortal cursed cryptid infiltrating a trade school.
