@@ -1,5 +1,3 @@
-## Download Latest Build
-
 [![Download Latest Release](https://img.shields.io/badge/Download-Latest%20Release-blue?style=for-the-badge)](https://github.com/707HACKERGOD/checkered/releases/latest)
 
 =======
