@@ -1,16 +1,9 @@
 [gd_scene format=3 uid="uid://br73uwst3utn0"]
 
-[ext_resource type="Shader" uid="uid://1tki0nktolop" path="res://Shaders/FlyingLeaves.gdshader" id="1_igmao"]
 [ext_resource type="ArrayMesh" uid="uid://kehnlnekp6q0" path="res://Assets/leaf_pile_leaves_1_arraymesh.tres" id="2_44su0"]
-[ext_resource type="Script" uid="uid://bu8h0ob5u5t0f" path="res://Shaders/PlayerFoliage.cs" id="3_35sxm"]
+[ext_resource type="Script" uid="uid://3cbnpjhl344" path="res://Shaders/PlayerFoliage.cs" id="3_35sxm"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_gntrk"]
-shader = ExtResource("1_igmao")
-shader_parameter/spread_radius = 2.0
-shader_parameter/wind_vector = Vector3(1, 0, 0)
-shader_parameter/spawn_mode = 0
-shader_parameter/fall_box_size = Vector3(40, 10, 40)
-shader_parameter/ground_height = 0.0
 
 [node name="LeafParticles" type="GPUParticles3D" unique_id=1709483706]
 emitting = false

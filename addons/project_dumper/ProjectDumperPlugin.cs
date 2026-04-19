@@ -1,3 +1,4 @@
+#if TOOLS
 using Godot;
 using System.Text;
 using System.Collections.Generic;
@@ -181,3 +182,4 @@ public partial class ProjectDumperPlugin : EditorPlugin
         return file.GetAsText();
     }
 }
+#endif

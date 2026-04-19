@@ -35,10 +35,6 @@ runtime/advanced/uses_dotnet=true
 
 project/assembly_name="Checkered"
 
-[editor_plugins]
-
-enabled=PackedStringArray("res://addons/project_dumper/plugin.cfg")
-
 [global_group]
 
 Player=""
