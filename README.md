@@ -23,14 +23,14 @@ Demo:
 - ✅ Day/Night cycle
 - ✅ Weather system that's fully tied to a wind vector
 - ✅ 4 seasons with different day lengths, special effects and sky colors
-- 🚧 Inventory UI, crafting UI, picking up items
-- 🚧 Dialogue UI
+- ✅ Inventory UI, picking up items
 - 🚧 Combat and health system with limb health
 - 🚧 NPC aggressive and desensive UI, interactions
-- 🚧 Animation and movement system: idle, walk, sprint, jump, crouch, crawl, turning around, climb, swim
 - 🚧 Possession system
+- 🚧 Dialogue UI
 - 🚧 Sounds and music
 - 🚧 Debug menu
+- 🚧 Animation and movement system: idle, walk, sprint, jump, crouch, crawl, turning around, climb, swim
 - Sanity system
 - 5 NPCs in the first demo: Barkeeper, Rich truant, Phantom, Base_F, Base_M
 - Calendar UI
