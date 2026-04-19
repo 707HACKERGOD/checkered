@@ -28,6 +28,8 @@
 [ext_resource type="AudioStream" uid="uid://b3nlalh63qxlh" path="res://Assets/Audio/autumn.wav" id="25_8flut"]
 [ext_resource type="AudioStream" uid="uid://8e8a66h3qvw0" path="res://Assets/Audio/winter.wav" id="26_u7x0b"]
 [ext_resource type="Script" uid="uid://jev5ywxrd7t2" path="res://Scripts/Characters/AnimationController.cs" id="27_u7x0b"]
+[ext_resource type="Script" uid="uid://b2jlc5asau10j" path="res://Scripts/Systems/Health.cs" id="29_kih0c"]
+[ext_resource type="Script" uid="uid://pqdria87in1e" path="res://Scripts/Systems/LimbHealth.cs" id="30_lyrkg"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_kyqiw"]
 radius = 0.3
@@ -43,7 +45,7 @@ shader_parameter/ground_height = 0.0
 [sub_resource type="SphereShape3D" id="SphereShape3D_5ixxa"]
 radius = 0.2
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kih0c"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lyrkg"]
 resource_local_to_scene = true
 resource_name = "Eye_Mat"
 cull_mode = 2
@@ -665,14 +667,14 @@ shape = SubResource("SphereShape3D_5ixxa")
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
 
 [node name="Skeleton3D" parent="syl_base_5/metarig" parent_id_path=PackedInt32Array(607563459, 939957713) index="0" unique_id=1078351443]
-bones/0/position = Vector3(-0.0095884465, 0.8352084, 0.032115526)
+bones/0/position = Vector3(-0.00026022055, 0.8367631, 0.032115523)
 bones/0/rotation = Quaternion(0.16563182, 7.9136875e-08, 1.3291164e-08, 0.9861877)
 bones/1/rotation = Quaternion(-0.18164173, -1.6633932e-08, -2.607924e-08, 0.9833648)
 bones/2/rotation = Quaternion(-0.06385426, -3.3459195e-08, -5.9468936e-09, 0.99795926)
-bones/3/rotation = Quaternion(-0.055261206, 0.001786514, 4.198428e-06, 0.99847037)
-bones/4/rotation = Quaternion(0.12144385, 2.3216003e-06, 4.6017853e-05, 0.9925983)
+bones/3/rotation = Quaternion(-0.027186597, 0.0017856917, 5.4391887e-05, 0.9996288)
+bones/4/rotation = Quaternion(0.108635366, -3.6665675e-08, 7.627926e-09, 0.9940817)
 bones/5/rotation = Quaternion(0.023930106, 1.7533196e-08, 1.2729309e-09, 0.9997137)
-bones/6/rotation = Quaternion(0.012781154, -8.9148685e-08, -2.71219e-10, 0.99991834)
+bones/6/rotation = Quaternion(0.012781154, -8.914915e-08, -2.7105868e-10, 0.99991834)
 bones/7/rotation = Quaternion(0.003346608, 0.2045822, -0.7822588, 0.588393)
 bones/8/position = Vector3(0.0084037855, 0.10204093, 0.0012207034)
 bones/8/rotation = Quaternion(0.035320576, 0.11817148, -0.49783376, 0.85845757)
@@ -681,10 +683,10 @@ bones/11/rotation = Quaternion(0.0033465335, -0.20458223, 0.78225875, 0.58839285
 bones/12/position = Vector3(-0.008403519, 0.10204095, 0.0012207029)
 bones/12/rotation = Quaternion(0.03532062, -0.118171535, 0.49783382, 0.85845757)
 bones/13/rotation = Quaternion(0.18507953, 0.014332607, 0.02784625, 0.9822244)
-bones/17/rotation = Quaternion(0.97794867, 0.02286059, -0.0026726092, 0.20757319)
-bones/18/rotation = Quaternion(0.11762389, 0.00047636335, 0.003768398, 0.99305093)
-bones/22/rotation = Quaternion(0.97741747, -0.01393318, 0.0019422978, 0.21084887)
-bones/23/rotation = Quaternion(0.12337155, 8.5609434e-05, -0.009556191, 0.99231464)
+bones/17/rotation = Quaternion(0.9797241, 0.01791384, -0.002371263, 0.19953506)
+bones/18/rotation = Quaternion(0.1028023, 0.00019455585, 0.0056511583, 0.99468577)
+bones/22/rotation = Quaternion(0.97977334, -0.017783904, 0.0023633265, 0.19930485)
+bones/23/rotation = Quaternion(0.10280481, -0.00019467282, -0.0056512966, 0.9946855)
 
 [node name="eyepatch_002" parent="syl_base_5/metarig/Skeleton3D" index="0" unique_id=511818000]
 layers = 8
@@ -694,7 +696,8 @@ layers = 8
 
 [node name="MESH_002" parent="syl_base_5/metarig/Skeleton3D" index="2" unique_id=2126420105]
 layers = 8
-surface_material_override/1 = SubResource("StandardMaterial3D_kih0c")
+blend_shapes/Blink = 0.2265111
+surface_material_override/1 = SubResource("StandardMaterial3D_lyrkg")
 
 [node name="AnimationPlayer" parent="syl_base_5" index="1" unique_id=1771080825]
 libraries/ = SubResource("AnimationLibrary_lyrkg")
@@ -749,5 +752,41 @@ parameters/Idle/TimeScale/scale = 0.29999999999999716
 
 [node name="AnimationController" type="Node" parent="." unique_id=1220244408]
 script = ExtResource("27_u7x0b")
+
+[node name="Health" type="Node" parent="." unique_id=1014753470]
+script = ExtResource("29_kih0c")
+
+[node name="Head" type="Node" parent="Health" unique_id=1335270822]
+script = ExtResource("30_lyrkg")
+LimbName = "Head"
+Critical = true
+
+[node name="Torso" type="Node" parent="Health" unique_id=1765743681]
+script = ExtResource("30_lyrkg")
+LimbName = "Torso"
+
+[node name="LeftArm" type="Node" parent="Health" unique_id=1364581089]
+script = ExtResource("30_lyrkg")
+LimbName = "LeftArm"
+
+[node name="RightArm" type="Node" parent="Health" unique_id=331370408]
+script = ExtResource("30_lyrkg")
+LimbName = "RightArm"
+
+[node name="LeftLeg" type="Node" parent="Health" unique_id=1324389308]
+script = ExtResource("30_lyrkg")
+LimbName = "LeftLeg"
+
+[node name="RightLeg" type="Node" parent="Health" unique_id=1234258254]
+script = ExtResource("30_lyrkg")
+LimbName = "RightLeg"
+
+[node name="LeftEye" type="Node" parent="Health" unique_id=622053606]
+script = ExtResource("30_lyrkg")
+LimbName = "LeftEye"
+
+[node name="RightEye" type="Node" parent="Health" unique_id=1224959890]
+script = ExtResource("30_lyrkg")
+LimbName = "RightEye"
 
 [editable path="syl_base_5"]

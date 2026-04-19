@@ -19,6 +19,9 @@ public partial class HUD : Control
     [Export] private Control _debugContainer;
     [Export] private VBoxContainer _debugList;
 
+    [Export] private LimbHealthUI _healthPanel;
+    public bool IsHealthPanelOpen => _healthPanel != null && _healthPanel.Visible;
+
     // ========== Interaction Prompt ==========
     [ExportCategory("Tooltip")]
     [Export] private Panel _tooltipPanel;      
@@ -96,6 +99,8 @@ public partial class HUD : Control
     private bool _lockFocused = false;
     private Panel _lockFocusBorder;
 
+    private List<Tween> _activeTweens = new();
+
     private abstract class DebugItem { public string Name; public Color Color = Colors.White; }
     private class HeaderItem : DebugItem
     {
@@ -116,6 +121,7 @@ public partial class HUD : Control
     // ========== Lifecycle ==========
     public override void _Ready()
     {
+        GameState.TimeScaleChanged += OnTimeScaleChanged;
         Instance = this;
         _timeManager = TimeManager.Instance;
         _weatherManager = GetNodeOrNull<WeatherManager>("/root/WeatherManager");
@@ -255,9 +261,12 @@ public partial class HUD : Control
         _tooltipPanel.Modulate = Colors.White;
 
         if (_tooltipTween != null && _tooltipTween.IsValid())
+        {
             _tooltipTween.Kill();
+            _activeTweens.Remove(_tooltipTween);
+        }
 
-        _tooltipTween = CreateTween();
+        _tooltipTween = CreateRealTimeTween();
         _tooltipTween.SetLoops();
         _tooltipTween.TweenProperty(_tooltipPanel, "modulate:a", 0.7f, 0.75f)
                     .SetEase(Tween.EaseType.InOut)
@@ -271,8 +280,11 @@ public partial class HUD : Control
     {
         if (_tooltipPanel != null)
             _tooltipPanel.Hide();
-        if (_tooltipTween != null && _tooltipTween.IsValid())
-            _tooltipTween.Kill();
+            if (_tooltipTween != null && _tooltipTween.IsValid())
+            {
+                _tooltipTween.Kill();
+                _activeTweens.Remove(_tooltipTween);
+            }
     }
 
     // ========== Inventory UI (Dynamic & Responsive) ==========
@@ -450,8 +462,12 @@ public partial class HUD : Control
         }
 
         // Animation logic 
-        _layoutTween?.Kill();
-        _layoutTween = CreateTween().SetParallel(true).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.InOut);
+        if (_layoutTween != null && _layoutTween.IsValid())
+        {
+            _layoutTween.Kill();
+            _activeTweens.Remove(_layoutTween);
+        }
+        _layoutTween = CreateRealTimeTween().SetParallel(true).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.InOut);
 
         Vector2 startVec = new Vector2(_inventoryLeftPanel.Position.X, _inventoryLeftPanel.Size.X);
         Vector2 targetVec = new Vector2(leftX, leftWidth);
@@ -740,7 +756,7 @@ public partial class HUD : Control
     // ========== Input ==========
     public override void _Input(InputEvent @event)
     {
-        // --- Debug Console (always available) ---
+        // --- DEBUG CONSOLE (always available) ---
         if (@event.IsActionPressed("toggle_console"))
         {
             ToggleDebug();
@@ -748,18 +764,134 @@ public partial class HUD : Control
             return;
         }
 
-        // --- Pause Menu (Escape) – ALWAYS works ---
-        if (@event.IsActionPressed("ui_cancel"))
+        bool healthOpen = _healthPanel != null && _healthPanel.Visible;
+        bool inventoryOpen = _inventoryPanel.Visible;
+
+        // --- IF ANY MENU IS OPEN ---
+        if (healthOpen || inventoryOpen)
         {
-            TogglePause();
-            GetViewport().SetInputAsHandled();
-            return;   // Do not process further input this frame
+            // Escape handling (unchanged)
+            if (@event.IsActionPressed("ui_cancel"))
+            {
+                if (healthOpen)
+                    _healthPanel.HandleInput(@event);
+                else
+                    ToggleInventory();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            // Health open: Tab acts as Escape
+            if (healthOpen && @event.IsActionPressed("toggle_inventory"))
+            {
+                _healthPanel.HandleInput(new InputEventAction() { Action = "ui_cancel", Pressed = true });
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            // Inventory open: H is ignored, Tab closes inventory
+            if (inventoryOpen && @event.IsActionPressed("toggle_health"))
+            {
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            if (inventoryOpen && @event.IsActionPressed("toggle_inventory"))
+            {
+                ToggleInventory();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            // Route to active menu
+            if (healthOpen)
+            {
+                _healthPanel.HandleInput(@event);
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+            else // inventoryOpen
+            {
+                // --- Existing inventory navigation (unchanged) ---
+                if (_lockFocused)
+                {
+                    if (@event.IsActionPressed("ui_accept"))
+                    {
+                        _lockToggle.ButtonPressed = !_lockToggle.ButtonPressed;
+                        GetViewport().SetInputAsHandled();
+                    }
+                    else if (@event.IsActionPressed("move_back")) // S key
+                    {
+                        _lockFocused = false;
+                        UpdateLockFocusVisual();
+                        _selectedSlotIndex = 0;
+                        UpdateSlotSelectionHighlight(_selectedSlotIndex);
+                        ShowSlotTooltipForIndex(_selectedSlotIndex);
+                        GetViewport().SetInputAsHandled();
+                    }
+                    return;
+                }
+
+                if (@event.IsActionPressed("move_left"))
+                {
+                    MoveGridSelection(-1, 0);
+                    GetViewport().SetInputAsHandled();
+                }
+                else if (@event.IsActionPressed("move_right"))
+                {
+                    MoveGridSelection(1, 0);
+                    GetViewport().SetInputAsHandled();
+                }
+                else if (@event.IsActionPressed("move_forward"))
+                {
+                    if (_selectedSlotIndex == 0)
+                    {
+                        _lockFocused = true;
+                        UpdateLockFocusVisual();
+                        UpdateSlotSelectionHighlight(-1);
+                        GetViewport().SetInputAsHandled();
+                    }
+                    else
+                    {
+                        MoveGridSelection(0, -1);
+                        GetViewport().SetInputAsHandled();
+                    }
+                }
+                else if (@event.IsActionPressed("move_back"))
+                {
+                    MoveGridSelection(0, 1);
+                    GetViewport().SetInputAsHandled();
+                }
+                else if (@event.IsActionPressed("ui_accept"))
+                {
+                    if (_selectedSlotIndex >= 0)
+                        SelectSlot(_selectedSlotIndex);
+                    GetViewport().SetInputAsHandled();
+                }
+                return;
+            }
         }
 
-        // --- Inventory Toggle (Tab) ---
+        // --- NO MENU OPEN: normal toggles ---
+        if (@event.IsActionPressed("toggle_health"))
+        {
+            _healthPanel.TargetHealth = GetPlayerHealth();
+            _healthPanel.Activate();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (@event.IsActionPressed("toggle_inventory"))
         {
             ToggleInventory();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        // --- Pause Menu (Escape) ---
+        if (@event.IsActionPressed("ui_cancel"))
+        {
+            TogglePause();
             GetViewport().SetInputAsHandled();
             return;
         }
@@ -770,73 +902,6 @@ public partial class HUD : Control
             if (_creativePanel != null)
                 _creativePanel.Visible = !_creativePanel.Visible;
             GetViewport().SetInputAsHandled();
-            return;
-        }
-
-        // --- Inventory Navigation (only when open) ---
-        if (_inventoryPanel.Visible)
-        {
-            // If lock is focused, handle its own keys
-            if (_lockFocused)
-            {
-                if (@event.IsActionPressed("ui_accept"))
-                {
-                    // Toggle the lock
-                    _lockToggle.ButtonPressed = !_lockToggle.ButtonPressed;
-                    GetViewport().SetInputAsHandled();
-                }
-                else if (@event.IsActionPressed("move_back")) // S key
-                {
-                    // Return focus to grid (top-left slot)
-                    _lockFocused = false;
-                    UpdateLockFocusVisual();
-                    _selectedSlotIndex = 0;
-                    UpdateSlotSelectionHighlight(_selectedSlotIndex);
-                    ShowSlotTooltipForIndex(_selectedSlotIndex);
-                    GetViewport().SetInputAsHandled();
-                }
-                // Ignore other movement keys while lock focused
-                return;
-            }
-
-        if (@event.IsActionPressed("move_left"))
-            {
-                MoveGridSelection(-1, 0);
-                GetViewport().SetInputAsHandled();
-            }
-            else if (@event.IsActionPressed("move_right"))
-            {
-                MoveGridSelection(1, 0);
-                GetViewport().SetInputAsHandled();
-            }
-            else if (@event.IsActionPressed("move_forward")) // W key
-            {
-                // Special case: from top-left slot, pressing W focuses the lock
-                if (_selectedSlotIndex == 0)
-                {
-                    _lockFocused = true;
-                    UpdateLockFocusVisual();
-                    // Clear grid selection highlight
-                    UpdateSlotSelectionHighlight(-1);
-                    GetViewport().SetInputAsHandled();
-                }
-                else
-                {
-                    MoveGridSelection(0, -1);
-                    GetViewport().SetInputAsHandled();
-                }
-            }
-            else if (@event.IsActionPressed("move_back")) // S key
-            {
-                MoveGridSelection(0, 1);
-                GetViewport().SetInputAsHandled();
-            }
-            else if (@event.IsActionPressed("ui_accept"))
-            {
-                if (_selectedSlotIndex >= 0)
-                    SelectSlot(_selectedSlotIndex);
-                GetViewport().SetInputAsHandled();
-            }
             return;
         }
 
@@ -851,7 +916,6 @@ public partial class HUD : Control
             GetViewport().SetInputAsHandled();
         }
     }
-
     private void ToggleInventory()
     {
         bool opening = !_inventoryPanel.Visible;
@@ -859,8 +923,12 @@ public partial class HUD : Control
         _lockToggle.Visible = opening;
 
         // Smoothly change game speed (does NOT affect UI)
-        _timeScaleTween?.Kill();
-        _timeScaleTween = CreateTween();
+        if (_timeScaleTween != null && _timeScaleTween.IsValid())
+        {
+            _timeScaleTween.Kill();
+            _activeTweens.Remove(_timeScaleTween);
+        }
+        _timeScaleTween = CreateRealTimeTween();
         _timeScaleTween.TweenMethod(Callable.From<float>(v => GameState.Instance.GameSpeed = v),
             GameState.Instance.GameSpeed, opening ? InventoryTimeScale : 1.0f, 0.3f)
             .SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.InOut);
@@ -871,7 +939,7 @@ public partial class HUD : Control
         {
             // Capture the current movement input for auto‑run
             GameState.Instance.AutoRunDirection = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
-            
+            GameState.Instance.AutoRunSprinting = Input.IsActionPressed("sprint");
             if (_inventoryOpenSound != null)
             {
                 _uiAudioPlayer.Stream = _inventoryOpenSound;
@@ -1207,9 +1275,21 @@ public partial class HUD : Control
     private void ToggleDebug()
     {
         _isDebugOpen = !_isDebugOpen;
-        if (_debugContainer != null) _debugContainer.Visible = _isDebugOpen;
-        if (_isDebugOpen) { GetTree().Paused = true; RenderDebugMenu(); }
-        else if (!_isPaused) GetTree().Paused = false;
+        if (_debugContainer != null)
+        {
+            _debugContainer.Visible = _isDebugOpen;
+            if (_isDebugOpen)
+            {
+                // Bring to front
+                _debugContainer.GetParent().MoveChild(_debugContainer, -1);
+                RenderDebugMenu();
+                GetTree().Paused = true;
+            }
+            else if (!_isPaused)
+            {
+                GetTree().Paused = false;
+            }
+        }
     }
 
     private void TogglePause()
@@ -1243,6 +1323,7 @@ public partial class HUD : Control
         if (camera == null) return;
 
         Vector2 screenPos = camera.UnprojectPosition(worldPos);
+    
         Vector2 panelSize = _tooltipPanel.GetCombinedMinimumSize();
         if (panelSize == Vector2.Zero) panelSize = new Vector2(200, 50);
         _tooltipPanel.Size = panelSize;
@@ -1256,11 +1337,15 @@ public partial class HUD : Control
 
         _tooltipPanel.Position = finalPos;
         _tooltipPanel.Show();
+        _tooltipPanel.GetParent().MoveChild(_tooltipPanel, -1);
 
         if (_tooltipTween != null && _tooltipTween.IsValid())
+        {
             _tooltipTween.Kill();
+            _activeTweens.Remove(_tooltipTween);
+        }
 
-        _tooltipTween = CreateTween();
+        _tooltipTween = CreateRealTimeTween();
         _tooltipTween.SetLoops();
         _tooltipTween.TweenProperty(_tooltipPanel, "modulate:a", 0.7f, 0.75f)
                     .SetEase(Tween.EaseType.InOut)
@@ -1383,6 +1468,7 @@ public partial class HUD : Control
 
     public override void _ExitTree()
     {
+        GameState.TimeScaleChanged -= OnTimeScaleChanged;
         if (Instance == this)
             Instance = null;
     }
@@ -1390,5 +1476,31 @@ public partial class HUD : Control
     {
         if (_lockFocusBorder != null)
             _lockFocusBorder.Visible = _lockFocused;
+    }
+
+    private Health GetPlayerHealth()
+    {
+        var player = GetTree().Root.FindChild("Player", true, false);
+        return player?.GetNode<Health>("Health");
+    }
+
+    private Tween CreateRealTimeTween()
+    {
+        var tween = CreateTween();
+        tween.SetSpeedScale(1.0f / GameState.Instance.GameSpeed);
+        _activeTweens.Add(tween);
+        tween.Finished += () => _activeTweens.Remove(tween);
+        return tween;
+    }
+
+    private void OnTimeScaleChanged(float newScale)
+    {
+        // Iterate over a copy to avoid issues if a tween finishes during the loop
+        var tweensCopy = _activeTweens.ToArray();
+        foreach (var tween in tweensCopy)
+        {
+            if (tween.IsValid())
+                tween.SetSpeedScale(1.0f / newScale);
+        }
     }
 }

@@ -308,7 +308,7 @@ public partial class WeatherManager : Node
     // -------------------------------------------------------------------------
     public override void _Process(double delta)
     {
-        float dt = (float)delta * GameState.Instance.GameSpeed;
+        float dt = (float)delta;
         if (!_subscribed && TimeManager.Instance != null)
         {
             SubscribeToTimeManager();
@@ -1246,11 +1246,18 @@ public partial class WeatherManager : Node
             soundDelay = Mathf.Clamp(soundDelay, _thunderDelayMin, _thunderDelayMax);
             
             // Play after delay
-            GetTree().CreateTimer(soundDelay).Timeout += () =>
+            Timer timer = new Timer();
+            timer.OneShot = true;
+            timer.ProcessMode = ProcessModeEnum.Always; // Not affected by TimeScale
+            timer.WaitTime = soundDelay;
+            timer.Timeout += () =>
             {
                 if (IsInstanceValid(_thunderPlayer))
                     _thunderPlayer.Play();
+                timer.QueueFree();
             };
+            AddChild(timer);
+            timer.Start();
         }
     }
 }

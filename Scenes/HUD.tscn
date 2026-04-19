@@ -2,6 +2,8 @@
 
 [ext_resource type="Theme" uid="uid://cvqanmwjxleoy" path="res://Scenes/UI/CheckeredTheme.tres" id="1_jo1ms"]
 [ext_resource type="Script" uid="uid://0ajgre01p3f1" path="res://Scripts/UI/HUD.cs" id="1_sd512"]
+[ext_resource type="Script" uid="uid://d2kfrj2n0wk7y" path="res://Scripts/UI/HealthBar.cs" id="3_psnte"]
+[ext_resource type="Script" uid="uid://bog7wtchg34i4" path="res://Scripts/UI/LimbHealthUI.cs" id="4_s3jbq"]
 
 [node name="HUD" type="Control" unique_id=2008112816 node_paths=PackedStringArray("_timeLabel", "_sanityBar", "_pauseMenu", "_debugContainer", "_debugList")]
 layout_mode = 3
@@ -93,3 +95,23 @@ anchor_bottom = 1.0
 offset_left = -0.10700035
 grow_horizontal = 0
 grow_vertical = 2
+
+[node name="ProgressBar" type="ProgressBar" parent="." unique_id=1817474894]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -2.0
+offset_top = -29.0
+offset_right = 2.0
+grow_horizontal = 2
+grow_vertical = 0
+script = ExtResource("3_psnte")
+
+[node name="HealthPanel" type="Control" parent="." unique_id=364305806]
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+script = ExtResource("4_s3jbq")

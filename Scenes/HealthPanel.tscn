@@ -1,0 +1,150 @@
+[gd_scene format=3 uid="uid://dikbmlw8s7ynq"]
+
+[ext_resource type="Script" uid="uid://bog7wtchg34i4" path="res://Scripts/UI/LimbHealthUI.cs" id="1_s52g4"]
+
+[node name="HealthPanel" type="Control" unique_id=1834898499]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+script = ExtResource("1_s52g4")
+
+[node name="PanelBackground" type="Panel" parent="." unique_id=2086671858]
+custom_minimum_size = Vector2(600, 400)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -381.0
+offset_top = -236.75
+offset_right = 381.0
+offset_bottom = 236.75
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BodyDiagram" type="Control" parent="PanelBackground" unique_id=867061185]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 1
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_left = 81.0
+offset_right = 331.0
+grow_vertical = 2
+
+[node name="Head" type="ColorRect" parent="PanelBackground/BodyDiagram" unique_id=55317119]
+layout_mode = 0
+offset_left = 115.0
+offset_top = 118.75
+offset_right = 155.0
+offset_bottom = 158.75
+
+[node name="Torso" type="ColorRect" parent="PanelBackground/BodyDiagram" unique_id=1260019227]
+layout_mode = 0
+offset_left = 116.0
+offset_top = 215.75
+offset_right = 156.0
+offset_bottom = 255.75
+
+[node name="LeftArm" type="ColorRect" parent="PanelBackground/BodyDiagram" unique_id=38246710]
+layout_mode = 0
+offset_left = 195.0
+offset_top = 214.75
+offset_right = 235.0
+offset_bottom = 254.75
+
+[node name="RightArm" type="ColorRect" parent="PanelBackground/BodyDiagram" unique_id=771950217]
+layout_mode = 0
+offset_left = 11.0
+offset_top = 217.75
+offset_right = 51.0
+offset_bottom = 257.75
+
+[node name="LeftLeg" type="ColorRect" parent="PanelBackground/BodyDiagram" unique_id=797969638]
+layout_mode = 0
+offset_left = 162.0
+offset_top = 361.75
+offset_right = 202.0
+offset_bottom = 401.75
+
+[node name="RightLeg" type="ColorRect" parent="PanelBackground/BodyDiagram" unique_id=1645157676]
+layout_mode = 0
+offset_left = 72.0
+offset_top = 362.75
+offset_right = 112.0
+offset_bottom = 402.75
+
+[node name="LeftEye" type="ColorRect" parent="PanelBackground/BodyDiagram" unique_id=1813312781]
+layout_mode = 0
+offset_left = 176.0
+offset_top = 62.75
+offset_right = 216.0
+offset_bottom = 102.75
+
+[node name="RightEye" type="ColorRect" parent="PanelBackground/BodyDiagram" unique_id=1637529538]
+layout_mode = 0
+offset_left = 46.0
+offset_top = 58.75
+offset_right = 86.0
+offset_bottom = 98.75
+
+[node name="PartStatusPanel" type="Panel" parent="PanelBackground" unique_id=1895911307]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -354.0
+offset_top = -118.0
+offset_right = -104.0
+offset_bottom = 126.0
+grow_horizontal = 0
+grow_vertical = 2
+
+[node name="PartNameLabel" type="Label" parent="PanelBackground/PartStatusPanel" unique_id=182595581]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -21.0
+offset_top = 64.0
+offset_right = 23.0
+offset_bottom = 87.0
+grow_horizontal = 2
+text = "Torso"
+
+[node name="HealthBar" type="ProgressBar" parent="PanelBackground/PartStatusPanel" unique_id=18969181]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -2.0
+offset_top = -13.5
+offset_right = 2.0
+offset_bottom = 13.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ConditionLabel" type="Label" parent="PanelBackground/PartStatusPanel" unique_id=516813373]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -33.0
+offset_top = -89.0
+offset_right = 28.5
+offset_bottom = -64.0
+grow_horizontal = 2
+grow_vertical = 0
+text = "Healthy"

@@ -5,6 +5,8 @@
 [ext_resource type="Script" uid="uid://wrff3vt2t7lk" path="res://Scripts/Characters/NpcEyeTracker.cs" id="1_w88vc"]
 [ext_resource type="Texture2D" uid="uid://ulx78hwquplr" path="res://Assets/syl_base_5_256x256_Grid3.png" id="3_sip5m"]
 [ext_resource type="Shape3D" uid="uid://bxbfyrklnhn7" path="res://Scripts/Characters/interest_area_npc.tres" id="4_j56hr"]
+[ext_resource type="Script" uid="uid://b2jlc5asau10j" path="res://Scripts/Systems/Health.cs" id="6_nx4xs"]
+[ext_resource type="Script" uid="uid://pqdria87in1e" path="res://Scripts/Systems/LimbHealth.cs" id="7_amnef"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_j56hr"]
 resource_local_to_scene = true
@@ -34,7 +36,7 @@ bones/2/rotation = Quaternion(-0.06385426, -3.3459195e-08, -5.9468936e-09, 0.997
 bones/3/rotation = Quaternion(-0.06238186, 0.0017864987, -8.5452775e-06, 0.99805075)
 bones/4/rotation = Quaternion(0.12464627, 2.9115326e-06, 5.7531634e-05, 0.99220127)
 bones/5/rotation = Quaternion(0.023930106, 1.7533196e-08, 1.2729309e-09, 0.9997137)
-bones/6/rotation = Quaternion(0.012781154, -8.914852e-08, -2.712775e-10, 0.99991834)
+bones/6/rotation = Quaternion(0.012781152, -8.91669e-08, -2.6485059e-10, 0.9999184)
 bones/7/rotation = Quaternion(0.003346608, 0.2045822, -0.7822588, 0.588393)
 bones/8/position = Vector3(0.0084037855, 0.10204093, 0.0012207034)
 bones/8/rotation = Quaternion(0.035320576, 0.11817148, -0.49783376, 0.85845757)
@@ -82,5 +84,33 @@ FaceMesh = NodePath("../syl_base_5/metarig/Skeleton3D/MESH_002")
 EyeMaterialSurfaceIndex = 1
 MinBlinkInterval = 1.0
 MaxBlinkInterval = 4.0
+
+[node name="Health" type="Node" parent="." unique_id=1515234529]
+script = ExtResource("6_nx4xs")
+
+[node name="Head" type="Node" parent="Health" unique_id=917647578]
+script = ExtResource("7_amnef")
+LimbName = "Head"
+Critical = true
+
+[node name="Torso" type="Node" parent="Health" unique_id=2079523670]
+script = ExtResource("7_amnef")
+LimbName = "Torso"
+
+[node name="LeftArm" type="Node" parent="Health" unique_id=1872731204]
+script = ExtResource("7_amnef")
+LimbName = "LeftArm"
+
+[node name="RightArm" type="Node" parent="Health" unique_id=1318143853]
+script = ExtResource("7_amnef")
+LimbName = "RightArm"
+
+[node name="LeftLeg" type="Node" parent="Health" unique_id=104378235]
+script = ExtResource("7_amnef")
+LimbName = "LeftLeg"
+
+[node name="RightLeg" type="Node" parent="Health" unique_id=1061711463]
+script = ExtResource("7_amnef")
+LimbName = "RightLeg"
 
 [editable path="syl_base_5"]

@@ -43,8 +43,9 @@ public partial class TimeManager : Node
     {
         if (Mathf.IsZeroApprox(TimeScale)) return;
 
-        float dt = (float)delta * TimeScale * GameState.Instance.GameSpeed;
-        _timer += dt * TimeScale;
+        // delta is already affected by Engine.TimeScale (global slow-mo)
+        float dt = (float)delta * TimeScale;
+        _timer += dt;
 
         if (_timer >= _realSecondsPerGameMinute)
         {
