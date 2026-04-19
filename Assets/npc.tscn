@@ -1,12 +1,12 @@
 [gd_scene format=3 uid="uid://bj7m52qir620q"]
 
-[ext_resource type="Script" uid="uid://d346ljtl4sjgd" path="res://Scripts/Characters/NpcController.cs" id="1_0wweb"]
-[ext_resource type="PackedScene" uid="uid://uy0gt5bh27sb" path="res://Assets/syl_base_5.glb" id="1_neahk"]
-[ext_resource type="Script" uid="uid://wrff3vt2t7lk" path="res://Scripts/Characters/NpcEyeTracker.cs" id="1_w88vc"]
-[ext_resource type="Texture2D" uid="uid://ulx78hwquplr" path="res://Assets/syl_base_5_256x256_Grid3.png" id="3_sip5m"]
-[ext_resource type="Shape3D" uid="uid://bxbfyrklnhn7" path="res://Scripts/Characters/interest_area_npc.tres" id="4_j56hr"]
-[ext_resource type="Script" uid="uid://b2jlc5asau10j" path="res://Scripts/Systems/Health.cs" id="6_nx4xs"]
-[ext_resource type="Script" uid="uid://pqdria87in1e" path="res://Scripts/Systems/LimbHealth.cs" id="7_amnef"]
+[ext_resource type="Script" path="res://Scripts/Characters/NpcController.cs" id="1_0wweb"]
+[ext_resource type="PackedScene" path="res://Assets/syl_base_5.glb" id="1_neahk"]
+[ext_resource type="Script" path="res://Scripts/Characters/NpcEyeTracker.cs" id="1_w88vc"]
+[ext_resource type="Texture2D" path="res://Assets/syl_base_5_256x256_Grid3.png" id="3_sip5m"]
+[ext_resource type="Shape3D" path="res://Scripts/Characters/interest_area_npc.tres" id="4_j56hr"]
+[ext_resource type="Script" path="res://Scripts/Systems/Health.cs" id="6_nx4xs"]
+[ext_resource type="Script" path="res://Scripts/Systems/LimbHealth.cs" id="7_amnef"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_j56hr"]
 resource_local_to_scene = true

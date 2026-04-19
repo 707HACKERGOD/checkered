@@ -1,6 +1,6 @@
 [gd_resource type="ShaderMaterial" format=3 uid="uid://4fbbes88suyf"]
 
-[ext_resource type="Shader" uid="uid://dgtxmwutjprn0" path="res://Shaders/TreeMaster.gdshader" id="1_101wb"]
+[ext_resource type="Shader" uid="uid://bra7n73xsjb16" path="res://Shaders/TreeMaster.gdshader" id="1_101wb"]
 [ext_resource type="Texture2D" uid="uid://dmi358la8f5bo" path="res://Assets/pine1_Plane4.png" id="2_4fqq0"]
 
 [resource]

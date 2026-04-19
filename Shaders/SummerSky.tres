@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="SeasonPalette" format=3 uid="uid://byqmfdqvakg77"]
+[gd_resource type="Resource" format=3 uid="uid://byqmfdqvakg77"]
 
-[ext_resource type="Script" uid="uid://beketmea06yvt" path="res://Scripts/Systems/SeasonPalette.cs" id="1_ncqsx"]
+[ext_resource type="Script" uid="uid://4oqq2ilvj7ad" path="res://Scripts/Systems/SeasonPalette.cs" id="1_ncqsx"]
 
 [sub_resource type="Gradient" id="Gradient_ncqsx"]
 offsets = PackedFloat32Array(0.10220995, 0.20718232, 0.27071825, 0.31491712, 0.66574585, 0.68508285, 0.7209945, 0.76519334, 0.9364641, 1)

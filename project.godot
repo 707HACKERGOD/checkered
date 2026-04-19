@@ -14,7 +14,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
-config/name="Checkered v0.14"
+config/name="Checkered v0.15"
 run/main_scene="uid://c3bouadlvlqxl"
 config/features=PackedStringArray("4.6", "C#", "GL Compatibility")
 run/max_fps=120
@@ -22,7 +22,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-GameState="*uid://b77x06aslxyb"
+GameState="*uid://da45shqjt7ivt"
 TimeManager="*res://Scripts/Systems/TimeManager.cs"
 WeatherManager="*uid://de7y7qmr4if0n"
 SanitySystem="*res://Scripts/Systems/SanitySystem.cs"

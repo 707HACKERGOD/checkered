@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://ck7bcwxsjem3a"]
 
-[ext_resource type="Texture2D" uid="uid://dswabs4kll25k" path="res://Assets/footprint.png" id="1_pbc4w"]
-[ext_resource type="Script" uid="uid://dwj17bh6q83fe" path="res://Scripts/Effects/FootprintDecal.cs" id="2_qw5pr"]
+[ext_resource type="Texture2D" path="res://Assets/footprint.png" id="1_pbc4w"]
+[ext_resource type="Script" path="res://Scripts/Effects/FootprintDecal.cs" id="2_qw5pr"]
 
 [node name="Decal" type="Decal" unique_id=1636873615]
 size = Vector3(0.3, 0.3, 0.3)

@@ -1,9 +1,9 @@
 [gd_scene format=3 uid="uid://d3r85210kwu82"]
 
-[ext_resource type="Theme" uid="uid://cvqanmwjxleoy" path="res://Scenes/UI/CheckeredTheme.tres" id="1_jo1ms"]
-[ext_resource type="Script" uid="uid://0ajgre01p3f1" path="res://Scripts/UI/HUD.cs" id="1_sd512"]
-[ext_resource type="Script" uid="uid://d2kfrj2n0wk7y" path="res://Scripts/UI/HealthBar.cs" id="3_psnte"]
-[ext_resource type="Script" uid="uid://bog7wtchg34i4" path="res://Scripts/UI/LimbHealthUI.cs" id="4_s3jbq"]
+[ext_resource type="Theme" path="res://Scenes/UI/CheckeredTheme.tres" id="1_jo1ms"]
+[ext_resource type="Script" path="res://Scripts/UI/HUD.cs" id="1_sd512"]
+[ext_resource type="Script" path="res://Scripts/UI/HealthBar.cs" id="3_psnte"]
+[ext_resource type="Script" path="res://Scripts/UI/LimbHealthUI.cs" id="4_s3jbq"]
 
 [node name="HUD" type="Control" unique_id=2008112816 node_paths=PackedStringArray("_timeLabel", "_sanityBar", "_pauseMenu", "_debugContainer", "_debugList")]
 layout_mode = 3
