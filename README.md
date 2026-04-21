@@ -48,3 +48,10 @@ Future plans:
 - 10 key characters that don't arrive immediately but can help you cure your curse if you befriend them one by one, though they will also force you to change up the gameplay.
 - Customize your home laboratory/factory - whether you  prefer the bar attic, the woods or the junkyard.
 - Abandon society, fight the whole city and then the military, or fail the college infiltration - the game won't give a game over, the curse is hungry for destruction of all, and you can only stop it if you show your own initiative.
+
+![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%2026-04-21%160551.png)
+![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20160620.png)
+![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20160827.png)
+![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20160931.png)
+![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20160945.png)
+![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20161028.png)
