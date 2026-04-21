@@ -53,4 +53,4 @@ Future plans:
 ![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20160827.png)
 ![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20160931.png)
 ![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20160945.png)
-![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20161028.png)
+![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20160551.png)
