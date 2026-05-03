@@ -1,0 +1,9 @@
+[gd_scene format=3 uid="uid://dvbhiuvfa8dln"]
+
+[ext_resource type="PackedScene" uid="uid://di6fqxhc8cxgt" path="res://Assets/leaf_pile.glb" id="1_knxvt"]
+[ext_resource type="ArrayMesh" uid="uid://kehnlnekp6q0" path="res://Assets/leaf_pile_leaves_1_arraymesh.tres" id="2_8c8j5"]
+
+[node name="leaf_pile" unique_id=1673685650 instance=ExtResource("1_knxvt")]
+
+[node name="Plane_001" parent="." index="0" unique_id=870174803]
+mesh = ExtResource("2_8c8j5")

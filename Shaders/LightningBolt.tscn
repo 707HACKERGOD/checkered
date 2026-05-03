@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://dhjfwp7nuouvw"]
+
+[ext_resource type="Script" path="res://Scripts/Effects/LightningBolt.cs" id="1_vxf7b"]
+[ext_resource type="Shader" path="res://Shaders/Lightning.gdshader" id="2_fmn3j"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_6u35r"]
+render_priority = 0
+shader = ExtResource("2_fmn3j")
+shader_parameter/seed = 0.0
+shader_parameter/vanish_value = 0.0
+
+[sub_resource type="QuadMesh" id="QuadMesh_cbnok"]
+material = SubResource("ShaderMaterial_6u35r")
+size = Vector2(10, 40)
+
+[node name="LightningBolt" type="Node3D" unique_id=2000987527]
+script = ExtResource("1_vxf7b")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=649534117]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 20, 0)
+mesh = SubResource("QuadMesh_cbnok")

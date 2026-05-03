@@ -1,0 +1,12 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://b543yrsgitq8m"]
+
+[ext_resource type="Texture2D" uid="uid://blbyy4cd5comc" path="res://Assets/Asphalt019_1K-JPG_Color.jpg" id="1_dynch"]
+[ext_resource type="Texture2D" uid="uid://2pbl11u4jvrr" path="res://Assets/Asphalt019_1K-JPG_NormalGL.jpg" id="2_m585a"]
+[ext_resource type="Texture2D" uid="uid://dmp7ojabtj0a6" path="res://Assets/Asphalt019_1K-JPG_Roughness.jpg" id="3_aa4bj"]
+
+[resource]
+albedo_texture = ExtResource("1_dynch")
+roughness_texture = ExtResource("3_aa4bj")
+normal_enabled = true
+normal_texture = ExtResource("2_m585a")
+uv1_scale = Vector3(5, 5, 5)

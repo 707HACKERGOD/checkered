@@ -1,0 +1,92 @@
+[gd_scene format=3 uid="uid://d3r85210kwu82"]
+
+[ext_resource type="Theme" uid="uid://cvqanmwjxleoy" path="res://Scenes/UI/CheckeredTheme.tres" id="1_jo1ms"]
+[ext_resource type="Script" uid="uid://cm5gt42g6dlxo" path="res://Scripts/UI/HUD.cs" id="1_sd512"]
+[ext_resource type="AudioStream" uid="uid://civ3kneya7wsq" path="res://Assets/Audio/inventory_open.ogg" id="3_g8s2e"]
+[ext_resource type="Script" uid="uid://csachb0rtxovs" path="res://Scripts/UI/HealthBar.cs" id="3_psnte"]
+[ext_resource type="AudioStream" uid="uid://qo1gpnj6rn2m" path="res://Assets/Audio/inventory_close.ogg" id="4_t385i"]
+[ext_resource type="Texture2D" uid="uid://dwapxrtf6tex3" path="res://icon.svg" id="6_t385i"]
+[ext_resource type="Texture2D" uid="uid://b2vpd5a1macxp" path="res://Assets/icon_1.png" id="7_nfm57"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_b5b84"]
+
+[node name="HUD" type="Control" unique_id=2068370090 node_paths=PackedStringArray("_timeLabel", "_sanityBar", "_pauseMenu")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+theme = ExtResource("1_jo1ms")
+script = ExtResource("1_sd512")
+_timeLabel = NodePath("TimeLabel")
+_sanityBar = NodePath("SanityBar")
+_pauseMenu = NodePath("PauseMenu")
+_inventoryOpenSound = ExtResource("3_g8s2e")
+_inventoryCloseSound = ExtResource("4_t385i")
+
+[node name="SanityBar" type="ProgressBar" parent="." unique_id=1017387679]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.81700003
+anchor_right = 1.0
+anchor_bottom = 0.085
+offset_left = -0.184021
+offset_bottom = -0.08000183
+grow_horizontal = 0
+
+[node name="TimeLabel" type="Label" parent="." unique_id=395740553]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.18400002
+anchor_bottom = 0.07700001
+offset_right = 0.031982422
+offset_bottom = 0.10399628
+
+[node name="PauseMenu" type="CanvasLayer" parent="." unique_id=1018563353]
+layer = 20
+
+[node name="ColorRect" type="ColorRect" parent="PauseMenu" unique_id=66339658]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.49019608)
+
+[node name="Label" type="Label" parent="PauseMenu" unique_id=667144827]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_jo1ms")
+theme_override_font_sizes/font_size = 50
+text = "PAUSED"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ProgressBar" type="ProgressBar" parent="." unique_id=1817474894]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -2.0
+offset_top = -29.0
+offset_right = 2.0
+grow_horizontal = 2
+grow_vertical = 0
+script = ExtResource("3_psnte")
+
+[node name="TouchScreenButton" type="TouchScreenButton" parent="." unique_id=48612817]
+position = Vector2(283, 74.00001)
+scale = Vector2(1, 0.3984375)
+texture_normal = ExtResource("6_t385i")
+texture_pressed = ExtResource("7_nfm57")
+shape = SubResource("RectangleShape2D_b5b84")
+action = "toggle_health"
+visibility_mode = 1

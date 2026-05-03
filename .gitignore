@@ -1,0 +1,38 @@
+# Godot generated files
+.godot/
+.import/
+.mono/
+*.mono_*
+*.godot*
+*.uid
+*.gen.*
+*.tmp
+*.log
+*.pid
+
+# Compiled C# files
+bin/
+obj/
+*.dll
+*.pdb
+
+# OS specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor specific
+*.sln
+*.csproj.user
+*.suo
+*.user
+*.userosscache
+*.usertasks
+*.vshost.*
+
+res/builds/
+res/android/
+res/addons/
+android/
+builds/
+addons/

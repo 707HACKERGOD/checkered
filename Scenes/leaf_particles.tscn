@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://br73uwst3utn0"]
+
+[ext_resource type="ArrayMesh" uid="uid://kehnlnekp6q0" path="res://Assets/leaf_pile_leaves_1_arraymesh.tres" id="2_44su0"]
+[ext_resource type="Script" uid="uid://3cbnpjhl344" path="res://Shaders/PlayerFoliage.cs" id="3_35sxm"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_gntrk"]
+
+[node name="LeafParticles" type="GPUParticles3D" unique_id=1709483706]
+emitting = false
+amount = 64
+process_material = SubResource("ShaderMaterial_gntrk")
+draw_pass_1 = ExtResource("2_44su0")
+script = ExtResource("3_35sxm")

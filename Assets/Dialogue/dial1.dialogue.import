@@ -1,0 +1,16 @@
+[remap]
+
+importer="dialogue_manager"
+importer_version=15
+type="Resource"
+uid="uid://xe4wddsihrgi"
+path="res://.godot/imported/dial1.dialogue-2ee21412aa9072805a3c367a588f1507.tres"
+
+[deps]
+
+source_file="res://Assets/dialogue/dial1.dialogue"
+dest_files=["res://.godot/imported/dial1.dialogue-2ee21412aa9072805a3c367a588f1507.tres"]
+
+[params]
+
+defaults=true

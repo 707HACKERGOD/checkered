@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://ck7bcwxsjem3a"]
+
+[ext_resource type="Texture2D" path="res://Assets/footprint.png" id="1_pbc4w"]
+[ext_resource type="Script" path="res://Scripts/Effects/FootprintDecal.cs" id="2_qw5pr"]
+
+[node name="Decal" type="Decal" unique_id=1636873615]
+size = Vector3(0.3, 0.3, 0.3)
+texture_albedo = ExtResource("1_pbc4w")
+albedo_mix = 0.5
+upper_fade = 0.1
+lower_fade = 0.1
+distance_fade_enabled = true
+distance_fade_begin = 10.0
+script = ExtResource("2_qw5pr")

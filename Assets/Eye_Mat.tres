@@ -1,0 +1,12 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://cyxpwfbdpfs2w"]
+
+[ext_resource type="Texture2D" uid="uid://ulx78hwquplr" path="res://Assets/syl_base_5_256x256_Grid3.png" id="1_30wah"]
+
+[resource]
+resource_local_to_scene = true
+resource_name = "Eye_Mat"
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("1_30wah")
+texture_filter = 2

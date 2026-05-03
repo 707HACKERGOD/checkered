@@ -1,0 +1,18 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://bj8n8iho1tfh8"]
+
+[ext_resource type="Shader" uid="uid://bhbl5ttbv5ixf" path="res://Shaders/LeafGround.gdshader" id="1_266kh"]
+[ext_resource type="Texture2D" uid="uid://c03f7uye2qs4p" path="res://Assets/leaf_pile_leaves_1.png" id="2_ik3d1"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_266kh")
+shader_parameter/leaf_texture = ExtResource("2_ik3d1")
+shader_parameter/leaf_color = Color(0.8, 0.4, 0.1, 1)
+shader_parameter/dissolve_amount = 0.0
+shader_parameter/gust_mode = 1.0
+shader_parameter/is_gusting = 0.0
+shader_parameter/gust_progress = 0.0
+shader_parameter/spawn_progress = 1.0
+shader_parameter/despawn_progress = 0.0
+shader_parameter/y_offset = 0.0
+shader_parameter/max_dip_depth = -0.15
