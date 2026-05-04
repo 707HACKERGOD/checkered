@@ -131,7 +131,7 @@ public partial class Player : CharacterBody3D
         // ----- Menu / action handling -----
         bool anyMenuOpen = (HUD.Instance != null && HUD.Instance.IsInventoryOpen) ||
                         (HUD.Instance != null && HUD.Instance.IsHealthPanelOpen);
-        if (anyMenuOpen)
+        if (HUD.Instance != null && HUD.Instance.IsGamePaused)
             return;
 
         if (@event.IsActionPressed("toggle_camera"))
@@ -351,10 +351,7 @@ public partial class Player : CharacterBody3D
 
     private bool IsAnyMenuOpen()
     {
-        return HUD.Instance != null &&
-            (HUD.Instance.IsInventoryOpen ||
-                HUD.Instance.IsHealthPanelOpen ||
-                HUD.Instance.IsDebugOpen);
+        return HUD.Instance != null && HUD.Instance.IsGamePaused;
     }
 
     private bool HandlePinchZoom(InputEvent @event)

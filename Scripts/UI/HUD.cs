@@ -12,7 +12,9 @@ public partial class HUD : Control
     [Export] private Label _timeLabel;
     [Export] private ProgressBar _sanityBar;
     [Export] private CanvasLayer _debugCanvasLayer;   // wraps the debug container
+    private ScrollContainer _debugScrollContainer;
     [Export] private CanvasLayer _healthCanvasLayer;  // wraps the health panel
+    public bool IsGamePaused => _isPaused || _isDebugOpen;
 
     public static HUD Instance { get; private set; }
     public bool IsInventoryOpen => _inventoryPanel != null && _inventoryPanel.Visible;
@@ -149,31 +151,21 @@ public partial class HUD : Control
         HideTooltip();
         BuildInventoryUI();
 
-        // Pause menu
-        if (_pauseMenu == null)
-        {
-            _pauseMenu = new CanvasLayer { Layer = 20, Visible = false };
-            var bg = new ColorRect { Color = new Color(0, 0, 0, 0.8f) };
-            bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-            _pauseMenu.AddChild(bg);
-            AddChild(_pauseMenu);
-        }
-        else
+        // Pause menu (assigned in editor)
+        if (_pauseMenu != null)
         {
             _pauseMenu.Layer = 20;
             _pauseMenu.Visible = false;
         }
 
-        // --- Health panel (always exists, starts hidden) ---
+        // --- Health panel (simple test version) ---
         if (_healthPanel == null)
         {
             _healthPanel = new LimbHealthUI { Visible = false };
-            _healthPanel.MouseFilter = MouseFilterEnum.Ignore;
+            _healthPanel.MouseFilter = MouseFilterEnum.Ignore;  // let mobile buttons stay on top
             _healthPanel.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 
-            // dark background so you can see it
             var hBg = new Panel();
-            hBg.MouseFilter = MouseFilterEnum.Ignore;
             hBg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
             hBg.AddThemeStyleboxOverride("panel", new StyleBoxFlat { BgColor = new Color(0.4f, 0, 0, 0.95f) });
             _healthPanel.AddChild(hBg);
@@ -183,6 +175,8 @@ public partial class HUD : Control
             AddChild(_healthCanvasLayer);
             _healthCanvasLayer.AddChild(_healthPanel);
             MoveChild(_healthCanvasLayer, GetChildCount());
+
+            // No tap-to-close on the background; use the menu bar button instead
         }
         else
         {
@@ -190,37 +184,48 @@ public partial class HUD : Control
         }
 
         // --- Debug container (always exists, starts hidden) ---
-        if (_debugControl == null)
-        {
-            _debugControl = new Control { Visible = false };
-            _debugControl.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-            _debugControl.MouseFilter = MouseFilterEnum.Ignore;   // touches fall through to mobile buttons
-
-            var dBg = new Panel();
-            dBg.MouseFilter = MouseFilterEnum.Ignore;
-            dBg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-            dBg.AddThemeStyleboxOverride("panel", new StyleBoxFlat { BgColor = new Color(0, 0, 0, 0.9f) });
-            _debugControl.AddChild(dBg);
-
-            var dLabel = new Label
-            {
-                Text = "🐞 DEBUG\nTap again to close",
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            dLabel.AddThemeColorOverride("font_color", Colors.White);
-            dLabel.AddThemeFontSizeOverride("font_size", 40);
-            dLabel.SetAnchorsPreset(Control.LayoutPreset.Center);
-            _debugControl.AddChild(dLabel);
-
-            _debugCanvasLayer = new CanvasLayer { Layer = 25 };
-            AddChild(_debugCanvasLayer);
-            _debugCanvasLayer.AddChild(_debugControl);
-            MoveChild(_debugCanvasLayer, GetChildCount());
-        }
-        else
-        {
+        if (_debugControl != null)
             _debugControl.Visible = false;
+
+        // Wrap debug VBoxContainer in a ScrollContainer for scrolling support
+        if (_debugVBoxContainer != null)
+        {
+            // Create ScrollContainer
+            _debugScrollContainer = new ScrollContainer();
+            _debugScrollContainer.Name = "DebugScroll";
+            _debugScrollContainer.FollowFocus = true;               // automatically scroll to focused child
+            _debugScrollContainer.SizeFlagsHorizontal = Control.SizeFlags.Fill;
+            _debugScrollContainer.SizeFlagsVertical = Control.SizeFlags.Fill;
+            _debugScrollContainer.MouseFilter = MouseFilterEnum.Pass; // allow touch drag scrolling on mobile
+
+            // Reparent the VBoxContainer under the ScrollContainer
+            _debugVBoxContainer.GetParent().RemoveChild(_debugVBoxContainer);
+            _debugScrollContainer.AddChild(_debugVBoxContainer);
+
+            // Add ScrollContainer to the debug control (full‑screen panel)
+            _debugControl.AddChild(_debugScrollContainer);
+
+            // Position the ScrollContainer to fill the parent
+            _debugScrollContainer.AnchorLeft = 0.0f;
+            _debugScrollContainer.AnchorRight = 1.0f;
+            _debugScrollContainer.AnchorTop = 0.0f;
+            _debugScrollContainer.AnchorBottom = 1.0f;
+            _debugScrollContainer.OffsetLeft = 0;
+            _debugScrollContainer.OffsetRight = 0;
+            _debugScrollContainer.OffsetTop = 0;
+            _debugScrollContainer.OffsetBottom = 0;
+        }
+
+        if (DisplayServer.IsTouchscreenAvailable() && _debugScrollContainer != null)
+        {
+            _debugScrollContainer.AnchorLeft = 0.0f;
+            _debugScrollContainer.AnchorRight = 0.3f;  // left 30% of screen
+            _debugScrollContainer.AnchorTop = 0.0f;
+            _debugScrollContainer.AnchorBottom = 1.0f;
+            _debugScrollContainer.OffsetLeft = 10;
+            _debugScrollContainer.OffsetRight = 0;
+            _debugScrollContainer.OffsetTop = 80;
+            _debugScrollContainer.OffsetBottom = -20;
         }
 
         // Player inventory
@@ -247,13 +252,13 @@ public partial class HUD : Control
             InputMap.AddAction("toggle_debug");
         if (!InputMap.HasAction("interact"))
             InputMap.AddAction("interact");
-        if (!InputMap.HasAction("jump"))
-            InputMap.AddAction("jump");
 
         // Rain / snow nodes
         _rainNode = GetTree().Root.FindChild("RainParticles", true, false) as GpuParticles3D;
         _splashNode = GetTree().Root.FindChild("RainSplashParticles", true, false) as GpuParticles3D;
         _snowNode = GetTree().Root.FindChild("SnowParticles", true, false) as GpuParticles3D;
+
+        GD.Print($"HUD layers - inventory: 5, debug/health: 25, pause: {_pauseMenu?.Layer}, mobile: 128");
     }
 
     private void OnViewportSizeChanged()
@@ -853,117 +858,160 @@ public partial class HUD : Control
     // ========== Input handling ==========
     public override void _Input(InputEvent @event)
     {
-
-        // NO MENU OPEN: normal gameplay toggles
-
-        if (@event.IsActionPressed("toggle_health"))
-        {
-            ToggleHealth();
-            GetViewport().SetInputAsHandled();
+        // Touch events are handled by MobileButton – ignore them here
+        if (@event is InputEventScreenTouch)
             return;
-        }
-        if (@event.IsActionPressed("toggle_inventory"))
-        {
-            ToggleInventory();
-            GetViewport().SetInputAsHandled();
-            return;
-        }
-        if (@event.IsActionPressed("ui_cancel"))
-        {
-            TogglePause();
-            GetViewport().SetInputAsHandled();
-            return;
-        }
 
-        bool healthOpen = IsHealthPanelOpen;
-        bool inventoryOpen = _inventoryPanel.Visible;
-        bool anyMenuOpen = healthOpen || inventoryOpen || _isDebugOpen;
-
-        if (anyMenuOpen)
+        // ---- MENU IS OPEN: route to the active menu ----
+        if (IsHealthPanelOpen)
         {
-            if (@event.IsActionPressed("ui_cancel"))
+            // Tab or Escape steps back inside the health panel
+            if (@event.IsActionPressed("toggle_inventory") || @event.IsActionPressed("ui_cancel"))
             {
-                if (healthOpen) ToggleHealth();
-                else if (inventoryOpen) ToggleInventory();
-                else if (_isDebugOpen) ToggleDebug();
+                _healthPanel.Cancel();
                 GetViewport().SetInputAsHandled();
                 return;
             }
 
-            if (@event.IsActionPressed("toggle_inventory"))
+            // Forward other keyboard/gamepad input for limb navigation
+            _healthPanel.HandleInput(@event);
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (_inventoryPanel.Visible)
+        {
+            // Tab or Escape closes inventory
+            if (@event.IsActionPressed("toggle_inventory") || @event.IsActionPressed("ui_cancel"))
             {
-                if (healthOpen) ToggleHealth();
                 ToggleInventory();
                 GetViewport().SetInputAsHandled();
                 return;
             }
 
+            // Inventory grid navigation
+            if (_lockFocused)
+            {
+                if (@event.IsActionPressed("ui_accept"))
+                {
+                    _lockToggle.ButtonPressed = !_lockToggle.ButtonPressed;
+                    GetViewport().SetInputAsHandled();
+                }
+                else if (@event.IsActionPressed("move_back"))
+                {
+                    _lockFocused = false;
+                    UpdateLockFocusVisual();
+                    _selectedSlotIndex = 0;
+                    UpdateSlotSelectionHighlight(_selectedSlotIndex);
+                    ShowSlotTooltipForIndex(_selectedSlotIndex);
+                    GetViewport().SetInputAsHandled();
+                }
+                return;
+            }
+
+            if (@event.IsActionPressed("move_left"))      { MoveGridSelection(-1, 0); GetViewport().SetInputAsHandled(); }
+            else if (@event.IsActionPressed("move_right")) { MoveGridSelection(1, 0); GetViewport().SetInputAsHandled(); }
+            else if (@event.IsActionPressed("move_forward"))
+            {
+                if (_selectedSlotIndex == 0)
+                {
+                    _lockFocused = true;
+                    UpdateLockFocusVisual();
+                    UpdateSlotSelectionHighlight(-1);
+                    GetViewport().SetInputAsHandled();
+                }
+                else
+                {
+                    MoveGridSelection(0, -1);
+                    GetViewport().SetInputAsHandled();
+                }
+            }
+            else if (@event.IsActionPressed("move_back"))  { MoveGridSelection(0, 1); GetViewport().SetInputAsHandled(); }
+            else if (@event.IsActionPressed("ui_accept"))  { if (_selectedSlotIndex >= 0) SelectSlot(_selectedSlotIndex); GetViewport().SetInputAsHandled(); }
+            return;
+        }
+
+        if (_isDebugOpen)
+        {
+            // ` closes debug
+            if (@event.IsActionPressed("toggle_debug"))
+            {
+                ToggleDebug();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+            // Escape also closes debug
+            if (@event.IsActionPressed("ui_cancel"))
+            {
+                ToggleDebug();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+            
+            bool consumed = false;
+            if (@event.IsActionPressed("ui_down"))      { Navigate(1); consumed = true; }
+            else if (@event.IsActionPressed("ui_up"))    { Navigate(-1); consumed = true; }
+            else if (@event.IsActionPressed("ui_accept")) { ExecuteCurrent(); consumed = true; }
+            else if (@event.IsActionPressed("ui_left"))  { AdjustCurrent(-1); consumed = true; }
+            else if (@event.IsActionPressed("ui_right")) { AdjustCurrent(1); consumed = true; }
+
+            if (consumed)
+                GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        // --- Remap keys depending on current menu state ---
+        bool healthOpen = IsHealthPanelOpen;
+        bool inventoryOpen = _inventoryPanel.Visible;
+
+        // Tab or Escape while Health is open → step back inside the health panel
+        if (healthOpen && (@event.IsActionPressed("toggle_inventory") || @event.IsActionPressed("ui_cancel")))
+        {
+            _healthPanel.Cancel();   // added in LimbHealthUI (see below)
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        // Tab or Escape while Inventory is open → close inventory
+        if (inventoryOpen && (@event.IsActionPressed("toggle_inventory") || @event.IsActionPressed("ui_cancel")))
+        {
+            ToggleInventory();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        // Escape while Debug is open → close debug
+        if (_isDebugOpen && @event.IsActionPressed("ui_cancel"))
+        {
+            ToggleDebug();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        // Only if NO menu is open do the global toggles apply
+        if (!healthOpen && !inventoryOpen && !_isDebugOpen)
+        {
             if (@event.IsActionPressed("toggle_health"))
             {
-                if (inventoryOpen) ToggleInventory();
                 ToggleHealth();
                 GetViewport().SetInputAsHandled();
                 return;
             }
-
-            if (healthOpen)
+            if (@event.IsActionPressed("toggle_inventory"))
             {
-                _healthPanel.HandleInput(@event);
+                ToggleInventory();
                 GetViewport().SetInputAsHandled();
                 return;
             }
-
-            if (inventoryOpen)
+            if (@event.IsActionPressed("ui_cancel"))
             {
-                // ---- Inventory navigation ----
-                if (_lockFocused)
-                {
-                    if (@event.IsActionPressed("ui_accept"))
-                    {
-                        _lockToggle.ButtonPressed = !_lockToggle.ButtonPressed;
-                        GetViewport().SetInputAsHandled();
-                    }
-                    else if (@event.IsActionPressed("move_back"))
-                    {
-                        _lockFocused = false;
-                        UpdateLockFocusVisual();
-                        _selectedSlotIndex = 0;
-                        UpdateSlotSelectionHighlight(_selectedSlotIndex);
-                        ShowSlotTooltipForIndex(_selectedSlotIndex);
-                        GetViewport().SetInputAsHandled();
-                    }
-                    return;
-                }
-
-                if (@event.IsActionPressed("move_left"))      { MoveGridSelection(-1, 0); GetViewport().SetInputAsHandled(); }
-                else if (@event.IsActionPressed("move_right")) { MoveGridSelection(1, 0); GetViewport().SetInputAsHandled(); }
-                else if (@event.IsActionPressed("move_forward"))
-                {
-                    if (_selectedSlotIndex == 0)
-                    {
-                        _lockFocused = true;
-                        UpdateLockFocusVisual();
-                        UpdateSlotSelectionHighlight(-1);
-                        GetViewport().SetInputAsHandled();
-                    }
-                    else
-                    {
-                        MoveGridSelection(0, -1);
-                        GetViewport().SetInputAsHandled();
-                    }
-                }
-                else if (@event.IsActionPressed("move_back"))  { MoveGridSelection(0, 1); GetViewport().SetInputAsHandled(); }
-                else if (@event.IsActionPressed("ui_accept"))  { if (_selectedSlotIndex >= 0) SelectSlot(_selectedSlotIndex); GetViewport().SetInputAsHandled(); }
+                TogglePause();
+                GetViewport().SetInputAsHandled();
                 return;
             }
-
-            if (_isDebugOpen)
+            if (@event.IsActionPressed("toggle_debug"))
             {
-                if (@event.IsActionPressed("ui_down"))      Navigate(1);
-                else if (@event.IsActionPressed("ui_up"))    Navigate(-1);
-                else if (@event.IsActionPressed("ui_accept")) ExecuteCurrent();
-                else if (@event.IsActionPressed("ui_left"))  AdjustCurrent(-1);
-                else if (@event.IsActionPressed("ui_right")) AdjustCurrent(1);
+                ToggleDebug();
                 GetViewport().SetInputAsHandled();
                 return;
             }
@@ -973,9 +1021,8 @@ public partial class HUD : Control
 
     public void TogglePause()
     {
-        GD.Print($"[HUD] TogglePause called. _isPaused was {_isPaused}, _pauseMenu null? {_pauseMenu == null}");
         _isPaused = !_isPaused;
-        GetTree().Paused = _isPaused;
+        GetTree().Paused = _isPaused || _isDebugOpen;   // keep paused if debug is also open
 
         if (_pauseMenu != null)
             _pauseMenu.Visible = _isPaused;
@@ -986,47 +1033,75 @@ public partial class HUD : Control
         if (_pauseResumeContainer != null)
             _pauseResumeContainer.Visible = _isPaused;
 
-        Input.MouseMode = _isPaused ? Input.MouseModeEnum.Visible : Input.MouseModeEnum.Captured;
+        if (!DisplayServer.IsTouchscreenAvailable())
+        {
+            Input.MouseMode = _isPaused || _isDebugOpen
+                ? Input.MouseModeEnum.Visible
+                : Input.MouseModeEnum.Captured;
+        }
+        EmitSignal(SignalName.MenuStateChanged);
     }
 
     public void ToggleHealth()
     {
-        GD.Print($"[HUD] ToggleHealth called. _healthPanel null? {_healthPanel == null}, visible? {_healthPanel?.Visible}");
         if (_healthPanel == null) { GD.PrintErr("HUD: _healthPanel is null"); return; }
+
+        // Prevent opening health if inventory is already open
+        if (!_healthPanel.Visible && IsInventoryOpen)
+            return;
+
         if (_healthPanel.Visible)
         {
             _healthPanel.Deactivate();
+            _healthPanel.Visible = false;
         }
         else
         {
+            _healthPanel.Visible = true;
             _healthPanel.TargetHealth = GetPlayerHealth();
             _healthPanel.Activate();
         }
         EmitSignal(SignalName.MenuStateChanged);
     }
-
+    private float _savedTimeScale = 1f;
     public void ToggleDebug()
     {
-        GD.Print($"[HUD] ToggleDebug called. _isDebugOpen was {_isDebugOpen}, _debugControl visible? {_debugControl?.Visible}");
         _isDebugOpen = !_isDebugOpen;
-        GetTree().Paused = _isDebugOpen;
-
         if (_debugControl != null)
+        {
             _debugControl.Visible = _isDebugOpen;
+            if (_isDebugOpen)
+            {
+                _debugControl.GetParent().MoveChild(_debugControl, -1); // bring to front
+                RenderDebugMenu();
+                GetTree().Paused = true;
+            }
+            else if (!_isPaused)   // only resume if pause menu isn't also open
+            {
+                GetTree().Paused = false;
+            }
+        }
 
-        Input.MouseMode = _isDebugOpen ? Input.MouseModeEnum.Visible : Input.MouseModeEnum.Captured;
+        if (!DisplayServer.IsTouchscreenAvailable())
+        {
+            Input.MouseMode = _isDebugOpen || _isPaused
+                ? Input.MouseModeEnum.Visible
+                : Input.MouseModeEnum.Captured;
+        }
 
         EmitSignal(SignalName.MenuStateChanged);
     }
 
     public void ToggleInventory()
     {
-        if (_inventoryPanel == null || _lockToggle == null)
-        {
-            GD.PrintErr("HUD: inventory not built yet");
-            return;
+        if (_inventoryPanel == null || _lockToggle == null) 
+        { 
+            GD.PrintErr("HUD: inventory not built yet"); 
+            return; 
         }
         bool opening = !_inventoryPanel.Visible;
+        if (opening && IsHealthPanelOpen)
+            return;
         _inventoryPanel.Visible = opening;
         _lockToggle.Visible = opening;
 
@@ -1111,10 +1186,11 @@ public partial class HUD : Control
 
     public void ToggleCamera()
     {
-        GD.Print("[HUD] ToggleCamera called, searching for Player...");
-        var player = GetTree().Root?.FindChild("Player", true, false) as Player;
-        if (player == null) GD.PrintErr("[HUD] ToggleCamera: Player not found!");
-        else player.ToggleCamera();
+        var player = GetTree().Root.FindChild("Player", true, false) as Player;
+        if (player != null)
+        {
+            player.ToggleCamera();   // we'll add a public method in Player
+        }
     }
 
     private void UpdateInitialSelectionHighlight()
@@ -1354,6 +1430,10 @@ public partial class HUD : Control
         if (_selectedIdx >= _menuItems.Count) _selectedIdx = 0;
         if (_menuItems[_selectedIdx] is HeaderItem) Navigate(dir);
         RenderDebugMenu();
+
+        // Auto‑scroll to keep the selected label visible
+        if (_debugScrollContainer != null && _selectedIdx >= 0 && _selectedIdx < _labelPool.Count)
+            _debugScrollContainer.EnsureControlVisible(_labelPool[_selectedIdx]);
     }
 
     private void ExecuteCurrent()
@@ -1376,6 +1456,8 @@ public partial class HUD : Control
             Label l = new Label();
             l.LabelSettings = new LabelSettings() { OutlineSize = 4, OutlineColor = Colors.Black };
             l.AddThemeFontSizeOverride("font_size", 26);
+            l.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            l.SizeFlagsHorizontal = Control.SizeFlags.Fill;
             _debugVBoxContainer.AddChild(l);
             _labelPool.Add(l);
         }

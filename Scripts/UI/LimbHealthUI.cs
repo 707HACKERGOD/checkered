@@ -253,7 +253,7 @@ public partial class LimbHealthUI : Control
             }
             else if (@event.IsActionPressed("ui_cancel"))
             {
-                Deactivate();
+                Cancel();
             }
         }
         else // Limb mode
@@ -489,5 +489,22 @@ public partial class LimbHealthUI : Control
             color = new Color(0, 1, 0);          // Green
 
         part.FillColor = color;
+    }
+
+    public void Cancel()
+    {
+        if (!_isActive) return;
+
+        if (_selectionMode == SelectionMode.Limb)
+        {
+            if (_selectedLimb == "LeftEye" || _selectedLimb == "RightEye")
+                SetSelectionMode(SelectionMode.Limb, "Head");
+            else
+                SetSelectionMode(SelectionMode.FullBody);
+        }
+        else
+        {
+            Deactivate();
+        }
     }
 }

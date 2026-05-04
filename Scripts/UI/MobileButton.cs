@@ -33,7 +33,7 @@ public partial class MobileButton : Button
             else if (!touch.Pressed && touch.Index == _activeTouchIndex)
             {
                 _activeTouchIndex = -1;
-                OnPressUp(insideButton: GetGlobalRect().HasPoint(touch.Position + GlobalPosition - Position));
+                OnPressUp(insideButton: GetGlobalRect().HasPoint(GlobalPosition + touch.Position));
                 AcceptEvent();
             }
             return;
@@ -66,6 +66,10 @@ public partial class MobileButton : Button
 
     private void OnPressUp(bool insideButton)
     {
+        // Diagnostics – show actual rect and touch position
+        var globalRect = GetGlobalRect();
+        GD.Print($"[{Text}] Rect: {globalRect}  Size: {Size}  GlobalPos: {GlobalPosition}  TouchPos: {GetGlobalMousePosition()}  inside: {insideButton}");
+
         if (!TapOnce)
         {
             if (_actionPressed && !string.IsNullOrEmpty(ActionName))
@@ -76,7 +80,6 @@ public partial class MobileButton : Button
             return;
         }
 
-        // TapOnce: only fire if released inside the button
         if (!insideButton) return;
 
         Tapped?.Invoke();
@@ -84,7 +87,6 @@ public partial class MobileButton : Button
         if (!string.IsNullOrEmpty(ActionName))
         {
             Input.ActionPress(ActionName);
-            // Release next frame using a deferred call (more reliable than CreateTimer)
             CallDeferred(nameof(ReleaseActionDeferred));
         }
     }
