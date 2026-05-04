@@ -165,18 +165,23 @@ public partial class HUD : Control
             _healthPanel.MouseFilter = MouseFilterEnum.Ignore;  // let mobile buttons stay on top
             _healthPanel.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 
-            var hBg = new Panel();
-            hBg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-            hBg.AddThemeStyleboxOverride("panel", new StyleBoxFlat { BgColor = new Color(0.4f, 0, 0, 0.95f) });
-            _healthPanel.AddChild(hBg);
-            _healthPanel.MoveChild(hBg, 0);
-
             _healthCanvasLayer = new CanvasLayer { Layer = 25 };
             AddChild(_healthCanvasLayer);
             _healthCanvasLayer.AddChild(_healthPanel);
             MoveChild(_healthCanvasLayer, GetChildCount());
 
-            // No tap-to-close on the background; use the menu bar button instead
+            var innerBg = _healthPanel.GetChildOrNull<Panel>(0); // first child is the background panel
+            if (innerBg != null)
+            {
+                innerBg.AnchorLeft = 0.15f;
+                innerBg.AnchorRight = 0.85f;
+                innerBg.AnchorTop = 0.1f;
+                innerBg.AnchorBottom = 0.9f;
+                innerBg.OffsetLeft = 0;
+                innerBg.OffsetRight = 0;
+                innerBg.OffsetTop = 0;
+                innerBg.OffsetBottom = 0;
+            }
         }
         else
         {
@@ -184,49 +189,98 @@ public partial class HUD : Control
         }
 
         // --- Debug container (always exists, starts hidden) ---
+        // Hide and destroy any editor‑built debug nodes
         if (_debugControl != null)
-            _debugControl.Visible = false;
-
-        // Wrap debug VBoxContainer in a ScrollContainer for scrolling support
+        {
+            if (_debugControl.IsInsideTree())
+            {
+                _debugControl.Visible = false;            // <-- hide immediately
+                _debugControl.QueueFree();
+            }
+            _debugControl = null;
+        }
         if (_debugVBoxContainer != null)
         {
-            // Create ScrollContainer
-            _debugScrollContainer = new ScrollContainer();
-            _debugScrollContainer.Name = "DebugScroll";
-            _debugScrollContainer.FollowFocus = true;               // automatically scroll to focused child
-            _debugScrollContainer.SizeFlagsHorizontal = Control.SizeFlags.Fill;
-            _debugScrollContainer.SizeFlagsVertical = Control.SizeFlags.Fill;
-            _debugScrollContainer.MouseFilter = MouseFilterEnum.Pass; // allow touch drag scrolling on mobile
-
-            // Reparent the VBoxContainer under the ScrollContainer
-            _debugVBoxContainer.GetParent().RemoveChild(_debugVBoxContainer);
-            _debugScrollContainer.AddChild(_debugVBoxContainer);
-
-            // Add ScrollContainer to the debug control (full‑screen panel)
-            _debugControl.AddChild(_debugScrollContainer);
-
-            // Position the ScrollContainer to fill the parent
-            _debugScrollContainer.AnchorLeft = 0.0f;
-            _debugScrollContainer.AnchorRight = 1.0f;
-            _debugScrollContainer.AnchorTop = 0.0f;
-            _debugScrollContainer.AnchorBottom = 1.0f;
-            _debugScrollContainer.OffsetLeft = 0;
-            _debugScrollContainer.OffsetRight = 0;
-            _debugScrollContainer.OffsetTop = 0;
-            _debugScrollContainer.OffsetBottom = 0;
+            if (_debugVBoxContainer.IsInsideTree())
+                _debugVBoxContainer.QueueFree();
+            _debugVBoxContainer = null;
         }
 
-        if (DisplayServer.IsTouchscreenAvailable() && _debugScrollContainer != null)
+        // 1. Full‑screen overlay (will contain everything)
+        var overlay = new Control();
+        overlay.Name = "DebugOverlay";
+        overlay.SetAnchorsPreset(LayoutPreset.FullRect);
+        overlay.Visible = false;
+        overlay.MouseFilter = MouseFilterEnum.Ignore;   // clicks/touches pass through
+
+        // 2. Left‑side dark background (only behind the debug list)
+        var bg = new ColorRect();
+        bg.Color = new Color(0, 0, 0, 0.5f);
+        bg.MouseFilter = MouseFilterEnum.Ignore;
+        overlay.AddChild(bg);
+
+        // 3. New VBoxContainer for the debug labels
+        var vbox = new VBoxContainer();
+        vbox.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        vbox.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
+
+        // 4. Wrap in a ScrollContainer
+        var scroll = new ScrollContainer();
+        scroll.Name = "DebugScroll";
+        scroll.HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled;   // force width from parent
+        scroll.FollowFocus = true;
+        scroll.MouseFilter = MouseFilterEnum.Stop;     // captures touch drag
+        scroll.GetVScrollBar().Visible = false;       // no visible bar
+
+        scroll.AddChild(vbox);
+        overlay.AddChild(scroll);
+
+        // 5. Position the debug panel – left on mobile, right on desktop
+        const float panelWidth = 0.4f;        // 40% of screen
+        const float marginLeft = 10;
+        const float marginRight = -10;
+        const float marginTop = 80;
+        const float marginBottom = -20;
+
+        bool isMobile = DisplayServer.IsTouchscreenAvailable();
+
+        void ApplyPanelAnchors(Control control)
         {
-            _debugScrollContainer.AnchorLeft = 0.0f;
-            _debugScrollContainer.AnchorRight = 0.3f;  // left 30% of screen
-            _debugScrollContainer.AnchorTop = 0.0f;
-            _debugScrollContainer.AnchorBottom = 1.0f;
-            _debugScrollContainer.OffsetLeft = 10;
-            _debugScrollContainer.OffsetRight = 0;
-            _debugScrollContainer.OffsetTop = 80;
-            _debugScrollContainer.OffsetBottom = -20;
+            if (isMobile)
+            {
+                // Left side
+                control.AnchorLeft = 0.0f;
+                control.AnchorRight = panelWidth;
+                control.OffsetLeft = marginLeft;
+                control.OffsetRight = marginRight;
+            }
+            else
+            {
+                // Right side
+                control.AnchorLeft = 1.0f - panelWidth;
+                control.AnchorRight = 1.0f;
+                control.OffsetLeft = -marginLeft;
+                control.OffsetRight = -marginRight;  // negative margin becomes positive inward
+            }
+            control.AnchorTop = 0.0f;
+            control.AnchorBottom = 1.0f;
+            control.OffsetTop = marginTop;
+            control.OffsetBottom = marginBottom;
         }
+
+        ApplyPanelAnchors(scroll);
+        ApplyPanelAnchors(bg);
+
+        // 6. Store references for the rest of the script
+        _debugControl = overlay;
+        _debugVBoxContainer = vbox;          // RenderDebugMenu will use this
+        _debugScrollContainer = scroll;
+
+        // 7. Attach to the CanvasLayer (or to HUD as fallback)
+        if (_debugCanvasLayer != null)
+            _debugCanvasLayer.AddChild(overlay);
+        else
+            AddChild(overlay);
 
         // Player inventory
         var player = GetTree().Root.FindChild("Player", true, false);
@@ -261,12 +315,12 @@ public partial class HUD : Control
         GD.Print($"HUD layers - inventory: 5, debug/health: 25, pause: {_pauseMenu?.Layer}, mobile: 128");
     }
 
+
+
     private void OnViewportSizeChanged()
     {
-        if (_inventoryPanel.Visible)
-        {
+        if (_inventoryPanel != null && _inventoryPanel.Visible)
             ApplyLayout(_currentLayout, true);
-        }
     }
 
     // ========== Interaction Prompt ==========
@@ -949,11 +1003,26 @@ public partial class HUD : Control
             }
             
             bool consumed = false;
-            if (@event.IsActionPressed("ui_down"))      { Navigate(1); consumed = true; }
-            else if (@event.IsActionPressed("ui_up"))    { Navigate(-1); consumed = true; }
-            else if (@event.IsActionPressed("ui_accept")) { ExecuteCurrent(); consumed = true; }
-            else if (@event.IsActionPressed("ui_left"))  { AdjustCurrent(-1); consumed = true; }
-            else if (@event.IsActionPressed("ui_right")) { AdjustCurrent(1); consumed = true; }
+            if (@event.IsActionPressed("ui_down") || @event.IsActionPressed("move_back"))
+            {
+                Navigate(1); consumed = true;
+            }
+            else if (@event.IsActionPressed("ui_up") || @event.IsActionPressed("move_forward"))
+            {
+                Navigate(-1); consumed = true;
+            }
+            else if (@event.IsActionPressed("ui_left") || @event.IsActionPressed("move_left"))
+            {
+                AdjustCurrent(-1); consumed = true;
+            }
+            else if (@event.IsActionPressed("ui_right") || @event.IsActionPressed("move_right"))
+            {
+                AdjustCurrent(1); consumed = true;
+            }
+            else if (@event.IsActionPressed("ui_accept"))
+            {
+                ExecuteCurrent(); consumed = true;
+            }
 
             if (consumed)
                 GetViewport().SetInputAsHandled();
@@ -1072,11 +1141,12 @@ public partial class HUD : Control
             _debugControl.Visible = _isDebugOpen;
             if (_isDebugOpen)
             {
-                _debugControl.GetParent().MoveChild(_debugControl, -1); // bring to front
+                // Bring the debug overlay (including its children) to front
+                _debugControl.GetParent().MoveChild(_debugControl, -1);
                 RenderDebugMenu();
                 GetTree().Paused = true;
             }
-            else if (!_isPaused)   // only resume if pause menu isn't also open
+            else if (!_isPaused)
             {
                 GetTree().Paused = false;
             }
@@ -1451,19 +1521,33 @@ public partial class HUD : Control
     private void RenderDebugMenu()
     {
         if (_debugVBoxContainer == null) return;
+
         while (_labelPool.Count < _menuItems.Count)
         {
+            int fontSize = DisplayServer.IsTouchscreenAvailable() ? 40 : 30; // debug font size is 40 on mobile and 30 on desktop
             Label l = new Label();
-            l.LabelSettings = new LabelSettings() { OutlineSize = 4, OutlineColor = Colors.Black };
-            l.AddThemeFontSizeOverride("font_size", 26);
+            l.LabelSettings = new LabelSettings()
+            {
+                OutlineSize = 4,
+                OutlineColor = Colors.Black,
+                FontSize = fontSize
+            };
             l.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-            l.SizeFlagsHorizontal = Control.SizeFlags.Fill;
+            l.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            l.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
+            l.MouseFilter = MouseFilterEnum.Ignore;   // let drag events reach ScrollContainer
             _debugVBoxContainer.AddChild(l);
             _labelPool.Add(l);
         }
+
         for (int i = 0; i < _labelPool.Count; i++)
         {
             var lbl = _labelPool[i];
+
+            lbl.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            lbl.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
+            lbl.MouseFilter = MouseFilterEnum.Ignore;
+
             if (i >= _menuItems.Count) { lbl.Visible = false; continue; }
             var item = _menuItems[i];
             lbl.Visible = true;

@@ -20,8 +20,8 @@ script = ExtResource("1_sd512")
 _timeLabel = NodePath("TimeLabel")
 _sanityBar = NodePath("SanityBar")
 _pauseMenu = NodePath("PauseMenu")
-_debugControl = NodePath("DebugControl")
-_debugVBoxContainer = NodePath("DebugControl/DebugVBoxContainer")
+_debugControl = NodePath("")
+_debugVBoxContainer = NodePath("")
 _inventoryOpenSound = ExtResource("3_g8s2e")
 _inventoryCloseSound = ExtResource("4_t385i")
 
@@ -65,33 +65,6 @@ theme_override_font_sizes/font_size = 50
 text = "PAUSED"
 horizontal_alignment = 1
 vertical_alignment = 1
-
-[node name="DebugControl" type="Control" parent="." unique_id=473154944]
-layout_mode = 1
-anchor_left = 0.73200005
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -176.26404
-grow_vertical = 2
-
-[node name="Background" type="ColorRect" parent="DebugControl" unique_id=1928926089]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 5.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0, 0, 0, 0.6313726)
-
-[node name="DebugVBoxContainer" type="VBoxContainer" parent="DebugControl" unique_id=1631559815]
-layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.023000002
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -0.10700035
-grow_vertical = 2
 
 [node name="ProgressBar" type="ProgressBar" parent="." unique_id=1817474894]
 layout_mode = 1
