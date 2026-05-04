@@ -176,6 +176,18 @@ public partial class LimbHealthUI : Control
         {
             part.IsEllipse = true;
         }
+        if (DisplayServer.IsTouchscreenAvailable())
+        {
+            part.MouseFilter = MouseFilterEnum.Stop;
+            part.GuiInput += (InputEvent evt) =>
+            {
+                if (evt is InputEventScreenTouch t && t.Pressed)
+                {
+                    SetSelectionMode(SelectionMode.Limb, def.Name);
+                    GetViewport().SetInputAsHandled();
+                }
+            };
+        }
         return part;
     }
 

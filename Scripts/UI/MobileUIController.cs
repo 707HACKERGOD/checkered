@@ -243,7 +243,7 @@ public partial class MobileUIController : CanvasLayer
         }
         else if (paused)
         {
-            // Standalone pause menu (no other menus open) – hide everything
+            // Standalone pause menu – hide everything
             _invBtn.Visible = false;
             _healthBtn.Visible = false;
             _debugBtn.Visible = false;
@@ -258,7 +258,7 @@ public partial class MobileUIController : CanvasLayer
             _pauseBtn.Visible = true;
         }
 
-        // Action bar and joystick are hidden whenever any menu or pause is active
+        // Action bar and joystick: hidden when any menu is open or game is paused
         _actionButtonBar.Visible = !anyMenuOpen && !paused;
         _joystick.Visible        = !anyMenuOpen && !paused;
     }

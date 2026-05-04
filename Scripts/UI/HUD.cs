@@ -223,6 +223,7 @@ public partial class HUD : Control
         var vbox = new VBoxContainer();
         vbox.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         vbox.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
+        vbox.MouseFilter = MouseFilterEnum.Ignore;
 
         // 4. Wrap in a ScrollContainer
         var scroll = new ScrollContainer();
@@ -231,9 +232,70 @@ public partial class HUD : Control
         scroll.FollowFocus = true;
         scroll.MouseFilter = MouseFilterEnum.Stop;     // captures touch drag
         scroll.GetVScrollBar().Visible = false;       // no visible bar
+        scroll.ProcessMode = ProcessModeEnum.Always;
 
         scroll.AddChild(vbox);
         overlay.AddChild(scroll);
+        // --- Stupid‑simple touch‑scrolling for the debug list ---
+        float scrollStartY = 0f;
+        int scrollStartOffset = 0;
+        Vector2 touchStartPos = Vector2.Zero;
+
+        scroll.GuiInput += (InputEvent e) =>
+        {
+            if (!scroll.Visible) return;
+
+            if (e is InputEventScreenTouch touch)
+            {
+                if (touch.Pressed)
+                {
+                    scrollStartY = touch.Position.Y;
+                    scrollStartOffset = scroll.ScrollVertical;
+                    touchStartPos = touch.Position;
+                    scroll.AcceptEvent();
+                    scroll.GetViewport().SetInputAsHandled();
+                }
+                else // Released
+                {
+                    if (touch.Position.DistanceTo(touchStartPos) < 20f)
+                    {
+                        // It's a tap – figure out which debug item was tapped
+                        float contentY = touch.Position.Y - scroll.GlobalPosition.Y + scroll.ScrollVertical;
+                        float totalHeight = 0f;
+                        int tappedIdx = -1;
+                        for (int i = 0; i < _labelPool.Count && i < _menuItems.Count; i++)
+                        {
+                            var lbl = _labelPool[i];
+                            if (!lbl.Visible) continue;
+                            float lblHeight = lbl.Size.Y;
+                            if (contentY >= totalHeight && contentY < totalHeight + lblHeight)
+                            {
+                                tappedIdx = i;
+                                break;
+                            }
+                            totalHeight += lblHeight;
+                        }
+                        if (tappedIdx >= 0)
+                        {
+                            _selectedIdx = tappedIdx;
+                            RenderDebugMenu();
+                            // For items with OnExecute, activate; for sliders, do nothing (later we add sliders)
+                            if (_menuItems[tappedIdx] is ActionItem act && act.OnExecute != null)
+                                act.OnExecute();
+                        }
+                    }
+                    scroll.AcceptEvent();
+                    scroll.GetViewport().SetInputAsHandled();
+                }
+            }
+            else if (e is InputEventScreenDrag drag)
+            {
+                float deltaY = drag.Position.Y - scrollStartY;
+                scroll.ScrollVertical = scrollStartOffset - (int)Math.Round(deltaY);
+                scroll.AcceptEvent();
+                scroll.GetViewport().SetInputAsHandled();
+            }
+        };
 
         // 5. Position the debug panel – left on mobile, right on desktop
         const float panelWidth = 0.4f;        // 40% of screen
@@ -278,7 +340,10 @@ public partial class HUD : Control
 
         // 7. Attach to the CanvasLayer (or to HUD as fallback)
         if (_debugCanvasLayer != null)
+        {
+            _debugCanvasLayer.ProcessMode = ProcessModeEnum.Always;
             _debugCanvasLayer.AddChild(overlay);
+        }
         else
             AddChild(overlay);
 
@@ -450,7 +515,7 @@ public partial class HUD : Control
         {
             AnchorRight = 1.0f,
             AnchorBottom = 1.0f,
-            MouseFilter = MouseFilterEnum.Stop,
+            MouseFilter = MouseFilterEnum.Pass,
             Visible = false
         };
         var bgStyle = new StyleBoxFlat { BgColor = new Color(0, 0, 0, 0.5f) };
@@ -465,7 +530,9 @@ public partial class HUD : Control
         _inventoryLeftPanel = new Panel();
         _inventoryLeftPanel.Theme = theme;                 
         ApplyInventoryPanelStyle(_inventoryLeftPanel);     
-        _inventoryLeftPanel.MouseFilter = MouseFilterEnum.Pass;
+        _inventoryLeftPanel.MouseFilter = DisplayServer.IsTouchscreenAvailable()
+            ? MouseFilterEnum.Stop
+            : MouseFilterEnum.Pass;
         _inventoryPanel.AddChild(_inventoryLeftPanel);
 
         // --- Lock Toggle (above left panel) ---
@@ -543,6 +610,7 @@ public partial class HUD : Control
         _inventoryRightPanel.AddChild(_crystalDiagram);
 
         ApplyLayout(LayoutState.Default, true);
+        EnableSwipeNavigation(_inventoryLeftPanel);
     }
 
     private void ApplyInventoryPanelStyle(Panel panel)
@@ -776,6 +844,7 @@ public partial class HUD : Control
 
     private void ConnectSlotSignals(Control slot)
     {
+        slot.MouseFilter = MouseFilterEnum.Stop;
         //slot.MouseEntered += () => ShowSlotTooltip(slot);
         //slot.MouseExited += () => _detailsLabel.Text = "";
 
@@ -785,6 +854,13 @@ public partial class HUD : Control
             {
                 int idx = (int)slot.GetMeta("slot_index");
                 SelectSlot(idx);
+                slot.GetViewport().SetInputAsHandled();
+            }
+            else if (e is InputEventScreenTouch touch && touch.Pressed)
+            {
+                int idx = (int)slot.GetMeta("slot_index");
+                SelectSlot(idx);
+                slot.GetViewport().SetInputAsHandled();
             }
         };
     }
@@ -1532,6 +1608,19 @@ public partial class HUD : Control
                 OutlineColor = Colors.Black,
                 FontSize = fontSize
             };
+            l.SetMeta("debug_index", _labelPool.Count);
+            l.GuiInput += (InputEvent evt) =>
+            {
+                if (evt is InputEventScreenTouch tt && tt.Pressed)
+                {
+                    int idx = (int)l.GetMeta("debug_index");
+                    _selectedIdx = idx;
+                    RenderDebugMenu();
+                    ExecuteCurrent();          // for presets/toggles, this runs the action
+                    // For sliders, execute does nothing – later we can add slider UI
+                    l.GetViewport().SetInputAsHandled();
+                }
+            };
             l.AutowrapMode = TextServer.AutowrapMode.WordSmart;
             l.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
             l.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
@@ -1827,5 +1916,50 @@ public partial class HUD : Control
         var image = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);
         image.Fill(Colors.Transparent);
         return ImageTexture.CreateFromImage(image);
+    }
+
+    private void EnableSwipeNavigation(Control panel)
+    {
+        Vector2 startPos = Vector2.Zero;
+        bool dragging = false;
+
+        panel.GuiInput += (InputEvent e) =>
+        {
+            if (e is InputEventScreenTouch t && t.Pressed)
+            {
+                startPos = t.Position;
+                dragging = true;
+                panel.AcceptEvent();      // claim the touch so camera doesn't react
+                panel.GetViewport().SetInputAsHandled();
+            }
+            else if (e is InputEventScreenTouch t2 && !t2.Pressed && dragging)
+            {
+                dragging = false;
+                Vector2 delta = t2.Position - startPos;
+                const float swipeThreshold = 30f;
+                if (delta.Length() < swipeThreshold)
+                {
+                    // Short tap → select
+                    Input.ActionPress("ui_accept");
+                    GetTree().CreateTimer(0.02).Timeout += () => Input.ActionRelease("ui_accept");
+                }
+                else
+                {
+                    // Swipe → navigate
+                    if (Mathf.Abs(delta.X) > Mathf.Abs(delta.Y))
+                        FireDirection(delta.X > 0 ? "move_right" : "move_left");
+                    else
+                        FireDirection(delta.Y > 0 ? "move_back" : "move_forward");
+                }
+                panel.AcceptEvent();
+                panel.GetViewport().SetInputAsHandled();
+            }
+        };
+    }
+
+    private void FireDirection(string action)
+    {
+        Input.ActionPress(action);
+        GetTree().CreateTimer(0.02).Timeout += () => Input.ActionRelease(action);
     }
 }
