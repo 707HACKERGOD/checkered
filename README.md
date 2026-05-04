@@ -36,7 +36,7 @@ Demo:
 - 🚧 Sounds and music
 - 🚧 Debug menu
 - 🚧 Animation and movement system: idle, walk, sprint, jump, crouch, crawl, turning around, climb, swim
-- Sanity system
+- Sanity system (control over districts)
 - 5 NPCs in the first demo: Barkeeper, Rich truant, Phantom, Base_F, Base_M
 - Calendar UI
 - Open world map with 2 key buildings in demo: bar, trade school
