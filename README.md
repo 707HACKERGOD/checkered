@@ -5,6 +5,11 @@
 [![Windows](https://img.shields.io/badge/Windows-v0.1.1--alpha-blue?logo=windows&style=for-the-badge)](https://github.com/707HACKERGOD/checkered/releases/tag/v0.1.1)  
 [![Android](https://img.shields.io/badge/Android-v0.1.1--alpha--android-green?logo=android&style=for-the-badge)](https://github.com/707HACKERGOD/checkered/releases/tag/v0.1.1-alpha-android)
 
+System requirements (WIP):
+- 500MB storage
+- Windows 10+, x64
+- Android version 15
+
 Checkered (wip title) is a Godot 3d open world game for Windows and Android where you are an immortal cursed cryptid infiltrating a trade school.
 
 
