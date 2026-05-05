@@ -7,9 +7,9 @@ public partial class Player : CharacterBody3D
 {
     // --- MOVEMENT ---
     [ExportGroup("Movement")]
-    [Export] public float WalkSpeed = 5.0f;
-    [Export] public float RunSpeed = 10.0f;
-    [Export] public float JumpVelocity = 4.5f;
+    [Export] public float WalkSpeed = 3.5f;
+    [Export] public float RunSpeed = 6.0f;
+    [Export] public float JumpVelocity = 3.0f;
     [Export] public float TurnSpeed = 12.0f;
     public float Gravity = ProjectSettings.GetSetting("physics/3d/default_gravity").AsSingle();
 
@@ -358,6 +358,8 @@ public partial class Player : CharacterBody3D
     {
         if (@event is InputEventScreenTouch t)
         {
+            if (IsTouchInMenu(_pinch0) || IsTouchInMenu(t.Index))
+                return false;
             if (t.Pressed)
             {
                 // Only fingers that started in free area can be part of pinch
@@ -420,6 +422,8 @@ public partial class Player : CharacterBody3D
             IsInFreeArea(drag.Index) &&                       // <-- uses start position
             drag.Index != VirtualJoystick.ActiveTouchIndex)
         {
+            if (DisplayServer.IsTouchscreenAvailable() && IsTouchInMenu(drag.Index))
+                return false;
             RotateCamera(drag.Relative);
             return true;
         }
@@ -457,5 +461,12 @@ public partial class Player : CharacterBody3D
     {
         _isFirstPerson = !_isFirstPerson;
         if (_eyeTracker != null) _eyeTracker.EnableHeadTracking = !_isFirstPerson;
+    }
+
+    private bool IsTouchInMenu(int touchIndex)
+    {
+        if (!_touchStartPositions.TryGetValue(touchIndex, out Vector2 startPos))
+            return false;   // touch not tracked, allow camera (safety)
+        return HUD.Instance != null && HUD.Instance.IsPointInsideAnyMenu(startPos);
     }
 }

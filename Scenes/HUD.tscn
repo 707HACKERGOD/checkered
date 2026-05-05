@@ -6,7 +6,7 @@
 [ext_resource type="Script" uid="uid://csachb0rtxovs" path="res://Scripts/UI/HealthBar.cs" id="3_psnte"]
 [ext_resource type="AudioStream" uid="uid://qo1gpnj6rn2m" path="res://Assets/Audio/inventory_close.ogg" id="4_t385i"]
 
-[node name="HUD" type="Control" unique_id=2068370090 node_paths=PackedStringArray("_timeLabel", "_sanityBar", "_pauseMenu", "_debugControl", "_debugVBoxContainer")]
+[node name="HUD" type="Control" unique_id=2068370090 node_paths=PackedStringArray("_timeLabel", "_sanityBar", "_pauseMenu")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -20,12 +20,11 @@ script = ExtResource("1_sd512")
 _timeLabel = NodePath("TimeLabel")
 _sanityBar = NodePath("SanityBar")
 _pauseMenu = NodePath("PauseMenu")
-_debugControl = NodePath("")
-_debugVBoxContainer = NodePath("")
 _inventoryOpenSound = ExtResource("3_g8s2e")
 _inventoryCloseSound = ExtResource("4_t385i")
 
 [node name="SanityBar" type="ProgressBar" parent="." unique_id=1017387679]
+visible = false
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.81700003

@@ -12,9 +12,12 @@ public partial class HUD : Control
     [Export] private Label _timeLabel;
     [Export] private ProgressBar _sanityBar;
     [Export] private CanvasLayer _debugCanvasLayer;   // wraps the debug container
+    private ColorRect _debugBackground;
     private ScrollContainer _debugScrollContainer;
+    private Vector2 _debugTouchStartPos;
     [Export] private CanvasLayer _healthCanvasLayer;  // wraps the health panel
     public bool IsGamePaused => _isPaused || _isDebugOpen;
+    private bool _scrollClaimedPress = false;
 
     public static HUD Instance { get; private set; }
     public bool IsInventoryOpen => _inventoryPanel != null && _inventoryPanel.Visible;
@@ -97,7 +100,7 @@ public partial class HUD : Control
 
     // ========== Debug Menu ==========
     private List<DebugItem> _menuItems = new List<DebugItem>();
-    private List<Label> _labelPool = new List<Label>();
+    private List<Control> _itemRows = new();
     private int _selectedIdx = 0;
     private bool _isDebugOpen = false;
 
@@ -123,6 +126,7 @@ public partial class HUD : Control
     {
         public Action OnExecute;
         public Action<int> OnAdjust;
+        public Action<float> SetValue;   // slider version, null if not a slider item
         public Func<string> GetDisplayValue;
         public ActionItem() { Color = Colors.LightGreen; }
     }
@@ -217,6 +221,7 @@ public partial class HUD : Control
         var bg = new ColorRect();
         bg.Color = new Color(0, 0, 0, 0.5f);
         bg.MouseFilter = MouseFilterEnum.Ignore;
+        _debugBackground = bg;          // ← add this
         overlay.AddChild(bg);
 
         // 3. New VBoxContainer for the debug labels
@@ -232,11 +237,14 @@ public partial class HUD : Control
         scroll.FollowFocus = true;
         scroll.MouseFilter = MouseFilterEnum.Stop;     // captures touch drag
         scroll.GetVScrollBar().Visible = false;       // no visible bar
+        scroll.GetVScrollBar().Modulate = Colors.Transparent;
         scroll.ProcessMode = ProcessModeEnum.Always;
 
         scroll.AddChild(vbox);
         overlay.AddChild(scroll);
         // --- Stupid‑simple touch‑scrolling for the debug list ---
+
+        // --- Touch‑scrolling for the debug list ---
         float scrollStartY = 0f;
         int scrollStartOffset = 0;
         Vector2 touchStartPos = Vector2.Zero;
@@ -249,46 +257,77 @@ public partial class HUD : Control
             {
                 if (touch.Pressed)
                 {
+                    // Determine if this touch should be given to an HSlider (or +/- button) instead of the scroll container.
+                    bool childWillHandle = false;
+                    Vector2 globalPos = scroll.GlobalPosition + touch.Position;
+
+                    // Walk the live UI tree: scroll -> _debugVBoxContainer -> PanelContainer -> VBoxContainer -> children
+                    if (_debugVBoxContainer != null)
+                    {
+                        foreach (Node panelNode in _debugVBoxContainer.GetChildren())
+                        {
+                            if (panelNode is PanelContainer panel && panel.GetGlobalRect().HasPoint(globalPos))
+                            {
+                                // Look inside the panel for an HSlider that contains the point
+                                var innerVBox = panel.GetChildOrNull<VBoxContainer>(0);
+                                if (innerVBox != null)
+                                {
+                                    foreach (Node row in innerVBox.GetChildren())
+                                    {
+                                        if (row is HBoxContainer hbox)
+                                        {
+                                            foreach (Node widget in hbox.GetChildren())
+                                            {
+                                                if (widget is HSlider slider && slider.GetGlobalRect().HasPoint(globalPos))
+                                                {
+                                                    childWillHandle = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        if (childWillHandle) break;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+
                     scrollStartY = touch.Position.Y;
                     scrollStartOffset = scroll.ScrollVertical;
                     touchStartPos = touch.Position;
-                    scroll.AcceptEvent();
-                    scroll.GetViewport().SetInputAsHandled();
-                }
-                else // Released
-                {
-                    if (touch.Position.DistanceTo(touchStartPos) < 20f)
+
+                    _scrollClaimedPress = !childWillHandle;
+                    if (_scrollClaimedPress)
                     {
-                        // It's a tap – figure out which debug item was tapped
-                        float contentY = touch.Position.Y - scroll.GlobalPosition.Y + scroll.ScrollVertical;
-                        float totalHeight = 0f;
-                        int tappedIdx = -1;
-                        for (int i = 0; i < _labelPool.Count && i < _menuItems.Count; i++)
+                        scroll.AcceptEvent();
+                        scroll.GetViewport().SetInputAsHandled();
+                    }
+                }
+                else if (_scrollClaimedPress && touch.Position.DistanceTo(touchStartPos) < 30f)
+                {
+                    // Short tap – find which panel row was tapped
+                    Vector2 globalTouchPos = scroll.GlobalPosition + touch.Position;
+                    for (int i = 0; i < _itemRows.Count && i < _menuItems.Count; i++)
+                    {
+                        var ctrl = _itemRows[i];
+                        if (ctrl.Visible && ctrl.GetGlobalRect().HasPoint(globalTouchPos))
                         {
-                            var lbl = _labelPool[i];
-                            if (!lbl.Visible) continue;
-                            float lblHeight = lbl.Size.Y;
-                            if (contentY >= totalHeight && contentY < totalHeight + lblHeight)
-                            {
-                                tappedIdx = i;
-                                break;
-                            }
-                            totalHeight += lblHeight;
-                        }
-                        if (tappedIdx >= 0)
-                        {
-                            _selectedIdx = tappedIdx;
+                            if (_menuItems[i] is HeaderItem)
+                                break;   // ignore header taps
+
+                            _selectedIdx = i;
                             RenderDebugMenu();
-                            // For items with OnExecute, activate; for sliders, do nothing (later we add sliders)
-                            if (_menuItems[tappedIdx] is ActionItem act && act.OnExecute != null)
+                            if (_menuItems[i] is ActionItem act && act.OnExecute != null)
                                 act.OnExecute();
+                            break;
                         }
                     }
                     scroll.AcceptEvent();
                     scroll.GetViewport().SetInputAsHandled();
                 }
             }
-            else if (e is InputEventScreenDrag drag)
+            else if (e is InputEventScreenDrag drag && _scrollClaimedPress)
             {
                 float deltaY = drag.Position.Y - scrollStartY;
                 scroll.ScrollVertical = scrollStartOffset - (int)Math.Round(deltaY);
@@ -322,7 +361,7 @@ public partial class HUD : Control
                 control.AnchorLeft = 1.0f - panelWidth;
                 control.AnchorRight = 1.0f;
                 control.OffsetLeft = -marginLeft;
-                control.OffsetRight = -marginRight;  // negative margin becomes positive inward
+                control.OffsetRight = -marginRight;
             }
             control.AnchorTop = 0.0f;
             control.AnchorBottom = 1.0f;
@@ -377,7 +416,7 @@ public partial class HUD : Control
         _splashNode = GetTree().Root.FindChild("RainSplashParticles", true, false) as GpuParticles3D;
         _snowNode = GetTree().Root.FindChild("SnowParticles", true, false) as GpuParticles3D;
 
-        GD.Print($"HUD layers - inventory: 5, debug/health: 25, pause: {_pauseMenu?.Layer}, mobile: 128");
+        //GD.Print($"HUD layers - inventory: 5, debug/health: 25, pause: {_pauseMenu?.Layer}, mobile: 128");
     }
 
 
@@ -386,6 +425,7 @@ public partial class HUD : Control
     {
         if (_inventoryPanel != null && _inventoryPanel.Visible)
             ApplyLayout(_currentLayout, true);
+        UpdateDebugScrollContainerRect();
     }
 
     // ========== Interaction Prompt ==========
@@ -533,6 +573,11 @@ public partial class HUD : Control
         _inventoryLeftPanel.MouseFilter = DisplayServer.IsTouchscreenAvailable()
             ? MouseFilterEnum.Stop
             : MouseFilterEnum.Pass;
+        _inventoryLeftPanel.GuiInput += (InputEvent e) =>
+        {
+            if (e is InputEventScreenTouch || e is InputEventScreenDrag)
+                _inventoryLeftPanel.GetViewport().SetInputAsHandled();
+        };
         _inventoryPanel.AddChild(_inventoryLeftPanel);
 
         // --- Lock Toggle (above left panel) ---
@@ -596,6 +641,11 @@ public partial class HUD : Control
         ApplyInventoryPanelStyle(_inventoryRightPanel);
         _inventoryRightPanel.MouseFilter = MouseFilterEnum.Pass;
         _inventoryRightPanel.Visible = false;
+        _inventoryRightPanel.GuiInput += (InputEvent e) =>
+        {
+            if (e is InputEventScreenTouch || e is InputEventScreenDrag)
+                _inventoryRightPanel.GetViewport().SetInputAsHandled();
+        };
         _inventoryPanel.AddChild(_inventoryRightPanel);
 
         _crystalDiagram = new CrystalDiagram
@@ -1219,6 +1269,7 @@ public partial class HUD : Control
             {
                 // Bring the debug overlay (including its children) to front
                 _debugControl.GetParent().MoveChild(_debugControl, -1);
+                CallDeferred(nameof(UpdateDebugScrollContainerRect));
                 RenderDebugMenu();
                 GetTree().Paused = true;
             }
@@ -1369,20 +1420,70 @@ public partial class HUD : Control
         AddToggle("Snow Particles", _snowNode);
 
         _menuItems.Add(new HeaderItem("GROUND & WIND (< >)"));
-        AddSlider("Puddle Coverage", "rain_amount", 0.05f);
-        AddSlider("Snow Coverage", "snow_amount", 0.05f);
-        AddSlider("Ice Coverage", "ice_amount", 0.05f);
+        // Puddle Coverage
+        _menuItems.Add(new ActionItem
+        {
+            Name = "Puddle Coverage",
+            OnAdjust = (dir) => {
+                float current = _trackedValues.ContainsKey("rain_amount") ? _trackedValues["rain_amount"] : 0f;
+                float next = Mathf.Clamp(current + (dir * 0.05f), 0.0f, 1.0f);
+                _trackedValues["rain_amount"] = next;
+                RenderingServer.GlobalShaderParameterSet("rain_amount", next);
+            },
+            SetValue = (val) => {
+                val = Mathf.Clamp(val, 0.0f, 1.0f);
+                _trackedValues["rain_amount"] = val;
+                RenderingServer.GlobalShaderParameterSet("rain_amount", val);
+            },
+            GetDisplayValue = () => _trackedValues["rain_amount"].ToString("0.00")
+        });
+        // Snow Coverage
+        _menuItems.Add(new ActionItem
+        {
+            Name = "Snow Coverage",
+            OnAdjust = (dir) => {
+                float current = _trackedValues.ContainsKey("snow_amount") ? _trackedValues["snow_amount"] : 0f;
+                float next = Mathf.Clamp(current + (dir * 0.05f), 0.0f, 1.0f);
+                _trackedValues["snow_amount"] = next;
+                RenderingServer.GlobalShaderParameterSet("snow_amount", next);
+            },
+            SetValue = (val) => {
+                val = Mathf.Clamp(val, 0.0f, 1.0f);
+                _trackedValues["snow_amount"] = val;
+                RenderingServer.GlobalShaderParameterSet("snow_amount", val);
+            },
+            GetDisplayValue = () => _trackedValues["snow_amount"].ToString("0.00")
+        });
+        // Ice Coverage
+        _menuItems.Add(new ActionItem
+        {
+            Name = "Ice Coverage",
+            OnAdjust = (dir) => {
+                float current = _trackedValues.ContainsKey("ice_amount") ? _trackedValues["ice_amount"] : 0f;
+                float next = Mathf.Clamp(current + (dir * 0.05f), 0.0f, 1.0f);
+                _trackedValues["ice_amount"] = next;
+                RenderingServer.GlobalShaderParameterSet("ice_amount", next);
+            },
+            SetValue = (val) => {
+                val = Mathf.Clamp(val, 0.0f, 1.0f);
+                _trackedValues["ice_amount"] = val;
+                RenderingServer.GlobalShaderParameterSet("ice_amount", val);
+            },
+            GetDisplayValue = () => _trackedValues["ice_amount"].ToString("0.00")
+        });
 
         _menuItems.Add(new ActionItem
         {
             Name = "Wind Speed",
             OnAdjust = (dir) => AdjustWind("wind_speed", dir * 1.0f),
+            SetValue = (val) => AdjustWind("wind_speed", val - _trackedValues["wind_speed"]),
             GetDisplayValue = () => _trackedValues["wind_speed"].ToString("0.0")
         });
         _menuItems.Add(new ActionItem
         {
             Name = "Wind Angle",
             OnAdjust = (dir) => AdjustWind("wind_angle", dir * 15.0f),
+            SetValue = (val) => AdjustWind("wind_angle", val - _trackedValues["wind_angle"]),
             GetDisplayValue = () => _trackedValues["wind_angle"].ToString("0") + "°"
         });
         _menuItems.Add(new ActionItem
@@ -1401,6 +1502,11 @@ public partial class HUD : Control
         {
             Name = "Fog Density",
             OnAdjust = (dir) => AdjustFogDensity(dir * 0.005f),
+            SetValue = (val) => {
+                var env = GetEnvironment();
+                if (env != null && env.VolumetricFogEnabled)
+                    env.VolumetricFogDensity = Mathf.Clamp(val, 0.0f, 0.5f);
+            },
             GetDisplayValue = () => GetFogDensity().ToString("0.000")
         });
 
@@ -1414,6 +1520,9 @@ public partial class HUD : Control
                     float next = Mathf.Max(0, _timeManager.TimeScale + (dir * 1.0f));
                     _timeManager.TimeScale = next;
                 }
+            },
+            SetValue = (val) => {
+                if (_timeManager != null) _timeManager.TimeScale = Mathf.Max(0, val);
             },
             GetDisplayValue = () => _timeManager?.TimeScale.ToString("0.0") + "x"
         });
@@ -1571,15 +1680,117 @@ public partial class HUD : Control
 
     private void Navigate(int dir)
     {
+        int prevIdx = _selectedIdx;
         _selectedIdx += dir;
         if (_selectedIdx < 0) _selectedIdx = _menuItems.Count - 1;
         if (_selectedIdx >= _menuItems.Count) _selectedIdx = 0;
-        if (_menuItems[_selectedIdx] is HeaderItem) Navigate(dir);
-        RenderDebugMenu();
+        if (_menuItems[_selectedIdx] is HeaderItem)
+            _selectedIdx = FindNextNonHeader(_selectedIdx, dir);
+        UpdateDebugSelection(prevIdx, _selectedIdx);
+        CallDeferred(nameof(DeferredEnsureVisible), _selectedIdx);
+    }
 
-        // Auto‑scroll to keep the selected label visible
-        if (_debugScrollContainer != null && _selectedIdx >= 0 && _selectedIdx < _labelPool.Count)
-            _debugScrollContainer.EnsureControlVisible(_labelPool[_selectedIdx]);
+    private int FindNextNonHeader(int startIdx, int dir)
+    {
+        int idx = startIdx;
+        for (int i = 0; i < _menuItems.Count; i++)
+        {
+            idx += dir;
+            if (idx < 0) idx = _menuItems.Count - 1;
+            if (idx >= _menuItems.Count) idx = 0;
+            if (!(_menuItems[idx] is HeaderItem))
+                return idx;
+        }
+        return startIdx;
+    }
+
+    private void UpdateDebugSelection(int oldIdx, int newIdx)
+    {
+        if (oldIdx >= 0 && oldIdx < _itemRows.Count)
+            ApplyDebugItemStyle(oldIdx, false);
+        if (newIdx >= 0 && newIdx < _itemRows.Count)
+            ApplyDebugItemStyle(newIdx, true);
+    }
+
+    private void ApplyDebugItemStyle(int idx, bool selected)
+    {
+        if (idx < 0 || idx >= _itemRows.Count || idx >= _menuItems.Count) return;
+
+        var itemPanel = _itemRows[idx] as PanelContainer;
+        if (itemPanel == null) return;
+
+        var item = _menuItems[idx];
+
+        // Panel background / border
+        var panelStyle = itemPanel.GetThemeStylebox("panel")?.Duplicate() as StyleBoxFlat;
+        if (panelStyle == null) panelStyle = new StyleBoxFlat();
+
+        panelStyle.BgColor = selected
+            ? new Color(0.15f, 0.25f, 0.15f, 0.7f)
+            : new Color(0.1f, 0.1f, 0.1f, 0.4f);
+        panelStyle.BorderColor = selected
+            ? Colors.GreenYellow
+            : new Color(0.4f, 0.4f, 0.4f, 0.6f);
+        panelStyle.SetBorderWidthAll(selected ? 3 : 1);
+        itemPanel.AddThemeStyleboxOverride("panel", panelStyle);
+
+        // Label text & color
+        var vbox = itemPanel.GetChildOrNull<VBoxContainer>(0);
+        if (vbox == null) return;
+        var lbl = vbox.GetChildOrNull<Label>(0);
+        if (lbl == null) return;
+
+        lbl.Text = BuildItemText(idx, item);
+        lbl.Modulate = selected
+            ? Colors.GreenYellow
+            : (item is HeaderItem ? Colors.Gold : Colors.LightGray);
+
+        // Slider grabber color (if this row has one)
+        if (item is ActionItem action && action.SetValue != null)
+        {
+            var sliderRow = vbox.GetChildOrNull<HBoxContainer>(1);
+            if (sliderRow != null)
+            {
+                foreach (Node child in sliderRow.GetChildren())
+                {
+                    if (child is HSlider slider)
+                    {
+                        var grabber = slider.GetThemeStylebox("grabber")?.Duplicate() as StyleBoxFlat;
+                        if (grabber != null)
+                        {
+                            grabber.BgColor = selected ? Colors.GreenYellow : Colors.White;
+                            slider.AddThemeStyleboxOverride("grabber", grabber);
+                        }
+                        var grabberHi = slider.GetThemeStylebox("grabber_highlight")?.Duplicate() as StyleBoxFlat;
+                        if (grabberHi != null)
+                        {
+                            grabberHi.BgColor = selected ? Colors.Yellow : Colors.White;
+                            slider.AddThemeStyleboxOverride("grabber_highlight", grabberHi);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void DeferredEnsureVisible(int idx)
+    {
+        if (_debugScrollContainer == null || idx < 0 || idx >= _itemRows.Count) return;
+
+        var item = _itemRows[idx];
+        _debugScrollContainer.EnsureControlVisible(item);
+
+        // Manual fallback – directly set scroll position if the previous call failed
+        var rect = item.GetRect();
+        int itemTop = (int)rect.Position.Y;
+        int itemBottom = (int)(rect.Position.Y + rect.Size.Y);
+        int viewHeight = (int)_debugScrollContainer.Size.Y;
+        int current = _debugScrollContainer.ScrollVertical;
+
+        if (itemTop < current)
+            _debugScrollContainer.ScrollVertical = itemTop;
+        else if (itemBottom > current + viewHeight)
+            _debugScrollContainer.ScrollVertical = itemBottom - viewHeight;
     }
 
     private void ExecuteCurrent()
@@ -1598,64 +1809,238 @@ public partial class HUD : Control
     {
         if (_debugVBoxContainer == null) return;
 
-        while (_labelPool.Count < _menuItems.Count)
+        foreach (Node child in _debugVBoxContainer.GetChildren())
+            child.QueueFree();
+        _itemRows.Clear();
+
+        _debugVBoxContainer.AddThemeConstantOverride("separation", 6);
+
+        int fontSize = DisplayServer.IsTouchscreenAvailable() ? 44 : 30;
+        bool mobile = DisplayServer.IsTouchscreenAvailable();
+
+        for (int i = 0; i < _menuItems.Count; i++)
         {
-            int fontSize = DisplayServer.IsTouchscreenAvailable() ? 40 : 30; // debug font size is 40 on mobile and 30 on desktop
-            Label l = new Label();
-            l.LabelSettings = new LabelSettings()
+            var item = _menuItems[i];
+            bool isSelected = (i == _selectedIdx);
+
+            // ----- Item Panel (visual outline + touch target) -----
+            var itemPanel = new PanelContainer();
+            itemPanel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            itemPanel.MouseFilter = MouseFilterEnum.Ignore;
+            itemPanel.CustomMinimumSize = new Vector2(0, mobile ? 90 : 50);
+
+            var panelStyle = new StyleBoxFlat();
+            panelStyle.BgColor = isSelected
+                ? new Color(0.15f, 0.25f, 0.15f, 0.7f)
+                : new Color(0.1f, 0.1f, 0.1f, 0.4f);
+            panelStyle.BorderColor = isSelected
+                ? Colors.GreenYellow
+                : new Color(0.4f, 0.4f, 0.4f, 0.6f);
+            panelStyle.SetBorderWidthAll(isSelected ? 3 : 1);
+            panelStyle.SetCornerRadiusAll(6);
+            panelStyle.ContentMarginLeft = 16;
+            panelStyle.ContentMarginRight = 16;
+            panelStyle.ContentMarginTop = mobile ? 12 : 6;
+            panelStyle.ContentMarginBottom = mobile ? 12 : 6;
+            itemPanel.AddThemeStyleboxOverride("panel", panelStyle);
+
+            var vbox = new VBoxContainer();
+            vbox.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            vbox.MouseFilter = MouseFilterEnum.Ignore;
+            itemPanel.AddChild(vbox);
+
+            // ----- Label -----
+            Label lbl = new Label();
+            lbl.LabelSettings = new LabelSettings()
             {
                 OutlineSize = 4,
                 OutlineColor = Colors.Black,
                 FontSize = fontSize
             };
-            l.SetMeta("debug_index", _labelPool.Count);
-            l.GuiInput += (InputEvent evt) =>
-            {
-                if (evt is InputEventScreenTouch tt && tt.Pressed)
-                {
-                    int idx = (int)l.GetMeta("debug_index");
-                    _selectedIdx = idx;
-                    RenderDebugMenu();
-                    ExecuteCurrent();          // for presets/toggles, this runs the action
-                    // For sliders, execute does nothing – later we can add slider UI
-                    l.GetViewport().SetInputAsHandled();
-                }
-            };
-            l.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-            l.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-            l.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
-            l.MouseFilter = MouseFilterEnum.Ignore;   // let drag events reach ScrollContainer
-            _debugVBoxContainer.AddChild(l);
-            _labelPool.Add(l);
-        }
-
-        for (int i = 0; i < _labelPool.Count; i++)
-        {
-            var lbl = _labelPool[i];
-
+            lbl.AutowrapMode = TextServer.AutowrapMode.WordSmart;
             lbl.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
             lbl.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
             lbl.MouseFilter = MouseFilterEnum.Ignore;
+            lbl.Text = BuildItemText(i, item);
+            lbl.Modulate = isSelected
+                ? Colors.GreenYellow
+                : (item is HeaderItem ? Colors.Gold : Colors.LightGray);
+            lbl.HorizontalAlignment = (item is HeaderItem)
+                ? HorizontalAlignment.Center
+                : HorizontalAlignment.Left;
+            vbox.AddChild(lbl);
 
-            if (i >= _menuItems.Count) { lbl.Visible = false; continue; }
-            var item = _menuItems[i];
-            lbl.Visible = true;
-            bool isSelected = (i == _selectedIdx);
+            // ----- Slider row (only for adjustable items) -----
+            if (item is ActionItem action && action.SetValue != null)
+            {
+                var sliderRow = new HBoxContainer();
+                sliderRow.AddThemeConstantOverride("separation", 10);
+                sliderRow.CustomMinimumSize = new Vector2(0, mobile ? 70 : 45);
+                sliderRow.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+                sliderRow.MouseFilter = MouseFilterEnum.Ignore;
 
-            if (item is HeaderItem)
-            {
-                lbl.Text = item.Name;
-                lbl.Modulate = item.Color;
-                lbl.HorizontalAlignment = HorizontalAlignment.Center;
+                // Minus button (mobile only)
+                if (mobile)
+                {
+                    var minusBtn = new Button();
+                    minusBtn.Text = "−";
+                    minusBtn.CustomMinimumSize = new Vector2(70, 60);
+                    minusBtn.MouseFilter = MouseFilterEnum.Stop;
+                    var btnStyle = new StyleBoxFlat();
+                    btnStyle.BgColor = new Color(0.25f, 0.25f, 0.25f, 0.9f);
+                    btnStyle.SetCornerRadiusAll(10);
+                    minusBtn.AddThemeStyleboxOverride("normal", btnStyle);
+                    minusBtn.AddThemeFontSizeOverride("font_size", 36);
+                    int idx = i;
+                    minusBtn.Pressed += () =>
+                    {
+                        if (_menuItems[idx] is ActionItem act && act.OnAdjust != null)
+                        {
+                            act.OnAdjust(-1);
+                            if (idx < _itemRows.Count && _itemRows[idx] is Control ctrl)
+                            {
+                                var label = ctrl.GetChild(0).GetChildOrNull<Label>(0);
+                                if (label != null)
+                                    label.Text = BuildItemText(idx, _menuItems[idx]);
+                            }
+                        }
+                    };
+                    sliderRow.AddChild(minusBtn);
+                }
+
+                var slider = new HSlider();
+                float val = 0;
+                string disp = action.GetDisplayValue();
+                if (disp.EndsWith("°")) disp = disp.TrimEnd('°');
+                if (disp.EndsWith("x")) disp = disp.TrimEnd('x');
+                float.TryParse(disp, System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.InvariantCulture, out val);
+
+                float min = 0, max = 1, step = 0.01f;
+                if (action.Name.Contains("Wind Speed")) { max = 50; step = 1; }
+                else if (action.Name.Contains("Wind Angle")) { max = 360; step = 15; }
+                else if (action.Name.Contains("Fog Density")) { max = 0.5f; step = 0.005f; }
+                else if (action.Name.Contains("Time Scale")) { min = 0; max = 10; step = 0.1f; }
+
+                slider.MinValue = min;
+                slider.MaxValue = max;
+                slider.Step = step;
+                slider.Value = Math.Clamp(val, min, max);
+                slider.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+                slider.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+                slider.CustomMinimumSize = new Vector2(0, mobile ? 50 : 30);
+                slider.MouseFilter = MouseFilterEnum.Stop;
+
+                // Thick track
+                var sliderBg = new StyleBoxFlat();
+                sliderBg.BgColor = new Color(0.2f, 0.2f, 0.2f, 0.9f);
+                sliderBg.SetCornerRadiusAll(8);
+                sliderBg.ContentMarginTop = mobile ? 10 : 6;
+                sliderBg.ContentMarginBottom = mobile ? 10 : 6;
+                slider.AddThemeStyleboxOverride("slider", sliderBg);
+
+                // Large grabber for touch
+                var grabberStyle = new StyleBoxFlat();
+                grabberStyle.BgColor = isSelected ? Colors.GreenYellow : Colors.White;
+                grabberStyle.SetCornerRadiusAll(mobile ? 16 : 10);
+                grabberStyle.ContentMarginLeft = mobile ? 24 : 14;
+                grabberStyle.ContentMarginRight = mobile ? 24 : 14;
+                grabberStyle.ContentMarginTop = mobile ? 24 : 14;
+                grabberStyle.ContentMarginBottom = mobile ? 24 : 14;
+
+                var grabberHighlight = (StyleBoxFlat)grabberStyle.Duplicate();
+                grabberHighlight.BgColor = Colors.Yellow;
+
+                slider.AddThemeStyleboxOverride("grabber", grabberStyle);
+                slider.AddThemeStyleboxOverride("grabber_highlight", grabberHighlight);
+
+                int capturedIdx = i;
+                slider.ValueChanged += (double v) =>
+                {
+                    action.SetValue((float)v);
+                    if (capturedIdx < _itemRows.Count && _itemRows[capturedIdx] is Control ctrl)
+                    {
+                        var label = ctrl.GetChild(0).GetChildOrNull<Label>(0);
+                        if (label != null)
+                            label.Text = BuildItemText(capturedIdx, action);
+                    }
+                };
+
+                if (mobile)
+                {
+                    slider.GuiInput += (InputEvent e) =>
+                    {
+                        if (e is InputEventScreenTouch touch && touch.Pressed)
+                        {
+                            slider.AcceptEvent();
+                            float ratio = Mathf.Clamp(touch.Position.X / Mathf.Max(slider.Size.X, 1f), 0f, 1f);
+                            double newVal = slider.MinValue + ratio * (slider.MaxValue - slider.MinValue);
+                            newVal = Mathf.Round((float)(newVal / slider.Step)) * slider.Step;
+                            slider.Value = newVal;
+                        }
+                        else if (e is InputEventScreenDrag drag)
+                        {
+                            slider.AcceptEvent();
+                            float ratio = Mathf.Clamp(drag.Position.X / Mathf.Max(slider.Size.X, 1f), 0f, 1f);
+                            double newVal = slider.MinValue + ratio * (slider.MaxValue - slider.MinValue);
+                            newVal = Mathf.Round((float)(newVal / slider.Step)) * slider.Step;
+                            slider.Value = newVal;
+                        }
+                    };
+                }
+
+                sliderRow.AddChild(slider);
+
+                // Plus button (mobile only)
+                if (mobile)
+                {
+                    var plusBtn = new Button();
+                    plusBtn.Text = "+";
+                    plusBtn.CustomMinimumSize = new Vector2(70, 60);
+                    plusBtn.MouseFilter = MouseFilterEnum.Stop;
+                    var btnStyle = new StyleBoxFlat();
+                    btnStyle.BgColor = new Color(0.25f, 0.25f, 0.25f, 0.9f);
+                    btnStyle.SetCornerRadiusAll(10);
+                    plusBtn.AddThemeStyleboxOverride("normal", btnStyle);
+                    plusBtn.AddThemeFontSizeOverride("font_size", 36);
+                    int idx = i;
+                    plusBtn.Pressed += () =>
+                    {
+                        if (_menuItems[idx] is ActionItem act && act.OnAdjust != null)
+                        {
+                            act.OnAdjust(1);
+                            if (idx < _itemRows.Count && _itemRows[idx] is Control ctrl)
+                            {
+                                var label = ctrl.GetChild(0).GetChildOrNull<Label>(0);
+                                if (label != null)
+                                    label.Text = BuildItemText(idx, _menuItems[idx]);
+                            }
+                        }
+                    };
+                    sliderRow.AddChild(plusBtn);
+                }
+
+                vbox.AddChild(sliderRow);
             }
-            else if (item is ActionItem action)
-            {
-                string val = action.GetDisplayValue != null ? $" [{action.GetDisplayValue()}]" : "";
-                lbl.Text = $"{(isSelected ? "> " : "  ")}{item.Name}{val}";
-                lbl.Modulate = isSelected ? Colors.GreenYellow : Colors.LightGray;
-                lbl.HorizontalAlignment = HorizontalAlignment.Left;
-            }
+
+            _debugVBoxContainer.AddChild(itemPanel);
+            _itemRows.Add(itemPanel);
         }
+        _debugVBoxContainer.QueueSort();
+    }
+
+    // Helper to build text for labels (unchanged from your original, just moved out)
+    private string BuildItemText(int i, DebugItem item)
+    {
+        bool isSelected = (i == _selectedIdx);
+        if (item is HeaderItem)
+            return item.Name;
+        else if (item is ActionItem action)
+        {
+            string val = action.GetDisplayValue != null ? $" [{action.GetDisplayValue()}]" : "";
+            return $"{(isSelected ? "> " : "  ")}{item.Name}{val}";
+        }
+        return "";
     }
 
     public override void _Process(double delta)
@@ -1961,5 +2346,70 @@ public partial class HUD : Control
     {
         Input.ActionPress(action);
         GetTree().CreateTimer(0.02).Timeout += () => Input.ActionRelease(action);
+    }
+
+    public bool IsPointInInventoryUI(Vector2 screenPoint)
+    {
+        if (!IsInventoryOpen) return false;   // ← add this
+        if (_inventoryLeftPanel != null && _inventoryLeftPanel.GetGlobalRect().HasPoint(screenPoint))
+            return true;
+        if (_inventoryRightPanel is { Visible: true } && _inventoryRightPanel.GetGlobalRect().HasPoint(screenPoint))
+            return true;
+        return false;
+    }
+
+    public bool IsPointInDebugPanel(Vector2 screenPoint)
+    {
+        if (!_isDebugOpen) return false;   // ← add this
+        return _debugScrollContainer != null && _debugScrollContainer.GetGlobalRect().HasPoint(screenPoint);
+    }
+
+    public bool IsPointInHealthPanel(Vector2 screenPoint)
+    {
+        if (!IsHealthPanelOpen) return false;   // ← add this
+        return _healthPanel != null && _healthPanel.IsPointInside(screenPoint);
+    }
+
+    public bool IsPointInsideAnyMenu(Vector2 screenPoint)
+    {
+        return IsPointInInventoryUI(screenPoint) ||
+            IsPointInDebugPanel(screenPoint) ||
+            IsPointInHealthPanel(screenPoint);
+    }
+
+    private void UpdateDebugScrollContainerRect()
+    {
+        if (_debugScrollContainer == null) return;
+
+        Vector2 vp = GetViewportRect().Size;
+        float panelWidthRatio = DisplayServer.IsTouchscreenAvailable() ? 0.3f : 0.4f;
+        float marginLeft  = 10;
+        float marginRight = 10;
+        float marginTop   = 80;
+        float marginBottom = 20;
+
+        float x = DisplayServer.IsTouchscreenAvailable()
+            ? 250    // was marginLeft (10) – now 250 px from left edge
+            : vp.X * (1.0f - panelWidthRatio) + 10;
+        float w = vp.X * panelWidthRatio - marginLeft - marginRight;
+        float h = vp.Y - marginTop - marginBottom;
+
+        _debugScrollContainer.AnchorLeft = 0;
+        _debugScrollContainer.AnchorRight = 0;
+        _debugScrollContainer.AnchorTop = 0;
+        _debugScrollContainer.AnchorBottom = 0;
+        _debugScrollContainer.Position = new Vector2(x, marginTop);
+        _debugScrollContainer.Size = new Vector2(w, h);
+
+        // Match the background to the same rectangle
+        if (_debugBackground != null)
+        {
+            _debugBackground.AnchorLeft = 0;
+            _debugBackground.AnchorRight = 0;
+            _debugBackground.AnchorTop = 0;
+            _debugBackground.AnchorBottom = 0;
+            _debugBackground.Position = new Vector2(x, marginTop);
+            _debugBackground.Size = new Vector2(w, h);
+        }
     }
 }

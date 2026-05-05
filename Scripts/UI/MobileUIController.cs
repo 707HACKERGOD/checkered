@@ -15,6 +15,7 @@ public partial class MobileUIController : CanvasLayer
     private MobileButton _healthBtn;
     private MobileButton _debugBtn;
     private MobileButton _pauseBtn;
+    private bool _uiRevealed = false;
 
     public override void _Ready()
     {
@@ -28,11 +29,18 @@ public partial class MobileUIController : CanvasLayer
         BuildJoystick();
         BuildMenuBar();
         BuildActionBar();
+        // Start invisible – alpha 0, mouse ignore
+        _menuButtonBar.Modulate = new Color(1, 1, 1, 0);
+        _menuButtonBar.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _actionButtonBar.Modulate = new Color(1, 1, 1, 0);
+        _actionButtonBar.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _joystick.Modulate = new Color(1, 1, 1, 0);
+        _joystick.MouseFilter = Control.MouseFilterEnum.Ignore;
         CallDeferred(nameof(WireHUD));
         GetViewport().SizeChanged += Relayout;
         CallDeferred(nameof(Relayout));
 
-        GD.Print($"MobileUI layer: {Layer}");
+        //GD.Print($"MobileUI layer: {Layer}");
     }
 
     private void BuildJoystick()
@@ -268,4 +276,32 @@ public partial class MobileUIController : CanvasLayer
         MobileInput.MovementDirection = dir;
     }
     
+    public override void _Input(InputEvent @event)
+    {
+        if (_uiRevealed) return;
+
+        if (@event is InputEventScreenTouch touch && touch.Pressed)
+        {
+            RevealUI();
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    private void RevealUI()
+    {
+        _uiRevealed = true;
+        var tween = CreateTween()
+            .SetParallel(true)
+            .SetTrans(Tween.TransitionType.Quad)
+            .SetEase(Tween.EaseType.InOut);
+        tween.TweenProperty(_menuButtonBar, "modulate:a", 1.0f, 0.5f);
+        tween.TweenProperty(_actionButtonBar, "modulate:a", 1.0f, 0.5f);
+        tween.TweenProperty(_joystick, "modulate:a", 1.0f, 0.5f);
+        tween.Finished += () =>
+        {
+            _menuButtonBar.MouseFilter = Control.MouseFilterEnum.Pass;
+            _actionButtonBar.MouseFilter = Control.MouseFilterEnum.Pass;
+            _joystick.MouseFilter = Control.MouseFilterEnum.Stop;
+        };
+    }
 }

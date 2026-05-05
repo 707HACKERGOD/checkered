@@ -68,7 +68,7 @@ public partial class MobileButton : Button
     {
         // Diagnostics – show actual rect and touch position
         var globalRect = GetGlobalRect();
-        GD.Print($"[{Text}] Rect: {globalRect}  Size: {Size}  GlobalPos: {GlobalPosition}  TouchPos: {GetGlobalMousePosition()}  inside: {insideButton}");
+        //GD.Print($"[{Text}] Rect: {globalRect}  Size: {Size}  GlobalPos: {GlobalPosition}  TouchPos: {GetGlobalMousePosition()}  inside: {insideButton}");
 
         if (!TapOnce)
         {

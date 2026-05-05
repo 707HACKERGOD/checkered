@@ -110,8 +110,12 @@ public partial class VirtualJoystick : Control
 
         _knob.Position = _center + offset - _knob.Size / 2;
 
-        float strength = Mathf.Clamp(distance / _maxTravel, 0f, 1f);
-        if (strength < Deadzone) strength = 0f;
+        // Raw linear strength (0–1)
+        float raw = Mathf.Clamp(distance / _maxTravel, 0f, 1f);
+        if (raw < Deadzone) raw = 0f;
+
+        // Quadratic curve – makes low pushes very subtle, sprint only near the edge
+        float strength = raw * raw;   // try raw * raw or raw * raw * raw for even stronger effect
 
         EmitSignal(SignalName.JoystickMoved, dir * strength);
     }

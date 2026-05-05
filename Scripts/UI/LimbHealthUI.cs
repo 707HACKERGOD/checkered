@@ -606,4 +606,9 @@ public partial class LimbHealthUI : Control
 
         // The status panel children will automatically fill their parent thanks to anchors – no further action needed.
     }
+
+    public bool IsPointInside(Vector2 screenPoint)
+    {
+        return _panelBackground != null && _panelBackground.GetGlobalRect().HasPoint(screenPoint);
+    }
 }
