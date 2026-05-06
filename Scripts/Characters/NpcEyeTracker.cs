@@ -1,8 +1,7 @@
 using Godot;
 using System;
 
-[Tool]
-public partial class NpcEyeTracker : Node // Made it a Node so it's a clean Component!
+    public partial class NpcEyeTracker : Node // Made it a Node so it's a clean Component!
 {
     [ExportGroup("Core References")]
     [Export] public Node3D Target;

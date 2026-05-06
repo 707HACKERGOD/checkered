@@ -34,6 +34,7 @@ public partial class Player : CharacterBody3D
     private NpcEyeTracker _eyeTracker;
     private Area3D _interestArea;
     private Node3D _casualTarget;
+    private NpcInteraction _currentNpc;
 
     // Camera states
     private bool _isFirstPerson = false;
@@ -260,41 +261,83 @@ public partial class Player : CharacterBody3D
         if (!anyMenuOpen && PlayerCamera != null)
         {
             var spaceState = GetWorld3D().DirectSpaceState;
+
+            // Ray from camera – always long enough to reach anything regardless of camera mode
             Vector3 origin = PlayerCamera.GlobalPosition;
-            Vector3 end = origin - PlayerCamera.GlobalTransform.Basis.Z * _interactDistance;
+            Vector3 end = origin - PlayerCamera.GlobalTransform.Basis.Z * 10.0f;
+
             var query = PhysicsRayQueryParameters3D.Create(origin, end);
-            query.CollisionMask = 2;
+            query.CollisionMask = 4;
             query.CollideWithAreas = true;
             query.CollideWithBodies = true;
+            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
 
             var result = spaceState.IntersectRay(query);
-            InteractableItem newTarget = null;
-            if (result.Count > 0 && result["collider"].AsGodotObject() is InteractableItem item)
-                newTarget = item;
+            InteractableItem itemTarget = null;
+            NpcInteraction npcTarget = null;
 
-            if (newTarget != _currentInteractable)
+            if (result.Count > 0)
             {
-                _currentInteractable = newTarget;
-                if (_hud != null)
+                // Distance check: measure from player, not from camera
+                Vector3 playerCenter = GlobalPosition + new Vector3(0, 1.5f, 0);   // chest height
+                Vector3 hitPoint = (Vector3)result["position"];
+                float distToPlayer = playerCenter.DistanceTo(hitPoint);
+
+                // Only accept hits within the player's personal interaction radius
+                if (distToPlayer <= _interactDistance)
                 {
-                    if (_currentInteractable != null)
-                        _hud.ShowTooltipAtWorldPosition($"Pick up {_currentInteractable.Data.Name}", _currentInteractable.GlobalPosition, "E");
-                    else
-                        _hud.HideTooltip();
+                    var collider = result["collider"].AsGodotObject();
+                    if (collider is InteractableItem item)
+                        itemTarget = item;
+                    else if (collider is CharacterBody3D body)
+                        npcTarget = body.GetNodeOrNull<NpcInteraction>("Interaction");
                 }
             }
 
-            if (Input.IsActionJustPressed("interact") && _currentInteractable != null)
+            // Handle tooltip switching
+            if (itemTarget != _currentInteractable || npcTarget != _currentNpc)
             {
-                _currentInteractable.Pickup();
-                _currentInteractable = null;
-                _hud?.HideTooltip();
+                _currentInteractable = itemTarget;
+                _currentNpc = npcTarget;
+
+                if (_currentInteractable != null)
+                {
+                    _hud.ShowTooltipAtWorldPosition($"Pick up {_currentInteractable.Data.Name}", 
+                                                    _currentInteractable.GlobalPosition, "E");
+                }
+                else if (_currentNpc != null)
+                {
+                    string prefix = _currentNpc.IsDead ? "Dead " : "";
+                    _hud.ShowTooltipAtWorldPosition($"Talk to {prefix}{_currentNpc.NpcName}", 
+                        _currentNpc.GetParent<CharacterBody3D>().GlobalPosition, "E");
+                }
+                else
+                {
+                    _hud.HideTooltip();
+                }
+            }
+
+            // Interact key
+            if (Input.IsActionJustPressed("interact"))
+            {
+                if (_currentInteractable != null)
+                {
+                    _currentInteractable.Pickup();
+                    _currentInteractable = null;
+                    _currentNpc = null;
+                    _hud?.HideTooltip();
+                }
+                else if (_currentNpc != null)
+                {
+                    _currentNpc.Interact();   // start dialogue
+                }
             }
         }
-        else if (_hud != null && _currentInteractable != null)
+        else if (_hud != null && (_currentInteractable != null || _currentNpc != null))
         {
             _hud.HideTooltip();
             _currentInteractable = null;
+            _currentNpc = null;
         }
     }
 
