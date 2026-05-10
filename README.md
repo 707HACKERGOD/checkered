@@ -36,7 +36,7 @@ Demo:
 - ✅ Inventory UI, picking up items
 - ✅ Combat and health system with limb health
 - ✅ Debug menu
-- 🚧 NPC aggressive and desensive UI, interactions
+- 🚧 NPC aggressive and desensive behavior
 - 🚧 Possession system
 - 🚧 Sounds and music
 - 🚧 Animation and movement system: idle, walk, sprint, jump, crouch, crawl, turning around, climb, swim
