@@ -1,26 +1,30 @@
 [gd_scene format=3 uid="uid://d3r85210kwu82"]
 
-[ext_resource type="Theme" path="res://Scenes/UI/CheckeredTheme.tres" id="1_jo1ms"]
-[ext_resource type="Script" path="res://Scripts/UI/HUD.cs" id="1_sd512"]
-[ext_resource type="Script" path="res://Scripts/UI/HealthBar.cs" id="3_psnte"]
-[ext_resource type="Script" path="res://Scripts/UI/LimbHealthUI.cs" id="4_s3jbq"]
+[ext_resource type="Theme" uid="uid://cvqanmwjxleoy" path="res://Scenes/UI/CheckeredTheme.tres" id="1_jo1ms"]
+[ext_resource type="Script" uid="uid://cm5gt42g6dlxo" path="res://Scripts/UI/HUD.cs" id="1_sd512"]
+[ext_resource type="AudioStream" uid="uid://civ3kneya7wsq" path="res://Assets/Audio/inventory_open.ogg" id="3_g8s2e"]
+[ext_resource type="Script" uid="uid://csachb0rtxovs" path="res://Scripts/UI/HealthBar.cs" id="3_psnte"]
+[ext_resource type="AudioStream" uid="uid://qo1gpnj6rn2m" path="res://Assets/Audio/inventory_close.ogg" id="4_t385i"]
 
-[node name="HUD" type="Control" unique_id=2008112816 node_paths=PackedStringArray("_timeLabel", "_sanityBar", "_pauseMenu", "_debugContainer", "_debugList")]
+[node name="HUD" type="Control" unique_id=2068370090 node_paths=PackedStringArray("_timeLabel", "_sanityBar", "_pauseMenu")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
 theme = ExtResource("1_jo1ms")
 script = ExtResource("1_sd512")
 _timeLabel = NodePath("TimeLabel")
 _sanityBar = NodePath("SanityBar")
 _pauseMenu = NodePath("PauseMenu")
-_debugContainer = NodePath("DebugContainer")
-_debugList = NodePath("DebugContainer/DebugList")
+_inventoryOpenSound = ExtResource("3_g8s2e")
+_inventoryCloseSound = ExtResource("4_t385i")
 
 [node name="SanityBar" type="ProgressBar" parent="." unique_id=1017387679]
+visible = false
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.81700003
@@ -38,16 +42,10 @@ anchor_bottom = 0.07700001
 offset_right = 0.031982422
 offset_bottom = 0.10399628
 
-[node name="PauseMenu" type="Control" parent="." unique_id=1155846475]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+[node name="PauseMenu" type="CanvasLayer" parent="." unique_id=1018563353]
+layer = 20
 
 [node name="ColorRect" type="ColorRect" parent="PauseMenu" unique_id=66339658]
-layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -56,45 +54,16 @@ grow_vertical = 2
 color = Color(0, 0, 0, 0.49019608)
 
 [node name="Label" type="Label" parent="PauseMenu" unique_id=667144827]
-layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme = ExtResource("1_jo1ms")
 theme_override_font_sizes/font_size = 50
 text = "PAUSED"
 horizontal_alignment = 1
 vertical_alignment = 1
-
-[node name="DebugContainer" type="Control" parent="." unique_id=1133056601]
-layout_mode = 1
-anchor_left = 0.73200005
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -0.2640381
-grow_horizontal = 0
-grow_vertical = 2
-
-[node name="Background" type="ColorRect" parent="DebugContainer" unique_id=222012017]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 5.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0, 0, 0, 0.6313726)
-
-[node name="DebugList" type="VBoxContainer" parent="DebugContainer" unique_id=1117128046]
-layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.023000002
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -0.10700035
-grow_horizontal = 0
-grow_vertical = 2
 
 [node name="ProgressBar" type="ProgressBar" parent="." unique_id=1817474894]
 layout_mode = 1
@@ -109,9 +78,3 @@ offset_right = 2.0
 grow_horizontal = 2
 grow_vertical = 0
 script = ExtResource("3_psnte")
-
-[node name="HealthPanel" type="Control" parent="." unique_id=364305806]
-anchors_preset = 0
-offset_right = 40.0
-offset_bottom = 40.0
-script = ExtResource("4_s3jbq")

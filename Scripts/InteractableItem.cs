@@ -42,7 +42,7 @@ public partial class InteractableItem : Area3D
 
         // Set collision layer to 2 (Items)
         // Note: 2 here sets it to the 2nd bit (value 2).
-        CollisionLayer = 2;  
+        CollisionLayer = 4;  
         CollisionMask = 0;   // Not needed to detect other objects
 
         //GD.Print($"[Item] {Data.Name} spawned at {GlobalPosition} with layer {CollisionLayer}");

@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://dpaeehxaw2kx4"
 path.s3tc="res://.godot/imported/streetlamp_lamp_uv_metal-lamp_uv_roughness.png-f075cbc26800a69d7b81be6502a2445e.s3tc.ctex"
+path.etc2="res://.godot/imported/streetlamp_lamp_uv_metal-lamp_uv_roughness.png-f075cbc26800a69d7b81be6502a2445e.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://Assets/streetlamp_lamp_uv_metal-lamp_uv_roughness.png"
-dest_files=["res://.godot/imported/streetlamp_lamp_uv_metal-lamp_uv_roughness.png-f075cbc26800a69d7b81be6502a2445e.s3tc.ctex"]
+dest_files=["res://.godot/imported/streetlamp_lamp_uv_metal-lamp_uv_roughness.png-f075cbc26800a69d7b81be6502a2445e.s3tc.ctex", "res://.godot/imported/streetlamp_lamp_uv_metal-lamp_uv_roughness.png-f075cbc26800a69d7b81be6502a2445e.etc2.ctex"]
 
 [params]
 

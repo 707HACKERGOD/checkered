@@ -1,13 +1,15 @@
 using Godot;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 public partial class Player : CharacterBody3D
 {
     // --- MOVEMENT ---
     [ExportGroup("Movement")]
-    [Export] public float WalkSpeed = 5.0f;
-    [Export] public float RunSpeed = 10.0f;
-    [Export] public float JumpVelocity = 4.5f;
+    [Export] public float WalkSpeed = 3.5f;
+    [Export] public float RunSpeed = 6.0f;
+    [Export] public float JumpVelocity = 3.0f;
     [Export] public float TurnSpeed = 12.0f;
     public float Gravity = ProjectSettings.GetSetting("physics/3d/default_gravity").AsSingle();
 
@@ -32,13 +34,19 @@ public partial class Player : CharacterBody3D
     private NpcEyeTracker _eyeTracker;
     private Area3D _interestArea;
     private Node3D _casualTarget;
+    private NpcInteraction _currentNpc;
 
     // Camera states
     private bool _isFirstPerson = false;
     private bool _isLockedOn = false;
     private float _targetZoom = 3.0f;
-    private float _minZoom = 1.5f;
+
     private float _maxZoom = 6.0f;
+
+    // --- COMBAT ---
+    [Export] private AudioStream _attackSound;
+    private AudioStreamPlayer _attackAudioPlayer;
+    private float _minZoom = 1.5f;
 
     // --- ANIMATION ---
     private AnimationTree _animTree;
@@ -48,6 +56,12 @@ public partial class Player : CharacterBody3D
 
     private readonly StringName _speedParam = "speed";
     private readonly StringName _turnParam = "turn_trigger";
+    // Pinch‑to‑zoom
+    private int _pinch0 = -1;
+    private int _pinch1 = -1;
+    private float _pinchBaseDist;
+    private float _pinchBaseZoom;
+    private Dictionary<int, Vector2> _touchStartPositions = new();
 
     public override void _Ready()
     {
@@ -91,29 +105,47 @@ public partial class Player : CharacterBody3D
             _turnResetTimer.OneShot = true;
             AddChild(_turnResetTimer);
             _turnResetTimer.Timeout += () => _animTree.Set($"parameters/{_turnParam}", false);
+            // Attack sound
+            if (_attackSound != null)
+            {
+                _attackAudioPlayer = new AudioStreamPlayer();
+                AddChild(_attackAudioPlayer);
+            }
         }
     }
 
     public override void _Input(InputEvent @event)
     {
-        // 1. FREE LOOK (always allowed)
-        if (@event is InputEventMouseMotion mouseMotion && !_isLockedOn)
+        // Track all touch positions for pinch detection
+        TouchTracker.Update(@event);
+        if (@event is InputEventScreenTouch touch)
         {
-            _cameraGimbal.RotateY(-mouseMotion.Relative.X * MouseSensitivity);
-            _innerGimbal.RotateX(-mouseMotion.Relative.Y * MouseSensitivity);
-
-            Vector3 rot = _innerGimbal.Rotation;
-            rot.X = Mathf.Clamp(rot.X, MinPitch, MaxPitch);
-            _innerGimbal.Rotation = rot;
+            if (touch.Pressed)
+                _touchStartPositions[touch.Index] = touch.Position;
+            else
+                _touchStartPositions.Remove(touch.Index);
         }
 
-        // 2. Block keyboard actions if inventory or health panel is open
+        // 1. Pinch zoom (two fingers) – highest priority
+        if (HandlePinchZoom(@event))
+        {
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        // 2. Camera look (only if single finger and not joystick finger)
+        if (HandleCameraLook(@event))
+        {
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        // ----- Menu / action handling -----
         bool anyMenuOpen = (HUD.Instance != null && HUD.Instance.IsInventoryOpen) ||
-                          (HUD.Instance != null && HUD.Instance.IsHealthPanelOpen);
-        if (anyMenuOpen)
+                        (HUD.Instance != null && HUD.Instance.IsHealthPanelOpen);
+        if (HUD.Instance != null && HUD.Instance.IsGamePaused)
             return;
 
-        // 3. Normal gameplay actions
         if (@event.IsActionPressed("toggle_camera"))
         {
             _isFirstPerson = !_isFirstPerson;
@@ -129,31 +161,12 @@ public partial class Player : CharacterBody3D
         if (@event.IsActionPressed("lock_on") && LockOnTarget != null)
             _isLockedOn = !_isLockedOn;
 
-        if (@event.IsActionPressed("ui_accept")) // Debug damage
+        // Attack
+        if (@event.IsActionPressed("attack") && !anyMenuOpen)
         {
-            Health health = GetNode<Health>("Health");
-            if (health != null)
-            {
-                var limbNames = new System.Collections.Generic.List<string>();
-                foreach (Node child in health.GetChildren())
-                {
-                    if (child is LimbHealth limb && !limb.IsDestroyed)
-                        limbNames.Add(limb.LimbName);
-                }
-
-                if (limbNames.Count > 0)
-                {
-                    int randomIndex = new Random().Next(limbNames.Count);
-                    string limbName = limbNames[randomIndex];
-                    LimbHealth limb = health.GetNode<LimbHealth>(limbName);
-                    float damage = limb.MaxHealth * 0.1f;
-                    health.TakeDamage(damage, limbName);
-                }
-                else
-                {
-                    health.TakeDamage(health.MaxHealth * 0.1f);
-                }
-            }
+            PerformAttack();
+            GetViewport().SetInputAsHandled();
+            return;
         }
     }
 
@@ -175,45 +188,63 @@ public partial class Player : CharacterBody3D
         if (!anyMenuOpen && Input.IsActionJustPressed("jump") && IsOnFloor())
             velocity.Y = JumpVelocity;
 
-        // --- HORIZONTAL MOVEMENT ---
-        Vector2 inputDir;
-        float speed;
-        bool canTurn180 = false;
+    // --- HORIZONTAL MOVEMENT ---
+    Vector2 inputDir;
+    float speed;
+    bool canTurn180 = false;
+    bool sprinting = false;
 
-        if (anyMenuOpen)
+    if (anyMenuOpen)
+    {
+        // When menu is open, use auto‑run direction (stored from when menu opened)
+        inputDir = GameState.Instance.AutoRunDirection;
+        speed = GameState.Instance.AutoRunSprinting ? RunSpeed : WalkSpeed;
+    }
+    else
+    {
+        // Normal gameplay: get input from mobile joystick or keyboard
+        if (DisplayServer.IsTouchscreenAvailable())
         {
-            inputDir = GameState.Instance.AutoRunDirection;
-            speed = GameState.Instance.AutoRunSprinting ? RunSpeed : WalkSpeed;
+            inputDir = MobileInput.MovementDirection;
+            float mag = inputDir.Length();
+            sprinting = mag > 0.85f;
+            // map magnitude to speed: up to 0.85 = walk, 0.85+ = run/sprint
+            speed = Mathf.Lerp(WalkSpeed, sprinting ? RunSpeed : WalkSpeed, Mathf.InverseLerp(0.2f, sprinting ? 1f : 0.85f, mag));
+            inputDir = mag > 0.001f ? inputDir.Normalized() : Vector2.Zero;
         }
         else
         {
             inputDir = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
-            bool sprinting = Input.IsActionPressed("sprint");
-            speed = sprinting ? RunSpeed : WalkSpeed;
-            canTurn180 = Input.IsActionJustPressed("turn_180");
-            GameState.Instance.AutoRunSprinting = sprinting;
+            sprinting = Input.IsActionPressed("sprint");
         }
+        speed = sprinting ? RunSpeed : WalkSpeed;
+        canTurn180 = Input.IsActionJustPressed("turn_180");
+        
+        // Store for auto‑run if a menu is opened later
+        GameState.Instance.AutoRunDirection = inputDir;
+        GameState.Instance.AutoRunSprinting = sprinting;
+    }
 
-        Vector3 direction = (_cameraGimbal.Transform.Basis * new Vector3(inputDir.X, 0, inputDir.Y)).Normalized();
-        float currentSpeed = velocity.Length();
+    Vector3 direction = (_cameraGimbal.Transform.Basis * new Vector3(inputDir.X, 0, inputDir.Y)).Normalized();
+    float currentSpeed = velocity.Length();
 
-        if (direction != Vector3.Zero)
+    if (direction != Vector3.Zero)
+    {
+        velocity.X = direction.X * speed;
+        velocity.Z = direction.Z * speed;
+
+        bool isTurning = _stateMachine != null && _stateMachine.GetCurrentNode() == "Turn";
+        if (!isTurning)
         {
-            velocity.X = direction.X * speed;
-            velocity.Z = direction.Z * speed;
-
-            bool isTurning = _stateMachine != null && _stateMachine.GetCurrentNode() == "Turn";
-            if (!isTurning)
-            {
-                float targetAngle = Mathf.Atan2(-direction.X, -direction.Z);
-                Rotation = new Vector3(0, Mathf.LerpAngle(Rotation.Y, targetAngle, TurnSpeed * dt), 0);
-            }
+            float targetAngle = Mathf.Atan2(-direction.X, -direction.Z);
+            Rotation = new Vector3(0, Mathf.LerpAngle(Rotation.Y, targetAngle, TurnSpeed * dt), 0);
         }
-        else
-        {
-            velocity.X = Mathf.MoveToward(velocity.X, 0, speed);
-            velocity.Z = Mathf.MoveToward(velocity.Z, 0, speed);
-        }
+    }
+    else
+    {
+        velocity.X = Mathf.MoveToward(velocity.X, 0, speed);
+        velocity.Z = Mathf.MoveToward(velocity.Z, 0, speed);
+    }
 
         Velocity = velocity;
         MoveAndSlide();
@@ -244,41 +275,83 @@ public partial class Player : CharacterBody3D
         if (!anyMenuOpen && PlayerCamera != null)
         {
             var spaceState = GetWorld3D().DirectSpaceState;
+
+            // Ray from camera – always long enough to reach anything regardless of camera mode
             Vector3 origin = PlayerCamera.GlobalPosition;
-            Vector3 end = origin - PlayerCamera.GlobalTransform.Basis.Z * _interactDistance;
+            Vector3 end = origin - PlayerCamera.GlobalTransform.Basis.Z * 10.0f;
+
             var query = PhysicsRayQueryParameters3D.Create(origin, end);
-            query.CollisionMask = 2;
+            query.CollisionMask = 4;
             query.CollideWithAreas = true;
             query.CollideWithBodies = true;
+            query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
 
             var result = spaceState.IntersectRay(query);
-            InteractableItem newTarget = null;
-            if (result.Count > 0 && result["collider"].AsGodotObject() is InteractableItem item)
-                newTarget = item;
+            InteractableItem itemTarget = null;
+            NpcInteraction npcTarget = null;
 
-            if (newTarget != _currentInteractable)
+            if (result.Count > 0)
             {
-                _currentInteractable = newTarget;
-                if (_hud != null)
+                // Distance check: measure from player, not from camera
+                Vector3 playerCenter = GlobalPosition + new Vector3(0, 1.5f, 0);   // chest height
+                Vector3 hitPoint = (Vector3)result["position"];
+                float distToPlayer = playerCenter.DistanceTo(hitPoint);
+
+                // Only accept hits within the player's personal interaction radius
+                if (distToPlayer <= _interactDistance)
                 {
-                    if (_currentInteractable != null)
-                        _hud.ShowTooltipAtWorldPosition($"Pick up {_currentInteractable.Data.Name}", _currentInteractable.GlobalPosition, "E");
-                    else
-                        _hud.HideTooltip();
+                    var collider = result["collider"].AsGodotObject();
+                    if (collider is InteractableItem item)
+                        itemTarget = item;
+                    else if (collider is CharacterBody3D body)
+                        npcTarget = body.GetNodeOrNull<NpcInteraction>("Interaction");
                 }
             }
 
-            if (Input.IsActionJustPressed("interact") && _currentInteractable != null)
+            // Handle tooltip switching
+            if (itemTarget != _currentInteractable || npcTarget != _currentNpc)
             {
-                _currentInteractable.Pickup();
-                _currentInteractable = null;
-                _hud?.HideTooltip();
+                _currentInteractable = itemTarget;
+                _currentNpc = npcTarget;
+
+                if (_currentInteractable != null)
+                {
+                    _hud.ShowTooltipAtWorldPosition($"Pick up {_currentInteractable.Data.Name}", 
+                                                    _currentInteractable.GlobalPosition, "E");
+                }
+                else if (_currentNpc != null)
+                {
+                    string prefix = _currentNpc.IsDead ? "Dead " : "";
+                    _hud.ShowTooltipAtWorldPosition($"Talk to {prefix}{_currentNpc.NpcName}", 
+                        _currentNpc.GetParent<CharacterBody3D>().GlobalPosition, "E");
+                }
+                else
+                {
+                    _hud.HideTooltip();
+                }
+            }
+
+            // Interact key
+            if (Input.IsActionJustPressed("interact"))
+            {
+                if (_currentInteractable != null)
+                {
+                    _currentInteractable.Pickup();
+                    _currentInteractable = null;
+                    _currentNpc = null;
+                    _hud?.HideTooltip();
+                }
+                else if (_currentNpc != null)
+                {
+                    _currentNpc.Interact();   // start dialogue
+                }
             }
         }
-        else if (_hud != null && _currentInteractable != null)
+        else if (_hud != null && (_currentInteractable != null || _currentNpc != null))
         {
             _hud.HideTooltip();
             _currentInteractable = null;
+            _currentNpc = null;
         }
     }
 
@@ -331,5 +404,285 @@ public partial class Player : CharacterBody3D
     {
         if (body == _casualTarget)
             _casualTarget = null;
+    }
+
+    private bool IsAnyMenuOpen()
+    {
+        return HUD.Instance != null && HUD.Instance.IsGamePaused;
+    }
+
+    private bool HandlePinchZoom(InputEvent @event)
+    {
+        if (@event is InputEventScreenTouch t)
+        {
+            if (IsTouchInMenu(_pinch0) || IsTouchInMenu(t.Index))
+                return false;
+            if (t.Pressed)
+            {
+                // Only fingers that started in free area can be part of pinch
+                if (!IsInFreeArea(t.Index))
+                    return false;
+
+                if (_pinch0 == -1)
+                    _pinch0 = t.Index;
+                else if (_pinch1 == -1 && t.Index != _pinch0)
+                {
+                    _pinch1 = t.Index;
+                    if (TouchTracker.TryGet(_pinch0, out Vector2 p0) &&
+                        TouchTracker.TryGet(_pinch1, out Vector2 p1))
+                    {
+                        _pinchBaseDist = p0.DistanceTo(p1);
+                        _pinchBaseZoom = _targetZoom;
+                    }
+                    return true;   // immediately claim the two fingers
+                }
+            }
+            else
+            {
+                if (t.Index == _pinch0) _pinch0 = -1;
+                if (t.Index == _pinch1) _pinch1 = -1;
+            }
+            return false;
+        }
+
+        // Process ongoing pinch drag
+        if (_pinch0 != -1 && _pinch1 != -1 &&
+            TouchTracker.TryGet(_pinch0, out Vector2 cur0) &&
+            TouchTracker.TryGet(_pinch1, out Vector2 cur1))
+        {
+            float curDist = cur0.DistanceTo(cur1);
+            if (curDist > 0.01f && _pinchBaseDist > 0.01f)
+            {
+                float scale = curDist / _pinchBaseDist;
+                _targetZoom = Mathf.Clamp(_pinchBaseZoom / scale, _minZoom, _maxZoom);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private bool HandleCameraLook(InputEvent @event)
+    {
+        if (_isLockedOn || IsAnyMenuOpen()) return false;
+
+        // Don't allow camera look while pinch is active
+        if (_pinch0 != -1 && _pinch1 != -1) return false;
+
+        if (@event is InputEventMouseMotion mouse && !DisplayServer.IsTouchscreenAvailable())
+        {
+            RotateCamera(mouse.Relative);
+            return true;
+        }
+
+        if (@event is InputEventScreenDrag drag &&
+            DisplayServer.IsTouchscreenAvailable() &&
+            IsInFreeArea(drag.Index) &&                       // <-- uses start position
+            drag.Index != VirtualJoystick.ActiveTouchIndex)
+        {
+            if (DisplayServer.IsTouchscreenAvailable() && IsTouchInMenu(drag.Index))
+                return false;
+            RotateCamera(drag.Relative);
+            return true;
+        }
+        return false;
+    }
+
+    private void RotateCamera(Vector2 relative)
+    {
+        _cameraGimbal.RotateY(-relative.X * MouseSensitivity);
+        _innerGimbal.RotateX(-relative.Y * MouseSensitivity);
+        Vector3 rot = _innerGimbal.Rotation;
+        rot.X = Mathf.Clamp(rot.X, MinPitch, MaxPitch);
+        _innerGimbal.Rotation = rot;
+    }
+
+    private bool IsInFreeArea(int touchIndex)
+    {
+        if (!_touchStartPositions.TryGetValue(touchIndex, out Vector2 startPos))
+            return false;
+
+        // Check joystick (using the static reference)
+        if (MobileUIController.Joystick != null && MobileUIController.Joystick.GetGlobalRect().HasPoint(startPos))
+            return false;
+
+        // Check all mobile buttons
+        foreach (var container in MobileUIController.ButtonContainers)
+        {
+            if (container != null && container.GetGlobalRect().HasPoint(startPos))
+                return false;
+        }
+        return true;
+    }
+
+    public void ToggleCamera()
+    {
+        _isFirstPerson = !_isFirstPerson;
+        if (_eyeTracker != null) _eyeTracker.EnableHeadTracking = !_isFirstPerson;
+    }
+
+    private bool IsTouchInMenu(int touchIndex)
+    {
+        if (!_touchStartPositions.TryGetValue(touchIndex, out Vector2 startPos))
+            return false;   // touch not tracked, allow camera (safety)
+        return HUD.Instance != null && HUD.Instance.IsPointInsideAnyMenu(startPos);
+    }
+
+    private void PerformAttack()
+    {
+        // Play swing sound (always, even if none hit)
+        if (_attackAudioPlayer != null && _attackSound != null)
+        {
+            _attackAudioPlayer.Stream = _attackSound;
+            _attackAudioPlayer.Play();
+        }
+
+        if (PlayerCamera == null) return;
+
+        var spaceState = GetWorld3D().DirectSpaceState;
+        Vector3 origin = PlayerCamera.GlobalPosition;
+        Vector3 end = origin - PlayerCamera.GlobalTransform.Basis.Z * 100.0f;
+
+        var query = PhysicsRayQueryParameters3D.Create(origin, end);
+        query.CollisionMask = 1 << 4; // layer 5 = BodyParts
+        query.CollideWithAreas = true;
+        query.CollideWithBodies = false;
+        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+
+        var result = spaceState.IntersectRay(query);
+        if (result.Count > 0)
+        {
+            Area3D hitArea = result["collider"].As<Area3D>();
+            if (hitArea == null) return;
+
+            string limbName = hitArea.Name; // we named the Area3D after the limb in NpcController
+            if (string.IsNullOrEmpty(limbName)) return;
+
+            // Find the NPC
+            Node current = hitArea.GetParent();   // BoneAttachment3D
+            current = current?.GetParent();       // Skeleton3D
+            while (current != null && !(current is CharacterBody3D))
+                current = current.GetParent();
+            var npc = current as CharacterBody3D;
+            if (npc == null || npc.GetNodeOrNull<NpcController>(".")?.IsDead == true) return;
+
+            var health = npc.GetNodeOrNull<Health>("Health");
+            if (health == null) return;
+
+            // Get the specific limb health
+            LimbHealth limbHealth = null;
+            foreach (Node child in health.GetChildren())
+            {
+                if (child is LimbHealth lh && lh.Name == limbName)
+                {
+                    limbHealth = lh;
+                    break;
+                }
+            }
+
+            float damage = limbHealth != null ? limbHealth.MaxHealth * 0.2f : 20f; // fallback
+            health.TakeDamage(damage, limbName);
+
+            float currentHealth = limbHealth?.CurrentHealth ?? 0;
+            // Get NPC controller and display name
+            var npcController = npc.GetNodeOrNull<NpcController>(".");
+            string npcName = npcController != null ? npcController.DisplayName : "Unknown";
+            string status = npcController != null && npcController.IsDead ? "DEAD" : "alive";
+
+            GD.Print($"[{npcName}] {status} | Total Health: {health.CurrentHealth:F1}/{health.MaxHealth:F1} | Hit {limbName} for {damage:F1} damage. {limbName} HP: {currentHealth:F1}/{limbHealth?.MaxHealth ?? 0:F1}");
+            // Flash the hit limb (or whole body for old NPCs)
+            FlashLimb(npc, limbName);
+        }
+    }
+
+    private async void FlashLimb(CharacterBody3D npc, string limbName)
+    {
+        var modelRoot = npc.GetNodeOrNull<Node3D>("ModelRoot");
+        if (modelRoot == null) return;
+
+        // Collect all meshes under ModelRoot
+        var allMeshes = new List<MeshInstance3D>();
+        FindAllMeshes(modelRoot, allMeshes);
+        if (allMeshes.Count == 0) return;
+
+        MeshInstance3D limbMesh = null;
+
+        // Try to find the exact limb mesh using the corrected dictionary
+        if (NpcController.LimbMeshNames.TryGetValue(limbName, out string meshName))
+        {
+            limbMesh = allMeshes.FirstOrDefault(m =>
+                m.Name.ToString().Equals(meshName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // If not found, flash ALL meshes as a fallback (guaranteed visual feedback)
+        List<MeshInstance3D> meshesToFlash;
+        if (limbMesh != null)
+            meshesToFlash = new List<MeshInstance3D> { limbMesh };
+        else
+            meshesToFlash = allMeshes;   // whole body flash if limb unknown
+
+        // Store original surface materials for each mesh
+        var originalMaterials = new Dictionary<MeshInstance3D, Material[]>();
+
+        foreach (var mesh in meshesToFlash)
+        {
+            int surfaceCount = mesh.Mesh.GetSurfaceCount();
+            var mats = new Material[surfaceCount];
+            for (int i = 0; i < surfaceCount; i++)
+            {
+                mats[i] = mesh.GetActiveMaterial(i);
+                var redMat = new StandardMaterial3D
+                {
+                    AlbedoColor = new Color(1, 0, 0),
+                    ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded
+                };
+                mesh.SetSurfaceOverrideMaterial(i, redMat);
+            }
+            originalMaterials[mesh] = mats;
+        }
+
+        await ToSignal(GetTree().CreateTimer(0.15f), "timeout");
+
+        // Restore original materials
+        foreach (var (mesh, mats) in originalMaterials)
+        {
+            for (int i = 0; i < mats.Length; i++)
+                mesh.SetSurfaceOverrideMaterial(i, mats[i]);
+        }
+    }
+
+    // Helper: finds first MeshInstance3D whose name contains the partial string (case‑insensitive)
+    private static MeshInstance3D FindMeshByPartialName(Node start, string partialName)
+    {
+        if (start is MeshInstance3D mi)
+        {
+            string nodeName = mi.Name.ToString();   // convert StringName to string
+            if (nodeName.IndexOf(partialName, StringComparison.OrdinalIgnoreCase) >= 0)
+                return mi;
+        }
+
+        foreach (Node child in start.GetChildren())
+        {
+            var result = FindMeshByPartialName(child, partialName);
+            if (result != null) return result;
+        }
+        return null;
+    }
+    // Helper: recursively gather all MeshInstance3D nodes
+    private void FindAllMeshes(Node node, List<MeshInstance3D> list)
+    {
+        if (node is MeshInstance3D mi)
+            list.Add(mi);
+        foreach (Node child in node.GetChildren())
+            FindAllMeshes(child, list);
+    }
+    private static T FindNodeRecursive<T>(Node start, string name) where T : class
+    {
+        if (start is T t && start.Name == name) return t;
+        foreach (Node child in start.GetChildren())
+        {
+            var found = FindNodeRecursive<T>(child, name);
+            if (found != null) return found;
+        }
+        return null;
     }
 }

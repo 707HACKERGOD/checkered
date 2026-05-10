@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://c102cp2fqj2i7"
 path.s3tc="res://.godot/imported/Skybox_cloudy_bw2.jpg-f4a354c75089bf50d281ed49434b8a71.s3tc.ctex"
+path.etc2="res://.godot/imported/Skybox_cloudy_bw2.jpg-f4a354c75089bf50d281ed49434b8a71.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://Assets/Skybox_cloudy_bw2.jpg"
-dest_files=["res://.godot/imported/Skybox_cloudy_bw2.jpg-f4a354c75089bf50d281ed49434b8a71.s3tc.ctex"]
+dest_files=["res://.godot/imported/Skybox_cloudy_bw2.jpg-f4a354c75089bf50d281ed49434b8a71.s3tc.ctex", "res://.godot/imported/Skybox_cloudy_bw2.jpg-f4a354c75089bf50d281ed49434b8a71.etc2.ctex"]
 
 [params]
 

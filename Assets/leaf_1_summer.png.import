@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://dmtpk0e2fnhbi"
 path.s3tc="res://.godot/imported/leaf_1_summer.png-0cc147d552852292e9a50e675e9a34a7.s3tc.ctex"
+path.etc2="res://.godot/imported/leaf_1_summer.png-0cc147d552852292e9a50e675e9a34a7.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://Assets/leaf_1_summer.png"
-dest_files=["res://.godot/imported/leaf_1_summer.png-0cc147d552852292e9a50e675e9a34a7.s3tc.ctex"]
+dest_files=["res://.godot/imported/leaf_1_summer.png-0cc147d552852292e9a50e675e9a34a7.s3tc.ctex", "res://.godot/imported/leaf_1_summer.png-0cc147d552852292e9a50e675e9a34a7.etc2.ctex"]
 
 [params]
 

@@ -1,35 +1,34 @@
 [gd_scene format=3 uid="uid://3s82rtv51ye2"]
 
-[ext_resource type="Script" path="res://Scripts/Characters/Player.cs" id="1_rpqav"]
-[ext_resource type="Shader" path="res://Shaders/PlayerLeaves.gdshader" id="2_dewec"]
-[ext_resource type="Script" path="res://Scripts/Inventory.cs" id="2_utwlt"]
-[ext_resource type="ArrayMesh" path="res://Assets/leaf_pile_leaves_1_arraymesh.tres" id="3_dewec"]
-[ext_resource type="Script" path="res://Shaders/PlayerFoliage.cs" id="4_5ixxa"]
-[ext_resource type="PackedScene" path="res://Scenes/PlayerCapsule.glb" id="5_5ixxa"]
-[ext_resource type="PackedScene" path="res://Assets/syl_base_5.glb" id="6_nn08x"]
-[ext_resource type="Script" path="res://Scripts/Characters/NpcEyeTracker.cs" id="7_52ee3"]
-[ext_resource type="Texture2D" path="res://Assets/syl_base_5_256x256_Grid3.png" id="7_bhhdu"]
-[ext_resource type="Script" path="res://Scenes/FootprintSpawner.cs" id="9_megsn"]
-[ext_resource type="PackedScene" path="res://Assets/FootprintDecal.tscn" id="10_yoq75"]
-[ext_resource type="AudioStream" path="res://Assets/Audio/Footsteps/footstep_snow_1.wav" id="11_i2e8t"]
-[ext_resource type="Script" path="res://Scripts/Effects/RainAudio.cs" id="11_ksbbd"]
-[ext_resource type="Script" path="res://Scripts/Effects/SeasonalAmbient.cs" id="12_glx4g"]
-[ext_resource type="AudioStream" path="res://Assets/Audio/Footsteps/footstep_snow_2.wav" id="12_qidb7"]
-[ext_resource type="AudioStream" path="res://Assets/Audio/Footsteps/footstep_snow_3.wav" id="13_70hv0"]
-[ext_resource type="AudioStream" path="res://Assets/Audio/Footsteps/footstep_snow_4.wav" id="14_8flut"]
-[ext_resource type="AudioStream" path="res://Assets/Audio/Footsteps/footstep_snow_5.wav" id="15_u7x0b"]
-[ext_resource type="AudioStream" path="res://Assets/Audio/Footsteps/footstep_snow_6.wav" id="16_utwlt"]
-[ext_resource type="AudioStream" path="res://Assets/Audio/Footsteps/footstep_1.wav" id="17_kih0c"]
-[ext_resource type="AudioStream" path="res://Assets/Audio/Footsteps/footstep_2.wav" id="18_lyrkg"]
-[ext_resource type="AudioStream" path="res://Assets/Audio/Footsteps/footstep_3.wav" id="19_c43xd"]
-[ext_resource type="AudioStream" path="res://Assets/Audio/Footsteps/footstep_4.wav" id="20_avx33"]
-[ext_resource type="AudioStream" path="res://Assets/Audio/Footsteps/footstep_5.wav" id="21_rxg2u"]
-[ext_resource type="AudioStream" path="res://Assets/Audio/rain.wav" id="22_qidb7"]
-[ext_resource type="AudioStream" path="res://Assets/Audio/autumn.wav" id="25_8flut"]
-[ext_resource type="AudioStream" path="res://Assets/Audio/winter.wav" id="26_u7x0b"]
-[ext_resource type="Script" path="res://Scripts/Characters/AnimationController.cs" id="27_u7x0b"]
-[ext_resource type="Script" path="res://Scripts/Systems/Health.cs" id="29_kih0c"]
-[ext_resource type="Script" path="res://Scripts/Systems/LimbHealth.cs" id="30_lyrkg"]
+[ext_resource type="Script" uid="uid://wgrik0pwmidg" path="res://Scripts/Characters/Player.cs" id="1_rpqav"]
+[ext_resource type="Shader" uid="uid://chaogs8wspvnb" path="res://Shaders/PlayerLeaves.gdshader" id="2_dewec"]
+[ext_resource type="Script" uid="uid://b7y2xvayua7o1" path="res://Scripts/Inventory.cs" id="2_utwlt"]
+[ext_resource type="ArrayMesh" uid="uid://kehnlnekp6q0" path="res://Assets/leaf_pile_leaves_1_arraymesh.tres" id="3_dewec"]
+[ext_resource type="Script" uid="uid://3cbnpjhl344" path="res://Shaders/PlayerFoliage.cs" id="4_5ixxa"]
+[ext_resource type="PackedScene" uid="uid://dj05w43q5i6w6" path="res://Scenes/PlayerCapsule.glb" id="5_5ixxa"]
+[ext_resource type="PackedScene" uid="uid://uy0gt5bh27sb" path="res://Assets/syl_base_5.glb" id="6_nn08x"]
+[ext_resource type="Script" uid="uid://baeilegx8pm2u" path="res://Scripts/Characters/NpcEyeTracker.cs" id="7_52ee3"]
+[ext_resource type="Script" uid="uid://bxerjk20hgn6k" path="res://Scenes/FootprintSpawner.cs" id="9_megsn"]
+[ext_resource type="PackedScene" uid="uid://ck7bcwxsjem3a" path="res://Assets/FootprintDecal.tscn" id="10_yoq75"]
+[ext_resource type="AudioStream" uid="uid://cyycmyol7cxys" path="res://Assets/Audio/Footsteps/footstep_snow_1.wav" id="11_i2e8t"]
+[ext_resource type="Script" uid="uid://d26r58iysjfev" path="res://Scripts/Effects/RainAudio.cs" id="11_ksbbd"]
+[ext_resource type="Script" uid="uid://dy1prm0dl0eax" path="res://Scripts/Effects/SeasonalAmbient.cs" id="12_glx4g"]
+[ext_resource type="AudioStream" uid="uid://cevovbwe2bn8h" path="res://Assets/Audio/Footsteps/footstep_snow_2.wav" id="12_qidb7"]
+[ext_resource type="AudioStream" uid="uid://d0x744on85jka" path="res://Assets/Audio/Footsteps/footstep_snow_3.wav" id="13_70hv0"]
+[ext_resource type="AudioStream" uid="uid://brsesnpqqydr7" path="res://Assets/Audio/Footsteps/footstep_snow_4.wav" id="14_8flut"]
+[ext_resource type="AudioStream" uid="uid://wq16q21hpqoj" path="res://Assets/Audio/Footsteps/footstep_snow_5.wav" id="15_u7x0b"]
+[ext_resource type="AudioStream" uid="uid://ch8u5osu45xwm" path="res://Assets/Audio/Footsteps/footstep_snow_6.wav" id="16_utwlt"]
+[ext_resource type="AudioStream" uid="uid://seam4giarf6x" path="res://Assets/Audio/Footsteps/footstep_1.wav" id="17_kih0c"]
+[ext_resource type="AudioStream" uid="uid://dm0nc8qtvmfs5" path="res://Assets/Audio/Footsteps/footstep_2.wav" id="18_lyrkg"]
+[ext_resource type="AudioStream" uid="uid://cjnd0kuf5awmx" path="res://Assets/Audio/Footsteps/footstep_3.wav" id="19_c43xd"]
+[ext_resource type="AudioStream" uid="uid://ceq2f3skb8188" path="res://Assets/Audio/Footsteps/footstep_4.wav" id="20_avx33"]
+[ext_resource type="AudioStream" uid="uid://bdelnnrhl1a21" path="res://Assets/Audio/Footsteps/footstep_5.wav" id="21_rxg2u"]
+[ext_resource type="AudioStream" uid="uid://b0egprs6jecqx" path="res://Assets/Audio/rain.wav" id="22_qidb7"]
+[ext_resource type="AudioStream" uid="uid://b3nlalh63qxlh" path="res://Assets/Audio/autumn.wav" id="25_8flut"]
+[ext_resource type="AudioStream" uid="uid://8e8a66h3qvw0" path="res://Assets/Audio/winter.wav" id="26_u7x0b"]
+[ext_resource type="Script" uid="uid://bwqls4byv5da" path="res://Scripts/Characters/AnimationController.cs" id="27_u7x0b"]
+[ext_resource type="Script" uid="uid://vq5uv3ys31o8" path="res://Scripts/Systems/Health.cs" id="29_kih0c"]
+[ext_resource type="Script" uid="uid://csft87qrpx63j" path="res://Scripts/Systems/LimbHealth.cs" id="30_lyrkg"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_kyqiw"]
 radius = 0.3
@@ -44,14 +43,6 @@ shader_parameter/ground_height = 0.0
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_5ixxa"]
 radius = 0.2
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lyrkg"]
-resource_local_to_scene = true
-resource_name = "Eye_Mat"
-cull_mode = 2
-vertex_color_use_as_albedo = true
-albedo_texture = ExtResource("7_bhhdu")
-texture_filter = 2
 
 [sub_resource type="Animation" id="Animation_u7x0b"]
 resource_name = "Idle"
@@ -632,7 +623,7 @@ transitions = ["Start", "Idle", SubResource("AnimationNodeStateMachineTransition
 graph_offset = Vector2(-105.57075, 0)
 
 [node name="Player" type="CharacterBody3D" unique_id=434817830 node_paths=PackedStringArray("PlayerCamera") groups=["Player"]]
-collision_mask = 6
+collision_mask = 3
 script = ExtResource("1_rpqav")
 PlayerCamera = NodePath("CameraGimbal/InnerGimbal/SpringArm/Camera")
 
@@ -666,15 +657,15 @@ shape = SubResource("SphereShape3D_5ixxa")
 [node name="syl_base_5" parent="." unique_id=607563459 instance=ExtResource("6_nn08x")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
 
-[node name="Skeleton3D" parent="syl_base_5/metarig" parent_id_path=PackedInt32Array(607563459, 939957713) index="0" unique_id=1078351443]
-bones/0/position = Vector3(-0.00026022055, 0.8367631, 0.032115523)
+[node name="Skeleton3D" parent="syl_base_5/metarig" parent_id_path=PackedInt32Array(607563459, 1277451019) index="0" unique_id=1599754758]
+bones/0/position = Vector3(-0.010643322, 0.8350326, 0.032115538)
 bones/0/rotation = Quaternion(0.16563182, 7.9136875e-08, 1.3291164e-08, 0.9861877)
 bones/1/rotation = Quaternion(-0.18164173, -1.6633932e-08, -2.607924e-08, 0.9833648)
 bones/2/rotation = Quaternion(-0.06385426, -3.3459195e-08, -5.9468936e-09, 0.99795926)
-bones/3/rotation = Quaternion(-0.027186597, 0.0017856917, 5.4391887e-05, 0.9996288)
-bones/4/rotation = Quaternion(0.108635366, -3.6665675e-08, 7.627926e-09, 0.9940817)
+bones/3/rotation = Quaternion(-0.05906075, 0.0017865171, -2.6009013e-06, 0.9982528)
+bones/4/rotation = Quaternion(0.1231637, 2.6384043e-06, 5.2200856e-05, 0.9923864)
 bones/5/rotation = Quaternion(0.023930106, 1.7533196e-08, 1.2729309e-09, 0.9997137)
-bones/6/rotation = Quaternion(0.012781154, -8.914915e-08, -2.7105868e-10, 0.99991834)
+bones/6/rotation = Quaternion(0.012781154, -8.914682e-08, -2.7187017e-10, 0.99991834)
 bones/7/rotation = Quaternion(0.003346608, 0.2045822, -0.7822588, 0.588393)
 bones/8/position = Vector3(0.0084037855, 0.10204093, 0.0012207034)
 bones/8/rotation = Quaternion(0.035320576, 0.11817148, -0.49783376, 0.85845757)
@@ -683,23 +674,21 @@ bones/11/rotation = Quaternion(0.0033465335, -0.20458223, 0.78225875, 0.58839285
 bones/12/position = Vector3(-0.008403519, 0.10204095, 0.0012207029)
 bones/12/rotation = Quaternion(0.03532062, -0.118171535, 0.49783382, 0.85845757)
 bones/13/rotation = Quaternion(0.18507953, 0.014332607, 0.02784625, 0.9822244)
-bones/17/rotation = Quaternion(0.9797241, 0.01791384, -0.002371263, 0.19953506)
-bones/18/rotation = Quaternion(0.1028023, 0.00019455585, 0.0056511583, 0.99468577)
-bones/22/rotation = Quaternion(0.97977334, -0.017783904, 0.0023633265, 0.19930485)
-bones/23/rotation = Quaternion(0.10280481, -0.00019467282, -0.0056512966, 0.9946855)
+bones/17/rotation = Quaternion(0.9777647, 0.023402685, -0.002702008, 0.20837776)
+bones/18/rotation = Quaternion(0.119373746, 0.0005145508, 0.0034678786, 0.9928432)
+bones/22/rotation = Quaternion(0.97713035, -0.0134270135, 0.001898812, 0.21220864)
+bones/23/rotation = Quaternion(0.12579204, 0.00012386582, -0.010116855, 0.99200505)
 
-[node name="eyepatch_002" parent="syl_base_5/metarig/Skeleton3D" index="0" unique_id=511818000]
+[node name="eyepatch_002" parent="syl_base_5/metarig/Skeleton3D" index="0" unique_id=1559059956]
 layers = 8
 
-[node name="MESH_001" parent="syl_base_5/metarig/Skeleton3D" index="1" unique_id=889350891]
+[node name="MESH_001" parent="syl_base_5/metarig/Skeleton3D" index="1" unique_id=1210930024]
 layers = 8
 
-[node name="MESH_002" parent="syl_base_5/metarig/Skeleton3D" index="2" unique_id=2126420105]
+[node name="MESH_002" parent="syl_base_5/metarig/Skeleton3D" index="2" unique_id=93869840]
 layers = 8
-blend_shapes/Blink = 0.2265111
-surface_material_override/1 = SubResource("StandardMaterial3D_lyrkg")
 
-[node name="AnimationPlayer" parent="syl_base_5" index="1" unique_id=1771080825]
+[node name="AnimationPlayer" parent="syl_base_5" index="1" unique_id=4902186]
 libraries/ = SubResource("AnimationLibrary_lyrkg")
 
 [node name="EyeTrackerComponent" type="Node" parent="." unique_id=851110760 node_paths=PackedStringArray("CharacterSkeleton", "FaceMesh")]
@@ -707,9 +696,8 @@ process_priority = 1
 script = ExtResource("7_52ee3")
 CharacterSkeleton = NodePath("../syl_base_5/metarig/Skeleton3D")
 FaceMesh = NodePath("../syl_base_5/metarig/Skeleton3D/MESH_002")
+EnableHeadTracking = false
 EyeMaterialSurfaceIndex = 1
-MinBlinkInterval = 1.0
-MaxBlinkInterval = 4.0
 
 [node name="InterestArea" type="Area3D" parent="." unique_id=887048409]
 collision_layer = 0

@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://cd16337acds5t"
 path.s3tc="res://.godot/imported/field-with-purple-clouds.jpg-9bcf451f5b7bc6ebff1b1b5574c77edd.s3tc.ctex"
+path.etc2="res://.godot/imported/field-with-purple-clouds.jpg-9bcf451f5b7bc6ebff1b1b5574c77edd.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://Assets/field-with-purple-clouds.jpg"
-dest_files=["res://.godot/imported/field-with-purple-clouds.jpg-9bcf451f5b7bc6ebff1b1b5574c77edd.s3tc.ctex"]
+dest_files=["res://.godot/imported/field-with-purple-clouds.jpg-9bcf451f5b7bc6ebff1b1b5574c77edd.s3tc.ctex", "res://.godot/imported/field-with-purple-clouds.jpg-9bcf451f5b7bc6ebff1b1b5574c77edd.etc2.ctex"]
 
 [params]
 

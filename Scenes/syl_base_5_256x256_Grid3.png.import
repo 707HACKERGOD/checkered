@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://cluxf66yedx3m"
 path.s3tc="res://.godot/imported/syl_base_5_256x256_Grid3.png-868476f396821e0a86d213b56d8537da.s3tc.ctex"
+path.etc2="res://.godot/imported/syl_base_5_256x256_Grid3.png-868476f396821e0a86d213b56d8537da.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://Scenes/syl_base_5_256x256_Grid3.png"
-dest_files=["res://.godot/imported/syl_base_5_256x256_Grid3.png-868476f396821e0a86d213b56d8537da.s3tc.ctex"]
+dest_files=["res://.godot/imported/syl_base_5_256x256_Grid3.png-868476f396821e0a86d213b56d8537da.s3tc.ctex", "res://.godot/imported/syl_base_5_256x256_Grid3.png-868476f396821e0a86d213b56d8537da.etc2.ctex"]
 
 [params]
 

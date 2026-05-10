@@ -37,15 +37,23 @@ public partial class Health : Node
         if (!string.IsNullOrEmpty(limbName) && _limbs.TryGetValue(limbName, out LimbHealth limb))
         {
             limb.TakeDamage(amount);
+
+            // If a critical limb was destroyed, the NPC dies immediately
+            if (limb.Critical && limb.CurrentHealth <= 0)
+            {
+                CurrentHealth = 0;
+                EmitSignal(SignalName.Died);
+                Die();
+                return;   // skip recalculating – we're dead
+            }
         }
         else
         {
-            // If no limb specified, spread damage across all limbs proportionally (optional)
+            // Distributed damage (optional)
             foreach (var l in _limbs.Values)
                 l.TakeDamage(amount / _limbs.Count);
         }
 
-        // Recalculate total health from limbs
         RecalculateTotalHealth();
 
         if (CurrentHealth <= 0f)

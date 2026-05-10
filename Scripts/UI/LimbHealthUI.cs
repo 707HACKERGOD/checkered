@@ -12,6 +12,8 @@ public partial class LimbHealthUI : Control
     private Label _partNameLabel;
     private ProgressBar _healthBar;
     private Label _conditionLabel;
+    private float _lastBackgroundWidth = -1f;   // used to detect size changes
+    private float _bodyScale = 1f;              // current scale factor for the body diagram
 
     // Limb controls (created dynamically)
     private Dictionary<string, SelectableBodyPart> _limbControls = new();
@@ -67,10 +69,11 @@ public partial class LimbHealthUI : Control
         _panelBackground = new Panel
         {
             AnchorLeft = 0.5f, AnchorRight = 0.5f, AnchorTop = 0.5f, AnchorBottom = 0.5f,
-            OffsetLeft = -320, OffsetRight = 320, OffsetTop = -210, OffsetBottom = 210
+            OffsetLeft = -480, OffsetRight = 480, OffsetTop = -320, OffsetBottom = 320
         };
         AddChild(_panelBackground);
         ApplyPanelStyle(_panelBackground, new Color(0.078f, 0.063f, 0.059f, 0.925f));
+        _panelBackground.Resized += () => CallDeferred(nameof(UpdateLayout));
 
         _bodyDiagram = new Panel
         {
@@ -93,23 +96,54 @@ public partial class LimbHealthUI : Control
             _limbControls[def.Name] = limb;
         }
 
-        _partStatusPanel = new Panel { Position = new Vector2(250, 20), Size = new Vector2(260, 360) };
+        _partStatusPanel = new Panel();
+        _partStatusPanel.Name = "StatusPanel";
+        // position and size it dynamically in UpdateLayout
         _panelBackground.AddChild(_partStatusPanel);
         ApplyPanelStyle(_partStatusPanel, new Color(0.102f, 0.082f, 0.082f, 1.0f));
 
-        _partNameLabel = new Label { Position = new Vector2(10, 10), Size = new Vector2(240, 30), HorizontalAlignment = HorizontalAlignment.Center };
+        _partNameLabel = new Label
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
         _partNameLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.267f, 0.267f));
         _partNameLabel.AddThemeFontSizeOverride("font_size", 24);
         _partStatusPanel.AddChild(_partNameLabel);
 
-        _healthBar = new ProgressBar { Position = new Vector2(10, 50), Size = new Vector2(240, 24), MinValue = 0, MaxValue = 100 };
-        _partStatusPanel.AddChild(_healthBar);
+        _healthBar = new ProgressBar
+        {
+            MinValue = 0,
+            MaxValue = 100
+        };
         ApplyHealthBarStyle(_healthBar);
+        _partStatusPanel.AddChild(_healthBar);
 
-        _conditionLabel = new Label { Position = new Vector2(10, 90), Size = new Vector2(240, 260), AutowrapMode = TextServer.AutowrapMode.WordSmart, VerticalAlignment = VerticalAlignment.Top };
+        _conditionLabel = new Label
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Top,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart
+        };
         _conditionLabel.AddThemeColorOverride("font_color", new Color(0.878f, 0.835f, 0.78f));
         _conditionLabel.AddThemeFontSizeOverride("font_size", 16);
         _partStatusPanel.AddChild(_conditionLabel);
+
+        // Use anchors to fill the status panel
+        _partNameLabel.AnchorLeft = 0; _partNameLabel.AnchorRight = 1;
+        _partNameLabel.AnchorTop = 0; _partNameLabel.AnchorBottom = 0;
+        _partNameLabel.OffsetLeft = 10; _partNameLabel.OffsetRight = -10;
+        _partNameLabel.OffsetTop = 10; _partNameLabel.OffsetBottom = 40;
+
+        _healthBar.AnchorLeft = 0; _healthBar.AnchorRight = 1;
+        _healthBar.AnchorTop = 0; _healthBar.AnchorBottom = 0;
+        _healthBar.OffsetLeft = 10; _healthBar.OffsetRight = -10;
+        _healthBar.OffsetTop = 50; _healthBar.OffsetBottom = 74;
+
+        _conditionLabel.AnchorLeft = 0; _conditionLabel.AnchorRight = 1;
+        _conditionLabel.AnchorTop = 0; _conditionLabel.AnchorBottom = 1;
+        _conditionLabel.OffsetLeft = 10; _conditionLabel.OffsetRight = -10;
+        _conditionLabel.OffsetTop = 90; _conditionLabel.OffsetBottom = -10;
     }
 
     private void CreateSelectionStyle()
@@ -141,6 +175,18 @@ public partial class LimbHealthUI : Control
         if (def.Name == "Head")
         {
             part.IsEllipse = true;
+        }
+        if (DisplayServer.IsTouchscreenAvailable())
+        {
+            part.MouseFilter = MouseFilterEnum.Stop;
+            part.GuiInput += (InputEvent evt) =>
+            {
+                if (evt is InputEventScreenTouch t && t.Pressed)
+                {
+                    SetSelectionMode(SelectionMode.Limb, def.Name);
+                    GetViewport().SetInputAsHandled();
+                }
+            };
         }
         return part;
     }
@@ -185,19 +231,31 @@ public partial class LimbHealthUI : Control
         _isActive = true;
         Visible = true;
         MouseFilter = MouseFilterEnum.Stop;
-        
+
         // Auto‑run: capture current movement input
-        GameState.Instance.AutoRunDirection = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
         GameState.Instance.AutoRunActive = Input.IsActionPressed("move_forward");
-        GameState.Instance.AutoRunSprinting = Input.IsActionPressed("sprint");
-        
+        if (DisplayServer.IsTouchscreenAvailable())
+        {
+            GameState.Instance.AutoRunDirection = MobileInput.MovementDirection;
+            GameState.Instance.AutoRunSprinting = Input.IsActionPressed("sprint");
+        }
+        else
+        {
+            GameState.Instance.AutoRunDirection = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
+            GameState.Instance.AutoRunSprinting = Input.IsActionPressed("sprint");
+        }
+
         UpdateAllLimbs();
         if (_selectionMode == SelectionMode.FullBody)
             ShowFullBodyStatus();
         else if (!string.IsNullOrEmpty(_selectedLimb))
             ShowLimbStatus(_selectedLimb);
-            
+
         GameState.Instance.GameSpeed = 0.2f;
+
+        // Notify the HUD about the menu state change
+        HUD.Instance?.OnHealthPanelToggled();
+        CallDeferred(nameof(UpdateLayout));
     }
 
     public void Deactivate()
@@ -206,12 +264,15 @@ public partial class LimbHealthUI : Control
         Visible = false;
         MouseFilter = MouseFilterEnum.Ignore;
         ClearSelectionOutline();
-        
+
         // Turn off auto‑run
         GameState.Instance.AutoRunActive = false;
         GameState.Instance.AutoRunDirection = Vector2.Zero;
-        
+
         GameState.Instance.GameSpeed = 1.0f;
+
+        // Notify the HUD about the menu state change
+        HUD.Instance?.OnHealthPanelToggled();
     }
 
     public void HandleInput(InputEvent @event)
@@ -239,7 +300,7 @@ public partial class LimbHealthUI : Control
             }
             else if (@event.IsActionPressed("ui_cancel"))
             {
-                Deactivate();
+                Cancel();
             }
         }
         else // Limb mode
@@ -475,5 +536,79 @@ public partial class LimbHealthUI : Control
             color = new Color(0, 1, 0);          // Green
 
         part.FillColor = color;
+    }
+
+    public void Cancel()
+    {
+        if (!_isActive) return;
+
+        if (_selectionMode == SelectionMode.Limb)
+        {
+            if (_selectedLimb == "LeftEye" || _selectedLimb == "RightEye")
+                SetSelectionMode(SelectionMode.Limb, "Head");
+            else
+                SetSelectionMode(SelectionMode.FullBody);
+        }
+        else
+        {
+            Deactivate();
+        }
+    }
+
+    private void UpdateLayout()
+    {
+        if (_panelBackground == null || _bodyDiagram == null || _partStatusPanel == null)
+            return;
+
+        Vector2 bgSize = _panelBackground.Size;
+        if (bgSize.X <= 0 || bgSize.Y <= 0) return;
+
+        // Margins
+        const float margin = 20f;
+        float availWidth = bgSize.X - margin * 2;
+        float availHeight = bgSize.Y - margin * 2;
+
+        // Body diagram takes left 35% of available width, maintaining aspect ratio
+        float maxBodyWidth = availWidth * 0.35f;
+        float maxBodyHeight = availHeight * 0.9f;
+
+        // Original diagram size (from constant)
+        Vector2 origSize = BodyDiagramSize; // 200x400
+        _bodyScale = Mathf.Min(maxBodyWidth / origSize.X, maxBodyHeight / origSize.Y);
+
+        Vector2 newBodySize = origSize * _bodyScale;
+
+        // Position the body diagram – left aligned, vertically centered
+        _bodyDiagram.Position = new Vector2(margin, (bgSize.Y - newBodySize.Y) * 0.5f);
+        _bodyDiagram.Size = newBodySize;
+
+        // Resize and reposition all limb controls
+        for (int i = 0; i < _limbDefinitions.Length; i++)
+        {
+            var def = _limbDefinitions[i];
+            if (_limbControls.TryGetValue(def.Name, out var part))
+            {
+                part.Position = def.Position * _bodyScale;
+                part.Size = def.Size * _bodyScale;
+                if (part.IsEllipse)
+                {
+                    // For ellipse (head), corner radius should scale too
+                    part.CornerRadius = Mathf.RoundToInt(def.CornerRadius * _bodyScale);
+                }
+            }
+        }
+
+        // Position the status panel to the right of the body diagram
+        float statusPanelX = margin + newBodySize.X + margin;  // small gap
+        float statusPanelWidth = bgSize.X - statusPanelX - margin;
+        _partStatusPanel.Position = new Vector2(statusPanelX, margin);
+        _partStatusPanel.Size = new Vector2(statusPanelWidth, availHeight);
+
+        // The status panel children will automatically fill their parent thanks to anchors – no further action needed.
+    }
+
+    public bool IsPointInside(Vector2 screenPoint)
+    {
+        return _panelBackground != null && _panelBackground.GetGlobalRect().HasPoint(screenPoint);
     }
 }

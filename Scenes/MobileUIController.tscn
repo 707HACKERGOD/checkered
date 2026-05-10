@@ -1,0 +1,9 @@
+[gd_scene format=3 uid="uid://cj1ok7x111vye"]
+
+[ext_resource type="Script" uid="uid://yjbssitadmo4" path="res://Scripts/UI/MobileUIController.cs" id="1_pvvcs"]
+[ext_resource type="PackedScene" uid="uid://bjlwtu6dxwgfn" path="res://Scenes/VirtualJoystick.tscn" id="2_l4yrf"]
+
+[node name="MobileUIController" type="CanvasLayer" unique_id=1045282899]
+layer = 10
+script = ExtResource("1_pvvcs")
+_joystickScene = ExtResource("2_l4yrf")

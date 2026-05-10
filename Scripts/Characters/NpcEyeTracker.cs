@@ -1,8 +1,7 @@
 using Godot;
 using System;
 
-[Tool]
-public partial class NpcEyeTracker : Node // Made it a Node so it's a clean Component!
+    public partial class NpcEyeTracker : Node
 {
     [ExportGroup("Core References")]
     [Export] public Node3D Target;
@@ -26,6 +25,9 @@ public partial class NpcEyeTracker : Node // Made it a Node so it's a clean Comp
     [Export] public float EyeTrackingSpeed = 12.0f;
     [Export] public Vector2 UvSensitivity = new Vector2(0.05f, 0.05f);
     [Export] public Vector2 MaxUvOffset = new Vector2(0.1f, 0.1f);
+
+    // NEW: Base offset that brings the iris to centre before tracking
+    [Export] public Vector2 EyeUvBase = Vector2.Zero;
     [Export] public bool SidewaysUvFix = true;
 
     [ExportGroup("Blink Settings")]
@@ -38,7 +40,7 @@ public partial class NpcEyeTracker : Node // Made it a Node so it's a clean Comp
 
     private int _headIdx = -1;
     private int _headParentIdx = -1;
-    private StandardMaterial3D _eyeMaterial;
+    private Material _eyeMaterial;          // can be either ShaderMaterial or StandardMaterial3D
     private Vector2 _currentUvOffset = Vector2.Zero;
     
     private int _blinkShapeIdx = -1;
@@ -64,12 +66,23 @@ public partial class NpcEyeTracker : Node // Made it a Node so it's a clean Comp
 
         if (IsInstanceValid(FaceMesh))
         {
-            Material mat = FaceMesh.GetActiveMaterial(EyeMaterialSurfaceIndex);
-            if (mat is StandardMaterial3D stdMat)
+            Material original = FaceMesh.GetActiveMaterial(EyeMaterialSurfaceIndex);
+            if (original is ShaderMaterial shdOriginal)
             {
-                _eyeMaterial = stdMat.Duplicate() as StandardMaterial3D;
+                _eyeMaterial = (ShaderMaterial)shdOriginal.Duplicate();
                 FaceMesh.SetSurfaceOverrideMaterial(EyeMaterialSurfaceIndex, _eyeMaterial);
-                _currentUvOffset = new Vector2(_eyeMaterial.Uv1Offset.X, _eyeMaterial.Uv1Offset.Y);
+            }
+            else if (original is StandardMaterial3D stdOriginal)
+            {
+                _eyeMaterial = (StandardMaterial3D)stdOriginal.Duplicate();
+                FaceMesh.SetSurfaceOverrideMaterial(EyeMaterialSurfaceIndex, _eyeMaterial);
+                // Get initial UV offset if needed (optional)
+                _currentUvOffset = new Vector2(((StandardMaterial3D)_eyeMaterial).Uv1Offset.X, ((StandardMaterial3D)_eyeMaterial).Uv1Offset.Y);
+            }
+            else
+            {
+                GD.PrintErr($"Eye material at surface {EyeMaterialSurfaceIndex} is not supported.");
+                _eyeMaterial = null;
             }
 
             if (FaceMesh.Mesh != null)
@@ -157,9 +170,7 @@ public partial class NpcEyeTracker : Node // Made it a Node so it's a clean Comp
 
         // If target is null, OR if target walked behind our back
         if (!shouldTrack)
-        {
-            targetRotation = CharacterSkeleton.GetBoneRest(_headIdx).Basis.GetRotationQuaternion();
-        }
+            return;   // leave the bone alone; animation takes over
 
         Quaternion currentRot = CharacterSkeleton.GetBonePoseRotation(_headIdx);
         Quaternion newRot = currentRot.Normalized().Slerp(targetRotation.Normalized(), (float)delta * HeadTrackingSpeed);
@@ -170,7 +181,7 @@ public partial class NpcEyeTracker : Node // Made it a Node so it's a clean Comp
     {
         if (_eyeMaterial == null || _headIdx == -1) return;
 
-        Vector2 targetUvOffset = Vector2.Zero; // Defaults to center (Rest Pose)
+        Vector2 targetUvOffset = EyeUvBase;
 
         // Only do math if we have a target (otherwise it stays Zero)
         if (hasTarget && EnableEyeTracking)
@@ -185,16 +196,30 @@ public partial class NpcEyeTracker : Node // Made it a Node so it's a clean Comp
                 float rawU = targetLocalToHead.X * UvSensitivity.X;
                 float rawV = targetLocalToHead.Y * UvSensitivity.Y;
 
-                if (SidewaysUvFix) targetUvOffset = new Vector2(rawV, rawU);
-                else targetUvOffset = new Vector2(rawU, -rawV); 
+                Vector2 trackingDelta;
+                if (SidewaysUvFix)
+                    trackingDelta = new Vector2(rawV, rawU);
+                else
+                    trackingDelta = new Vector2(rawU, -rawV);
 
-                targetUvOffset.X = Mathf.Clamp(targetUvOffset.X, -MaxUvOffset.X, MaxUvOffset.X);
-                targetUvOffset.Y = Mathf.Clamp(targetUvOffset.Y, -MaxUvOffset.Y, MaxUvOffset.Y);
+                // Clamp the tracking delta so the total offset (base + delta) stays within MaxUvOffset
+                Vector2 totalOffset = EyeUvBase + trackingDelta;
+                totalOffset.X = Mathf.Clamp(totalOffset.X, -MaxUvOffset.X, MaxUvOffset.X);
+                totalOffset.Y = Mathf.Clamp(totalOffset.Y, -MaxUvOffset.Y, MaxUvOffset.Y);
+
+                targetUvOffset = totalOffset;
             }
         }
 
         _currentUvOffset = _currentUvOffset.Lerp(targetUvOffset, (float)delta * EyeTrackingSpeed);
-        _eyeMaterial.Uv1Offset = new Vector3(_currentUvOffset.X, _currentUvOffset.Y, 0);
+        if (_eyeMaterial is ShaderMaterial shd)
+        {
+            shd.SetShaderParameter("eye_uv_offset", _currentUvOffset);
+        }
+        else if (_eyeMaterial is StandardMaterial3D std)
+        {
+            std.Uv1Offset = new Vector3(_currentUvOffset.X, _currentUvOffset.Y, 0);
+        }
     }
 
     private void ProcessBlinking(double delta)

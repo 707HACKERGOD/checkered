@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://itb63fcje7ky"
 path.s3tc="res://.godot/imported/eyepatch_256x256_Grid3.png-3843227b6cf00a4464e27ad42cf94ec1.s3tc.ctex"
+path.etc2="res://.godot/imported/eyepatch_256x256_Grid3.png-3843227b6cf00a4464e27ad42cf94ec1.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://Assets/eyepatch_256x256_Grid3.png"
-dest_files=["res://.godot/imported/eyepatch_256x256_Grid3.png-3843227b6cf00a4464e27ad42cf94ec1.s3tc.ctex"]
+dest_files=["res://.godot/imported/eyepatch_256x256_Grid3.png-3843227b6cf00a4464e27ad42cf94ec1.s3tc.ctex", "res://.godot/imported/eyepatch_256x256_Grid3.png-3843227b6cf00a4464e27ad42cf94ec1.etc2.ctex"]
 
 [params]
 
