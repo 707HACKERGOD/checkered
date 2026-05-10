@@ -2412,4 +2412,18 @@ public partial class HUD : Control
             _debugBackground.Size = new Vector2(w, h);
         }
     }
+
+    // Inside the HUD class
+    public void RefreshNpcTooltip(NpcInteraction npc)
+    {
+        if (npc == null)
+        {
+            HideTooltip();
+            return;
+        }
+
+        string prefix = npc.IsDead ? "Dead " : "";
+        ShowTooltipAtWorldPosition($"Talk to {prefix}{npc.NpcName}",
+            npc.GetParent<CharacterBody3D>().GlobalPosition, "E");
+    }
 }

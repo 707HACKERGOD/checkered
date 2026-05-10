@@ -40,8 +40,13 @@ public partial class Player : CharacterBody3D
     private bool _isFirstPerson = false;
     private bool _isLockedOn = false;
     private float _targetZoom = 3.0f;
-    private float _minZoom = 1.5f;
+
     private float _maxZoom = 6.0f;
+
+    // --- COMBAT ---
+    [Export] private AudioStream _attackSound;
+    private AudioStreamPlayer _attackAudioPlayer;
+    private float _minZoom = 1.5f;
 
     // --- ANIMATION ---
     private AnimationTree _animTree;
@@ -100,6 +105,12 @@ public partial class Player : CharacterBody3D
             _turnResetTimer.OneShot = true;
             AddChild(_turnResetTimer);
             _turnResetTimer.Timeout += () => _animTree.Set($"parameters/{_turnParam}", false);
+            // Attack sound
+            if (_attackSound != null)
+            {
+                _attackAudioPlayer = new AudioStreamPlayer();
+                AddChild(_attackAudioPlayer);
+            }
         }
     }
 
@@ -150,9 +161,12 @@ public partial class Player : CharacterBody3D
         if (@event.IsActionPressed("lock_on") && LockOnTarget != null)
             _isLockedOn = !_isLockedOn;
 
-        if (@event.IsActionPressed("ui_accept"))
+        // Attack
+        if (@event.IsActionPressed("attack") && !anyMenuOpen)
         {
-            // debug damage
+            PerformAttack();
+            GetViewport().SetInputAsHandled();
+            return;
         }
     }
 
@@ -511,5 +525,164 @@ public partial class Player : CharacterBody3D
         if (!_touchStartPositions.TryGetValue(touchIndex, out Vector2 startPos))
             return false;   // touch not tracked, allow camera (safety)
         return HUD.Instance != null && HUD.Instance.IsPointInsideAnyMenu(startPos);
+    }
+
+    private void PerformAttack()
+    {
+        // Play swing sound (always, even if none hit)
+        if (_attackAudioPlayer != null && _attackSound != null)
+        {
+            _attackAudioPlayer.Stream = _attackSound;
+            _attackAudioPlayer.Play();
+        }
+
+        if (PlayerCamera == null) return;
+
+        var spaceState = GetWorld3D().DirectSpaceState;
+        Vector3 origin = PlayerCamera.GlobalPosition;
+        Vector3 end = origin - PlayerCamera.GlobalTransform.Basis.Z * 100.0f;
+
+        var query = PhysicsRayQueryParameters3D.Create(origin, end);
+        query.CollisionMask = 1 << 4; // layer 5 = BodyParts
+        query.CollideWithAreas = true;
+        query.CollideWithBodies = false;
+        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+
+        var result = spaceState.IntersectRay(query);
+        if (result.Count > 0)
+        {
+            Area3D hitArea = result["collider"].As<Area3D>();
+            if (hitArea == null) return;
+
+            string limbName = hitArea.Name; // we named the Area3D after the limb in NpcController
+            if (string.IsNullOrEmpty(limbName)) return;
+
+            // Find the NPC
+            Node current = hitArea.GetParent();   // BoneAttachment3D
+            current = current?.GetParent();       // Skeleton3D
+            while (current != null && !(current is CharacterBody3D))
+                current = current.GetParent();
+            var npc = current as CharacterBody3D;
+            if (npc == null || npc.GetNodeOrNull<NpcController>(".")?.IsDead == true) return;
+
+            var health = npc.GetNodeOrNull<Health>("Health");
+            if (health == null) return;
+
+            // Get the specific limb health
+            LimbHealth limbHealth = null;
+            foreach (Node child in health.GetChildren())
+            {
+                if (child is LimbHealth lh && lh.Name == limbName)
+                {
+                    limbHealth = lh;
+                    break;
+                }
+            }
+
+            float damage = limbHealth != null ? limbHealth.MaxHealth * 0.2f : 20f; // fallback
+            health.TakeDamage(damage, limbName);
+
+            float currentHealth = limbHealth?.CurrentHealth ?? 0;
+            // Get NPC controller and display name
+            var npcController = npc.GetNodeOrNull<NpcController>(".");
+            string npcName = npcController != null ? npcController.DisplayName : "Unknown";
+            string status = npcController != null && npcController.IsDead ? "DEAD" : "alive";
+
+            GD.Print($"[{npcName}] {status} | Total Health: {health.CurrentHealth:F1}/{health.MaxHealth:F1} | Hit {limbName} for {damage:F1} damage. {limbName} HP: {currentHealth:F1}/{limbHealth?.MaxHealth ?? 0:F1}");
+            // Flash the hit limb (or whole body for old NPCs)
+            FlashLimb(npc, limbName);
+        }
+    }
+
+    private async void FlashLimb(CharacterBody3D npc, string limbName)
+    {
+        var modelRoot = npc.GetNodeOrNull<Node3D>("ModelRoot");
+        if (modelRoot == null) return;
+
+        // Collect all meshes under ModelRoot
+        var allMeshes = new List<MeshInstance3D>();
+        FindAllMeshes(modelRoot, allMeshes);
+        if (allMeshes.Count == 0) return;
+
+        MeshInstance3D limbMesh = null;
+
+        // Try to find the exact limb mesh using the corrected dictionary
+        if (NpcController.LimbMeshNames.TryGetValue(limbName, out string meshName))
+        {
+            limbMesh = allMeshes.FirstOrDefault(m =>
+                m.Name.ToString().Equals(meshName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // If not found, flash ALL meshes as a fallback (guaranteed visual feedback)
+        List<MeshInstance3D> meshesToFlash;
+        if (limbMesh != null)
+            meshesToFlash = new List<MeshInstance3D> { limbMesh };
+        else
+            meshesToFlash = allMeshes;   // whole body flash if limb unknown
+
+        // Store original surface materials for each mesh
+        var originalMaterials = new Dictionary<MeshInstance3D, Material[]>();
+
+        foreach (var mesh in meshesToFlash)
+        {
+            int surfaceCount = mesh.Mesh.GetSurfaceCount();
+            var mats = new Material[surfaceCount];
+            for (int i = 0; i < surfaceCount; i++)
+            {
+                mats[i] = mesh.GetActiveMaterial(i);
+                var redMat = new StandardMaterial3D
+                {
+                    AlbedoColor = new Color(1, 0, 0),
+                    ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded
+                };
+                mesh.SetSurfaceOverrideMaterial(i, redMat);
+            }
+            originalMaterials[mesh] = mats;
+        }
+
+        await ToSignal(GetTree().CreateTimer(0.15f), "timeout");
+
+        // Restore original materials
+        foreach (var (mesh, mats) in originalMaterials)
+        {
+            for (int i = 0; i < mats.Length; i++)
+                mesh.SetSurfaceOverrideMaterial(i, mats[i]);
+        }
+    }
+
+    // Helper: finds first MeshInstance3D whose name contains the partial string (case‑insensitive)
+    private static MeshInstance3D FindMeshByPartialName(Node start, string partialName)
+    {
+        if (start is MeshInstance3D mi)
+        {
+            string nodeName = mi.Name.ToString();   // convert StringName to string
+            if (nodeName.IndexOf(partialName, StringComparison.OrdinalIgnoreCase) >= 0)
+                return mi;
+        }
+
+        foreach (Node child in start.GetChildren())
+        {
+            var result = FindMeshByPartialName(child, partialName);
+            if (result != null) return result;
+        }
+        return null;
+    }
+    // Helper: recursively gather all MeshInstance3D nodes
+    private void FindAllMeshes(Node node, List<MeshInstance3D> list)
+    {
+        if (node is MeshInstance3D mi)
+            list.Add(mi);
+        foreach (Node child in node.GetChildren())
+            FindAllMeshes(child, list);
+    }
+    private static T FindNodeRecursive<T>(Node start, string name) where T : class
+    {
+        if (start is T t && start.Name == name) return t;
+        foreach (Node child in start.GetChildren())
+        {
+            var found = FindNodeRecursive<T>(child, name);
+            if (found != null) return found;
+        }
+        return null;
     }
 }

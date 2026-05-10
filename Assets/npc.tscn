@@ -44,6 +44,7 @@ Critical = true
 [node name="Torso" type="Node" parent="Health" unique_id=2079523670]
 script = ExtResource("7_amnef")
 LimbName = "Torso"
+Critical = true
 
 [node name="LeftArm" type="Node" parent="Health" unique_id=1872731204]
 script = ExtResource("7_amnef")
