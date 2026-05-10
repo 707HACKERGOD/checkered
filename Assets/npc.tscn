@@ -19,11 +19,9 @@ script = ExtResource("1_0wweb")
 
 [node name="ModelRoot" type="Node3D" parent="." unique_id=129137055]
 
-[node name="EyeTrackerComponent" type="Node" parent="." unique_id=27164503 node_paths=PackedStringArray("CharacterSkeleton", "FaceMesh")]
+[node name="EyeTrackerComponent" type="Node" parent="." unique_id=27164503]
 process_priority = 1
 script = ExtResource("1_w88vc")
-CharacterSkeleton = NodePath("")
-FaceMesh = NodePath("")
 
 [node name="VisionArea" type="Area3D" parent="." unique_id=285309370]
 collision_layer = 0

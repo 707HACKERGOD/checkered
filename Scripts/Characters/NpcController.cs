@@ -22,6 +22,16 @@ public partial class NpcController : CharacterBody3D
             var modelRoot = GetNodeOrNull<Node3D>("ModelRoot");
             if (modelRoot != null)
                 modelRoot.AddChild(model);
+                // Play the idle animation
+                var animPlayer = model.FindChild("AnimationPlayer", recursive: true) as AnimationPlayer;
+                if (animPlayer != null)
+                {
+                    if (animPlayer.HasAnimation("idle"))
+                        animPlayer.Play("idle");
+                    else
+                        GD.Print($"AnimationPlayer found but no 'idle' animation. Available: {animPlayer.GetAnimationList()}");
+                }
+                
             else
                 GD.PrintErr("NpcController: missing ModelRoot child");
         }
@@ -39,7 +49,7 @@ public partial class NpcController : CharacterBody3D
         if (_eyeTracker != null && model != null)
         {
             var skeleton = FindChildOfTypeRecursive<Skeleton3D>(model);
-            var faceMesh = FindChildOfTypeRecursive<MeshInstance3D>(model);
+            var faceMesh = FindBestFaceMesh(model);
             if (skeleton != null) _eyeTracker.CharacterSkeleton = skeleton;
             if (faceMesh != null) _eyeTracker.FaceMesh = faceMesh;
         }
@@ -85,5 +95,31 @@ public partial class NpcController : CharacterBody3D
     {
         if (body == _eyeTracker?.Target)
             _eyeTracker.Target = null;
+    }
+
+    private MeshInstance3D FindBestFaceMesh(Node startNode)
+    {
+        MeshInstance3D best = null;
+        int bestSurfaces = -1;
+        foreach (Node child in startNode.GetChildren())
+        {
+            if (child is MeshInstance3D mi)
+            {
+                int surfaces = mi.Mesh.GetSurfaceCount();
+                if (surfaces > bestSurfaces)
+                {
+                    bestSurfaces = surfaces;
+                    best = mi;
+                }
+            }
+            // Also search deeper
+            var found = FindBestFaceMesh(child);
+            if (found != null && found.Mesh.GetSurfaceCount() > bestSurfaces)
+            {
+                best = found;
+                bestSurfaces = found.Mesh.GetSurfaceCount();
+            }
+        }
+        return best;
     }
 }

@@ -1,0 +1,30 @@
+[gd_scene format=3 uid="uid://bgrpott7qrroi"]
+
+[ext_resource type="PackedScene" uid="uid://uy0gt5bh27sb" path="res://Assets/syl_base_5.glb" id="1_lsxoo"]
+
+[node name="syl_base_5" unique_id=1543444076 instance=ExtResource("1_lsxoo")]
+
+[node name="Skeleton3D" parent="metarig" parent_id_path=PackedInt32Array(1277451019) index="0" unique_id=1599754758]
+bones/0/position = Vector3(-1.815753e-05, 0.83680344, 0.032115523)
+bones/0/rotation = Quaternion(0.16563182, 7.9136875e-08, 1.3291164e-08, 0.9861877)
+bones/1/rotation = Quaternion(-0.18164173, -1.6633932e-08, -2.607924e-08, 0.9833648)
+bones/2/rotation = Quaternion(-0.06385426, -3.3459195e-08, -5.9468936e-09, 0.99795926)
+bones/3/rotation = Quaternion(-0.027186597, 0.0017856917, 5.4391887e-05, 0.9996288)
+bones/4/rotation = Quaternion(0.108635366, -3.6665675e-08, 7.627926e-09, 0.9940817)
+bones/5/rotation = Quaternion(0.023930106, 1.7533196e-08, 1.2729309e-09, 0.9997137)
+bones/6/rotation = Quaternion(0.012781154, -8.914682e-08, -2.7187017e-10, 0.99991834)
+bones/7/rotation = Quaternion(0.003346608, 0.2045822, -0.7822588, 0.588393)
+bones/8/position = Vector3(0.0084037855, 0.10204093, 0.0012207034)
+bones/8/rotation = Quaternion(0.035320576, 0.11817148, -0.49783376, 0.85845757)
+bones/9/rotation = Quaternion(0.18507957, -0.014332647, -0.027846182, 0.9822244)
+bones/11/rotation = Quaternion(0.0033465335, -0.20458223, 0.78225875, 0.58839285)
+bones/12/position = Vector3(-0.008403519, 0.10204095, 0.0012207029)
+bones/12/rotation = Quaternion(0.03532062, -0.118171535, 0.49783382, 0.85845757)
+bones/13/rotation = Quaternion(0.18507953, 0.014332607, 0.02784625, 0.9822244)
+bones/17/rotation = Quaternion(0.9797736, 0.01778384, -0.002363257, 0.19930355)
+bones/18/rotation = Quaternion(0.1028023, 0.00019455585, 0.0056511583, 0.99468577)
+bones/22/rotation = Quaternion(0.97977334, -0.017783904, 0.0023633265, 0.19930486)
+bones/23/rotation = Quaternion(0.1028048, -0.00019467282, -0.005651296, 0.9946855)
+
+[node name="eyepatch_002" parent="metarig/Skeleton3D" index="0" unique_id=1559059956]
+visible = false
