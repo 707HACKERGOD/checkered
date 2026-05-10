@@ -34,15 +34,15 @@ Demo:
 - ✅ Weather system that's fully tied to a wind vector
 - ✅ 4 seasons with different day lengths, special effects and sky colors
 - ✅ Inventory UI, picking up items
-- 🚧 Combat and health system with limb health
+- ✅ Combat and health system with limb health
+- ✅ Debug menu
 - 🚧 NPC aggressive and desensive UI, interactions
 - 🚧 Possession system
-- 🚧 Dialogue UI
 - 🚧 Sounds and music
-- 🚧 Debug menu
 - 🚧 Animation and movement system: idle, walk, sprint, jump, crouch, crawl, turning around, climb, swim
-- Sanity system (control over districts)
-- 5 NPCs in the first demo: Barkeeper, Rich truant, Phantom, Base_F, Base_M
+- 🚧 Sanity system (control over districts)
+- 🚧 5 NPCs in the first demo: Barkeeper, Rich truant, Phantom, Base_F, Base_M
+- Dialogue UI
 - Calendar UI
 - Open world map with 2 key buildings in demo: bar, trade school
 - Intro story
