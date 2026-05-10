@@ -56,8 +56,6 @@ public partial class InteractableItem : Area3D
         RotateY((float)delta);
     }
 
-    // REMOVED _InputEvent - It's no longer needed!
-
     public void Pickup()
     {
         GD.Print($"Picked up: {Data.Name}");

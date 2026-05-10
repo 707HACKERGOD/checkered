@@ -56,8 +56,8 @@ public partial class NpcController : CharacterBody3D
                 var animPlayer = model.FindChild("AnimationPlayer", recursive: true) as AnimationPlayer;
                 if (animPlayer != null)
                 {
-                    if (animPlayer.HasAnimation("F_NPC_mesh"))
-                        animPlayer.Play("F_NPC_mesh");
+                    if (animPlayer.HasAnimation("idle"))
+                        animPlayer.Play("idle");
                     else
                         GD.Print($"AnimationPlayer found but no 'idle' animation. Available: {animPlayer.GetAnimationList()}");
                 }

@@ -30,9 +30,9 @@ desktop.ini
 *.usertasks
 *.vshost.*
 
-res/builds/
+res/builds/exes
 res/android/
 res/addons/
 android/
-builds/
+builds/exes
 addons/
