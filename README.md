@@ -34,15 +34,15 @@ Demo:
 - ✅ Weather system that's fully tied to a wind vector
 - ✅ 4 seasons with different day lengths, special effects and sky colors
 - ✅ Inventory UI, picking up items
-- 🚧 Combat and health system with limb health
-- 🚧 NPC aggressive and desensive UI, interactions
+- ✅ Combat and health system with limb health
+- ✅ Debug menu
+- 🚧 NPC aggressive and desensive behavior
 - 🚧 Possession system
-- 🚧 Dialogue UI
 - 🚧 Sounds and music
-- 🚧 Debug menu
 - 🚧 Animation and movement system: idle, walk, sprint, jump, crouch, crawl, turning around, climb, swim
-- Sanity system (control over districts)
-- 5 NPCs in the first demo: Barkeeper, Rich truant, Phantom, Base_F, Base_M
+- 🚧 Sanity system (control over districts)
+- 🚧 5 NPCs in the first demo: Barkeeper, Rich truant, Phantom, Base_F, Base_M
+- Dialogue UI
 - Calendar UI
 - Open world map with 2 key buildings in demo: bar, trade school
 - Intro story
@@ -57,6 +57,7 @@ Future plans:
 - Customize your home laboratory/factory - whether you  prefer the bar attic, the woods or the junkyard.
 - Abandon society, fight the whole city and then the military, or fail the college infiltration - the game won't give a game over, the curse is hungry for destruction of all, and you can only stop it if you show your own initiative.
 
+![Gameplay Screenshot](builds/screenshots/v0.1.2/Screenshot%202026-05-11%20002943.png)
 ![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20160620.png)
 ![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20160827.png)
 ![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20160931.png)
