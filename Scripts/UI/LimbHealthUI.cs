@@ -432,37 +432,14 @@ public partial class LimbHealthUI : Control
 
         _partNameLabel.Text = "FULL BODY";
 
-        // Calculate average limb health
-        float totalMax = 0;
-        float totalCurrent = 0;
-        bool anyLimbFound = false;
-
-        foreach (var limbName in _limbControls.Keys)
-        {
-            var limb = TargetHealth.GetNodeOrNull<LimbHealth>(limbName);
-            if (limb != null)
-            {
-                totalMax += limb.MaxHealth;
-                totalCurrent += limb.CurrentHealth;
-                anyLimbFound = true;
-            }
-        }
-
-        float percent = anyLimbFound ? (totalCurrent / totalMax) * 100f : 100f;
+        float percent = (TargetHealth.CurrentHealth / TargetHealth.MaxHealth) * 100f;
         _healthBar.Value = percent;
 
-        // Condition based on lowest limb
-        float minLimbHealth = 1.0f;
-        foreach (var limbName in _limbControls.Keys)
-        {
-            var limb = TargetHealth.GetNodeOrNull<LimbHealth>(limbName);
-            if (limb != null && !limb.IsDestroyed)
-                minLimbHealth = Mathf.Min(minLimbHealth, limb.CurrentHealth / limb.MaxHealth);
-        }
+        // Condition based on overall health percentage
+        string condition = percent >= 90f ? "Healthy" :
+                        percent > 40f  ? "Damaged" :
+                        percent > 0f   ? "Critical" : "Crippled";
 
-        string condition = minLimbHealth >= 1.0f ? "Healthy" :
-                        minLimbHealth > 0.6f ? "Healthy" :
-                        minLimbHealth > 0.3f ? "Damaged" : "Critical";
         _conditionLabel.Text = $"Overall: {condition}";
     }
 

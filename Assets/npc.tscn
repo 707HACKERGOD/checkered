@@ -6,6 +6,8 @@
 [ext_resource type="Shape3D" uid="uid://bxbfyrklnhn7" path="res://Scripts/Characters/interest_area_npc.tres" id="4_j56hr"]
 [ext_resource type="Script" uid="uid://vq5uv3ys31o8" path="res://Scripts/Systems/Health.cs" id="6_nx4xs"]
 [ext_resource type="Script" uid="uid://csft87qrpx63j" path="res://Scripts/Systems/LimbHealth.cs" id="7_amnef"]
+[ext_resource type="Script" uid="uid://bt3jw2dnhhrw5" path="res://Scripts/Characters/NavAgentNPC.cs" id="7_nx4xs"]
+[ext_resource type="Script" uid="uid://l0gad2lm4bq5" path="res://Scripts/Characters/NpcNavCombat.cs" id="8_amnef"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_j5xvs"]
 radius = 0.3
@@ -39,12 +41,12 @@ script = ExtResource("6_nx4xs")
 [node name="Head" type="Node" parent="Health" unique_id=917647578]
 script = ExtResource("7_amnef")
 LimbName = "Head"
-Critical = true
+MaxHealth = 30.0
 
 [node name="Torso" type="Node" parent="Health" unique_id=2079523670]
 script = ExtResource("7_amnef")
 LimbName = "Torso"
-Critical = true
+MaxHealth = 150.0
 
 [node name="LeftArm" type="Node" parent="Health" unique_id=1872731204]
 script = ExtResource("7_amnef")
@@ -65,3 +67,12 @@ LimbName = "RightLeg"
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1646066617]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 shape = SubResource("CapsuleShape3D_j5xvs")
+
+[node name="NavAgentNPC" type="NavigationAgent3D" parent="." unique_id=458111228]
+avoidance_enabled = true
+height = 1.6
+radius = 0.3
+script = ExtResource("7_nx4xs")
+
+[node name="NPCNavCombat" type="Node" parent="." unique_id=753746985]
+script = ExtResource("8_amnef")

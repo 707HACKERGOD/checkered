@@ -8,7 +8,7 @@ public partial class Health : Node
     [Signal] public delegate void HealedEventHandler(float amount, float currentHealth);
     [Signal] public delegate void LimbDamagedEventHandler(string limbName, float amount, float limbHealth);
 
-    [Export] public float MaxHealth { get; set; } = 100f;
+    public float MaxHealth { get; private set; } = 100f;   // fixed scale
     public float CurrentHealth { get; private set; }
     public bool IsDead => CurrentHealth <= 0f;
 
@@ -16,8 +16,6 @@ public partial class Health : Node
 
     public override void _Ready()
     {
-        CurrentHealth = MaxHealth;
-        // Find all LimbHealth children
         foreach (Node child in GetChildren())
         {
             if (child is LimbHealth limb)
@@ -27,9 +25,10 @@ public partial class Health : Node
                     EmitSignal(SignalName.LimbDamaged, limb.LimbName, amount, current);
             }
         }
+        RecalculateTotalHealth();
+        CurrentHealth = MaxHealth;   // start at full
     }
 
-    // Health.cs
     public void TakeDamage(float amount, string limbName = null)
     {
         if (IsDead) return;
@@ -38,20 +37,21 @@ public partial class Health : Node
         {
             limb.TakeDamage(amount);
 
-            // If a critical limb was destroyed, the NPC dies immediately
-            if (limb.Critical && limb.CurrentHealth <= 0)
+            // Instant death when a vital core is destroyed
+            if ((limbName == "Head" || limbName == "Torso") && limb.IsDestroyed)
             {
                 CurrentHealth = 0;
                 EmitSignal(SignalName.Died);
                 Die();
-                return;   // skip recalculating – we're dead
+                return;
             }
         }
         else
         {
-            // Distributed damage (optional)
+            // Distributed damage (fallback) – rarely used
+            float perLimb = amount / _limbs.Count;
             foreach (var l in _limbs.Values)
-                l.TakeDamage(amount / _limbs.Count);
+                l.TakeDamage(perLimb);
         }
 
         RecalculateTotalHealth();
@@ -65,16 +65,45 @@ public partial class Health : Node
 
     private void RecalculateTotalHealth()
     {
-        float totalMax = 0;
-        float totalCurrent = 0;
-        foreach (var limb in _limbs.Values)
+        // Only work if we have Head and Torso – otherwise treat as full health
+        if (!_limbs.TryGetValue("Head", out LimbHealth head) ||
+            !_limbs.TryGetValue("Torso", out LimbHealth torso))
         {
-            totalMax += limb.MaxHealth;
-            totalCurrent += limb.CurrentHealth;
+            CurrentHealth = MaxHealth;
+            return;
         }
-        MaxHealth = totalMax;
-        CurrentHealth = totalCurrent;
-        EmitSignal(SignalName.Damaged, 0, CurrentHealth); // Notify UI
+
+        // 1) Core ratios (0.0 – 1.0)
+        float headRatio  = head.CurrentHealth  / head.MaxHealth;
+        float torsoRatio = torso.CurrentHealth / torso.MaxHealth;
+
+        // HEAD is squared because it's fragile – one punch from death feels critical
+        float headCriticality = headRatio * headRatio;
+
+        // Lethal score = product of critical parts
+        float lethalScore = headCriticality * torsoRatio;
+
+        // 2) Limbs buffer – average integrity of non‑vital parts
+        float limbSum = 0f;
+        int limbCount = 0;
+        foreach (var name in new[] { "LeftArm", "RightArm", "LeftLeg", "RightLeg" })
+        {
+            if (_limbs.TryGetValue(name, out var limb))
+            {
+                limbSum += limb.CurrentHealth / limb.MaxHealth;
+                limbCount++;
+            }
+        }
+        float avgLimbRatio = limbCount > 0 ? limbSum / limbCount : 1f;
+
+        // Limbs modulate final health by up to 40% (all broken → multiplier 0.6)
+        const float limbInfluence = 0.40f;
+        float limbMultiplier = 1f - limbInfluence + (limbInfluence * avgLimbRatio);
+
+        // Final health (clamped 0-100)
+        CurrentHealth = Mathf.Clamp(lethalScore * limbMultiplier * MaxHealth, 0f, MaxHealth);
+
+        EmitSignal(SignalName.Damaged, 0, CurrentHealth);
     }
 
     public void Heal(float amount)
@@ -84,8 +113,5 @@ public partial class Health : Node
         EmitSignal(SignalName.Healed, amount, CurrentHealth);
     }
 
-    protected virtual void Die()
-    {
-        // Override in derived classes if needed
-    }
+    protected virtual void Die() { /* override if needed */ }
 }

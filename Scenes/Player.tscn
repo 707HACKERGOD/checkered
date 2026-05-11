@@ -28,6 +28,7 @@
 [ext_resource type="AudioStream" uid="uid://8e8a66h3qvw0" path="res://Assets/Audio/winter.wav" id="26_u7x0b"]
 [ext_resource type="Script" uid="uid://bwqls4byv5da" path="res://Scripts/Characters/AnimationController.cs" id="27_u7x0b"]
 [ext_resource type="Script" uid="uid://vq5uv3ys31o8" path="res://Scripts/Systems/Health.cs" id="29_kih0c"]
+[ext_resource type="Script" uid="uid://c11ivomd88b80" path="res://Scripts/PlayerPossession.cs" id="30_c43xd"]
 [ext_resource type="Script" uid="uid://csft87qrpx63j" path="res://Scripts/Systems/LimbHealth.cs" id="30_lyrkg"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_kyqiw"]
@@ -658,12 +659,12 @@ shape = SubResource("SphereShape3D_5ixxa")
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
 
 [node name="Skeleton3D" parent="syl_base_5/metarig" parent_id_path=PackedInt32Array(607563459, 1277451019) index="0" unique_id=1599754758]
-bones/0/position = Vector3(-0.010643322, 0.8350326, 0.032115538)
+bones/0/position = Vector3(-0.0038439347, 0.8361658, 0.032115526)
 bones/0/rotation = Quaternion(0.16563182, 7.9136875e-08, 1.3291164e-08, 0.9861877)
 bones/1/rotation = Quaternion(-0.18164173, -1.6633932e-08, -2.607924e-08, 0.9833648)
 bones/2/rotation = Quaternion(-0.06385426, -3.3459195e-08, -5.9468936e-09, 0.99795926)
-bones/3/rotation = Quaternion(-0.05906075, 0.0017865171, -2.6009013e-06, 0.9982528)
-bones/4/rotation = Quaternion(0.1231637, 2.6384043e-06, 5.2200856e-05, 0.9923864)
+bones/3/rotation = Quaternion(-0.038381144, 0.001786188, 3.4387336e-05, 0.99926156)
+bones/4/rotation = Quaternion(0.11374348, 9.032828e-07, 1.8349036e-05, 0.99351025)
 bones/5/rotation = Quaternion(0.023930106, 1.7533196e-08, 1.2729309e-09, 0.9997137)
 bones/6/rotation = Quaternion(0.012781154, -8.914682e-08, -2.7187017e-10, 0.99991834)
 bones/7/rotation = Quaternion(0.003346608, 0.2045822, -0.7822588, 0.588393)
@@ -674,10 +675,10 @@ bones/11/rotation = Quaternion(0.0033465335, -0.20458223, 0.78225875, 0.58839285
 bones/12/position = Vector3(-0.008403519, 0.10204095, 0.0012207029)
 bones/12/rotation = Quaternion(0.03532062, -0.118171535, 0.49783382, 0.85845757)
 bones/13/rotation = Quaternion(0.18507953, 0.014332607, 0.02784625, 0.9822244)
-bones/17/rotation = Quaternion(0.9777647, 0.023402685, -0.002702008, 0.20837776)
-bones/18/rotation = Quaternion(0.119373746, 0.0005145508, 0.0034678786, 0.9928432)
-bones/22/rotation = Quaternion(0.97713035, -0.0134270135, 0.001898812, 0.21220864)
-bones/23/rotation = Quaternion(0.12579204, 0.00012386582, -0.010116855, 0.99200505)
+bones/17/rotation = Quaternion(0.9790155, 0.019827288, -0.002488599, 0.20280413)
+bones/18/rotation = Quaternion(0.109054685, 0.00030546475, 0.00492599, 0.9940235)
+bones/22/rotation = Quaternion(0.97879004, -0.016243923, 0.0021826737, 0.2042092)
+bones/23/rotation = Quaternion(0.11153164, -8.410497e-05, -0.0071956567, 0.99373484)
 
 [node name="eyepatch_002" parent="syl_base_5/metarig/Skeleton3D" index="0" unique_id=1559059956]
 layers = 8
@@ -776,5 +777,14 @@ LimbName = "LeftEye"
 [node name="RightEye" type="Node" parent="Health" unique_id=1224959890]
 script = ExtResource("30_lyrkg")
 LimbName = "RightEye"
+
+[node name="PlayerPossession" type="Node" parent="." unique_id=1588093834]
+script = ExtResource("30_c43xd")
+
+[node name="NavAgentPlayer" type="NavigationAgent3D" parent="." unique_id=1923823864]
+avoidance_enabled = true
+height = 1.62
+radius = 0.3
+neighbor_distance = 20.0
 
 [editable path="syl_base_5"]

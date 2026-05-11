@@ -1545,6 +1545,36 @@ public partial class HUD : Control
             OnExecute = () => JumpToNextSeason(),
             GetDisplayValue = () => "-->"
         });
+
+        //Possession system
+        _menuItems.Add(new HeaderItem("POSSESSION"));
+        _menuItems.Add(new ActionItem
+        {
+            Name = "Start Possession",
+            OnExecute = () =>
+            {
+                var player = GetTree().Root.FindChild("Player", true, false) as Player;
+                var possession = player?.GetNodeOrNull<PlayerPossession>("PlayerPossession");
+                possession?.StartPossession();
+            },
+            GetDisplayValue = () =>
+            {
+                var player = GetTree().Root.FindChild("Player", true, false) as Player;
+                var possession = player?.GetNodeOrNull<PlayerPossession>("PlayerPossession");
+                return possession != null && possession.IsPossessed ? "ACTIVE" : "";
+            }
+        });
+        _menuItems.Add(new ActionItem
+        {
+            Name = "End Possession",
+            OnExecute = () =>
+            {
+                var player = GetTree().Root.FindChild("Player", true, false) as Player;
+                var possession = player?.GetNodeOrNull<PlayerPossession>("PlayerPossession");
+                possession?.StopPossession();
+            },
+            GetDisplayValue = () => ""   // no display needed
+        });
     }
 
     private void AddPreset(string name, WeatherManager.WeatherState state)

@@ -42,39 +42,53 @@ public partial class NpcController : CharacterBody3D
 
     public override void _Ready()
     {
+        if (!IsInGroup("NPC"))
+            AddToGroup("NPC");
+
         Node3D model = null;
 
-        // --- Load and attach the model ---
+        // Load and attach the model
         if (ModelResource != null)
         {
             model = ModelResource.Instantiate<Node3D>();
+
+            // --- prevent ragdoll on spawn ---
+            var skeleton = FindChildOfTypeRecursive<Skeleton3D>(model);
+            if (skeleton != null)
+            {
+                var simulator = skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator3D");
+                if (simulator == null)
+                    simulator = skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator"); // fallback name
+                if (simulator != null)
+                {
+                    simulator.Active = false;                  // ensure simulator is off
+                    simulator.PhysicalBonesStopSimulation();   // also stop any lingering simulation
+                }
+            }
+
             var modelRoot = GetNodeOrNull<Node3D>("ModelRoot");
             if (modelRoot != null)
             {
                 modelRoot.AddChild(model);
-                // Play the idle animation
                 var animPlayer = model.FindChild("AnimationPlayer", recursive: true) as AnimationPlayer;
                 if (animPlayer != null)
                 {
                     if (animPlayer.HasAnimation("idle"))
                         animPlayer.Play("idle");
-                    else
-                        GD.Print($"AnimationPlayer found but no 'idle' animation. Available: {animPlayer.GetAnimationList()}");
                 }
             }
             else
                 GD.PrintErr("NpcController: missing ModelRoot child");
         }
 
-        // --- Apply optional collision shape override ---
+        // Apply optional collision shape override
         if (OverrideShape != null)
         {
             var bodyShape = GetNodeOrNull<CollisionShape3D>("CollisionShape3D");
-            if (bodyShape != null)
-                bodyShape.Shape = OverrideShape;
+            if (bodyShape != null) bodyShape.Shape = OverrideShape;
         }
 
-        // --- Wire the eye tracker (direct child) to the model's skeleton and face mesh ---
+        // Wire eye tracker
         _eyeTracker = GetNodeOrNull<NpcEyeTracker>("EyeTrackerComponent");
         if (_eyeTracker != null && model != null)
         {
@@ -83,27 +97,12 @@ public partial class NpcController : CharacterBody3D
             if (skeleton != null)
             {
                 _eyeTracker.CharacterSkeleton = skeleton;
-                // Attach limb colliders for combat
                 SetupLimbColliders(skeleton);
             }
             if (faceMesh != null) _eyeTracker.FaceMesh = faceMesh;
-            var health = GetNodeOrNull<Health>("Health");
-            if (health != null)
-            {
-                health.Died += () =>
-                {
-                    IsDead = true;
-                    var interaction = GetNodeOrNull<NpcInteraction>("Interaction");
-                    if (interaction != null)
-                    {
-                        interaction.IsDead = true;
-                        HUD.Instance?.RefreshNpcTooltip(interaction);
-                    }
-                };
-            }
         }
 
-        // --- Fill the interaction tooltip component (direct child) ---
+        // Interaction tooltip
         var interaction = GetNodeOrNull<NpcInteraction>("Interaction");
         if (interaction != null)
         {
@@ -111,11 +110,81 @@ public partial class NpcController : CharacterBody3D
             interaction.IsDead = IsDead;
         }
 
-        // --- Vision area setup (unchanged) ---
+        // Health – death logic
+        var health = GetNodeOrNull<Health>("Health");
+        if (health != null)
+        {
+            // Capture model explicitly for the lambda
+            Node3D capturedModel = model;
+            health.Died += () =>
+            {
+                IsDead = true;
+
+                // Freeze navigation
+                var navAgent = GetNodeOrNull<NavigationAgent3D>("NavAgentNPC");
+                if (navAgent != null)
+                {
+                    navAgent.MaxSpeed = 0f;
+                    navAgent.AvoidanceEnabled = false;
+                    navAgent.TargetPosition = GlobalPosition;
+                }
+
+                // Disable eye tracker
+                if (_eyeTracker != null)
+                {
+                    _eyeTracker.EnableHeadTracking = false;
+                    _eyeTracker.EnableEyeTracking = false;
+                    _eyeTracker.EnableBlinking = false;
+                    _eyeTracker.Target = null;
+                }
+
+                // Disable combat AI
+                var combat = GetNodeOrNull<Node>("NPCNavCombat");
+                if (combat != null)
+                    combat.SetProcess(false);
+
+                // Update tooltip
+                if (interaction != null)
+                {
+                    interaction.IsDead = true;
+                    HUD.Instance?.RefreshNpcTooltip(interaction);
+                }
+
+                // --- RAGDOLL ACTIVATION ---
+                if (capturedModel != null)
+                {
+                    var skeleton = FindChildOfTypeRecursive<Skeleton3D>(capturedModel);
+                    if (skeleton != null)
+                    {
+                        // Stop any animation – important!
+                        var animPlayer = capturedModel.FindChild("AnimationPlayer", recursive: true) as AnimationPlayer;
+                        if (animPlayer != null)
+                            animPlayer.Active = false;
+
+                        // Release any bone pose override from animation blending
+                        skeleton.ResetBonePoses();
+
+                        var simulator = skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator3D");
+                        if (simulator == null)
+                            simulator = skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator");
+                        if (simulator != null)
+                        {
+                            simulator.Active = true;          // enable the simulator
+                            simulator.PhysicalBonesStartSimulation();
+                        }
+                    }
+                }
+
+                // Apply gray material AFTER starting ragdoll so it's visible
+                var modelRoot = GetNodeOrNull<Node3D>("ModelRoot");
+                if (modelRoot != null)
+                    OverrideAllMeshesGray(modelRoot);
+            };
+        }
+
+        // Vision area
         _visionArea = GetNodeOrNull<Area3D>("VisionArea");
-        if (_visionArea == null)
-            GD.PrintErr("NPC Brain: Cannot find VisionArea!");
-        else
+        if (_visionArea != null)
         {
             _visionArea.BodyEntered += OnBodyEntered;
             _visionArea.BodyExited += OnBodyExited;
@@ -207,5 +276,27 @@ public partial class NpcController : CharacterBody3D
             }
         }
         return best;
+    }
+
+    // Helper to turn every MeshInstance3D gray
+    private void OverrideAllMeshesGray(Node3D root)
+    {
+        var grayMat = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(0.3f, 0.3f, 0.3f),
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded
+        };
+        foreach (var mi in FindAllMeshes(root))
+            for (int i = 0; i < mi.Mesh.GetSurfaceCount(); i++)
+                mi.SetSurfaceOverrideMaterial(i, grayMat);
+    }
+
+    private static List<MeshInstance3D> FindAllMeshes(Node node, List<MeshInstance3D> list = null)
+    {
+        list ??= new List<MeshInstance3D>();
+        if (node is MeshInstance3D mi) list.Add(mi);
+        foreach (Node child in node.GetChildren())
+            FindAllMeshes(child, list);
+        return list;
     }
 }

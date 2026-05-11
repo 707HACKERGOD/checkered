@@ -43,6 +43,11 @@ public partial class Player : CharacterBody3D
 
     private float _maxZoom = 6.0f;
 
+    // --- POSSESSION ---
+
+    private PlayerPossession _possession;
+    public bool IsPossessed => _possession != null && _possession.IsPossessed;
+
     // --- COMBAT ---
     [Export] private AudioStream _attackSound;
     private AudioStreamPlayer _attackAudioPlayer;
@@ -65,6 +70,8 @@ public partial class Player : CharacterBody3D
 
     public override void _Ready()
     {
+        _possession = GetNodeOrNull<PlayerPossession>("PlayerPossession");
+        
         Input.MouseMode = Input.MouseModeEnum.Captured;
 
         _cameraGimbal = GetNode<Node3D>("CameraGimbal");
@@ -164,6 +171,11 @@ public partial class Player : CharacterBody3D
         // Attack
         if (@event.IsActionPressed("attack") && !anyMenuOpen)
         {
+            if (IsPossessed)
+            {
+                GetViewport().SetInputAsHandled();
+                return;
+            }
             PerformAttack();
             GetViewport().SetInputAsHandled();
             return;
@@ -177,8 +189,20 @@ public partial class Player : CharacterBody3D
         _cameraGimbal.GlobalPosition = GlobalPosition + new Vector3(0, 1.5f, 0);
         Vector3 velocity = Velocity;
 
+        // Always process camera (first/third person, zoom, lock-on)
+        UpdateCameraTransitions(dt);
+        UpdateLockOn(dt);
+        UpdateEyeTracker();
+
         bool anyMenuOpen = (HUD.Instance != null && HUD.Instance.IsInventoryOpen) ||
                            (HUD.Instance != null && HUD.Instance.IsHealthPanelOpen);
+
+        if (IsPossessed)
+        {
+            // Movement is handled entirely by PlayerPossession – we still need MoveAndSlide() once.
+            MoveAndSlide();
+            return;
+        }
 
         // --- GRAVITY ---
         if (!IsOnFloor())
@@ -188,63 +212,63 @@ public partial class Player : CharacterBody3D
         if (!anyMenuOpen && Input.IsActionJustPressed("jump") && IsOnFloor())
             velocity.Y = JumpVelocity;
 
-    // --- HORIZONTAL MOVEMENT ---
-    Vector2 inputDir;
-    float speed;
-    bool canTurn180 = false;
-    bool sprinting = false;
+        // --- HORIZONTAL MOVEMENT ---
+        Vector2 inputDir;
+        float speed;
+        bool canTurn180 = false;
+        bool sprinting = false;
 
-    if (anyMenuOpen)
-    {
-        // When menu is open, use auto‑run direction (stored from when menu opened)
-        inputDir = GameState.Instance.AutoRunDirection;
-        speed = GameState.Instance.AutoRunSprinting ? RunSpeed : WalkSpeed;
-    }
-    else
-    {
-        // Normal gameplay: get input from mobile joystick or keyboard
-        if (DisplayServer.IsTouchscreenAvailable())
+        if (anyMenuOpen)
         {
-            inputDir = MobileInput.MovementDirection;
-            float mag = inputDir.Length();
-            sprinting = mag > 0.85f;
-            // map magnitude to speed: up to 0.85 = walk, 0.85+ = run/sprint
-            speed = Mathf.Lerp(WalkSpeed, sprinting ? RunSpeed : WalkSpeed, Mathf.InverseLerp(0.2f, sprinting ? 1f : 0.85f, mag));
-            inputDir = mag > 0.001f ? inputDir.Normalized() : Vector2.Zero;
+            // When menu is open, use auto‑run direction (stored from when menu opened)
+            inputDir = GameState.Instance.AutoRunDirection;
+            speed = GameState.Instance.AutoRunSprinting ? RunSpeed : WalkSpeed;
         }
         else
         {
-            inputDir = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
-            sprinting = Input.IsActionPressed("sprint");
+            // Normal gameplay: get input from mobile joystick or keyboard
+            if (DisplayServer.IsTouchscreenAvailable())
+            {
+                inputDir = MobileInput.MovementDirection;
+                float mag = inputDir.Length();
+                sprinting = mag > 0.85f;
+                // map magnitude to speed: up to 0.85 = walk, 0.85+ = run/sprint
+                speed = Mathf.Lerp(WalkSpeed, sprinting ? RunSpeed : WalkSpeed, Mathf.InverseLerp(0.2f, sprinting ? 1f : 0.85f, mag));
+                inputDir = mag > 0.001f ? inputDir.Normalized() : Vector2.Zero;
+            }
+            else
+            {
+                inputDir = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
+                sprinting = Input.IsActionPressed("sprint");
+            }
+            speed = sprinting ? RunSpeed : WalkSpeed;
+            canTurn180 = Input.IsActionJustPressed("turn_180");
+            
+            // Store for auto‑run if a menu is opened later
+            GameState.Instance.AutoRunDirection = inputDir;
+            GameState.Instance.AutoRunSprinting = sprinting;
         }
-        speed = sprinting ? RunSpeed : WalkSpeed;
-        canTurn180 = Input.IsActionJustPressed("turn_180");
-        
-        // Store for auto‑run if a menu is opened later
-        GameState.Instance.AutoRunDirection = inputDir;
-        GameState.Instance.AutoRunSprinting = sprinting;
-    }
 
-    Vector3 direction = (_cameraGimbal.Transform.Basis * new Vector3(inputDir.X, 0, inputDir.Y)).Normalized();
-    float currentSpeed = velocity.Length();
+        Vector3 direction = (_cameraGimbal.Transform.Basis * new Vector3(inputDir.X, 0, inputDir.Y)).Normalized();
+        float currentSpeed = velocity.Length();
 
-    if (direction != Vector3.Zero)
-    {
-        velocity.X = direction.X * speed;
-        velocity.Z = direction.Z * speed;
-
-        bool isTurning = _stateMachine != null && _stateMachine.GetCurrentNode() == "Turn";
-        if (!isTurning)
+        if (direction != Vector3.Zero)
         {
-            float targetAngle = Mathf.Atan2(-direction.X, -direction.Z);
-            Rotation = new Vector3(0, Mathf.LerpAngle(Rotation.Y, targetAngle, TurnSpeed * dt), 0);
+            velocity.X = direction.X * speed;
+            velocity.Z = direction.Z * speed;
+
+            bool isTurning = _stateMachine != null && _stateMachine.GetCurrentNode() == "Turn";
+            if (!isTurning)
+            {
+                float targetAngle = Mathf.Atan2(-direction.X, -direction.Z);
+                Rotation = new Vector3(0, Mathf.LerpAngle(Rotation.Y, targetAngle, TurnSpeed * dt), 0);
+            }
         }
-    }
-    else
-    {
-        velocity.X = Mathf.MoveToward(velocity.X, 0, speed);
-        velocity.Z = Mathf.MoveToward(velocity.Z, 0, speed);
-    }
+        else
+        {
+            velocity.X = Mathf.MoveToward(velocity.X, 0, speed);
+            velocity.Z = Mathf.MoveToward(velocity.Z, 0, speed);
+        }
 
         Velocity = velocity;
         MoveAndSlide();
@@ -265,11 +289,6 @@ public partial class Player : CharacterBody3D
                     _turnResetTimer.Start(0.5f);
             }
         }
-
-        // Camera transitions (smooth even in slow-mo)
-        UpdateCameraTransitions(dt);
-        UpdateLockOn(dt);
-        UpdateEyeTracker();
 
         // --- INTERACTION ---
         if (!anyMenuOpen && PlayerCamera != null)
@@ -527,7 +546,7 @@ public partial class Player : CharacterBody3D
         return HUD.Instance != null && HUD.Instance.IsPointInsideAnyMenu(startPos);
     }
 
-    private void PerformAttack()
+    public void PerformAttack()
     {
         // Play swing sound (always, even if none hit)
         if (_attackAudioPlayer != null && _attackSound != null)
