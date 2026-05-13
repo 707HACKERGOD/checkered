@@ -11,6 +11,7 @@ public partial class HUD : Control
     [ExportCategory("Main HUD")]
     [Export] private Label _timeLabel;
     [Export] private ProgressBar _sanityBar;
+    private Panel _possessionWarningPanel;
     [Export] private CanvasLayer _debugCanvasLayer;   // wraps the debug container
     private ColorRect _debugBackground;
     private ScrollContainer _debugScrollContainer;
@@ -393,6 +394,13 @@ public partial class HUD : Control
             _playerInventory.SlotUpdated += OnInventorySlotUpdated;
         PopulateInventorySlots();
 
+        // Possession
+        var possession = player?.GetNodeOrNull<PlayerPossession>("PlayerPossession");
+        if (possession != null)
+        {
+            possession.PossessionCountdownChanged += OnPossessionCountdownChanged;
+        }
+
         GetViewport().SizeChanged += OnViewportSizeChanged;
 
         _uiAudioPlayer = new AudioStreamPlayer();
@@ -417,6 +425,82 @@ public partial class HUD : Control
         _snowNode = GetTree().Root.FindChild("SnowParticles", true, false) as GpuParticles3D;
 
         //GD.Print($"HUD layers - inventory: 5, debug/health: 25, pause: {_pauseMenu?.Layer}, mobile: 128");
+
+        // --- Possession Warning Panel (matches JS demo) ---
+        var warningPanel = new Panel();
+        warningPanel.Name = "PossessionWarningPanel";
+        warningPanel.Visible = false;
+        warningPanel.MouseFilter = MouseFilterEnum.Ignore;
+
+        // Outer red pulsing border
+        var warningPanelStyle = new StyleBoxFlat
+        {
+            BgColor = new Color(0.55f, 0, 0, 0.9f),   // solid red background
+            BorderColor = new Color(1, 0.2f, 0.2f),
+            BorderWidthLeft = 3,
+            BorderWidthRight = 3,
+            BorderWidthTop = 3,
+            BorderWidthBottom = 3,
+            CornerRadiusTopLeft = 8,
+            CornerRadiusTopRight = 8,
+            CornerRadiusBottomLeft = 8,
+            CornerRadiusBottomRight = 8
+        };
+        warningPanel.AddThemeStyleboxOverride("panel", warningPanelStyle);
+
+        // Pulsing border animation for the warning panel
+        var pulseTween = CreateTween();
+        pulseTween.SetLoops();
+        pulseTween.TweenProperty(warningPanel, "modulate:a", 0.7f, 0.5f)
+                .SetEase(Tween.EaseType.InOut);
+        pulseTween.TweenProperty(warningPanel, "modulate:a", 1.0f, 0.5f)
+                .SetEase(Tween.EaseType.InOut);
+
+        // Size and position: centered, width 400, height 120
+        warningPanel.SetSize(new Vector2(400, 120));
+        warningPanel.Position = new Vector2(GetViewport().GetVisibleRect().Size.X / 2 - 200, 80);
+
+        // Warning text "POSSESSION IMMINENT" with glitch effect
+        var warningLabel = new Label();
+        warningLabel.Name = "WarningLabel";
+        warningLabel.Text = "POSSESSION IMMINENT";
+        warningLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        warningLabel.AddThemeColorOverride("font_color", new Color(1, 0.2f, 0.2f));
+        warningLabel.AddThemeFontSizeOverride("font_size", 24);
+        warningLabel.AddThemeConstantOverride("outline_size", 2);
+        warningLabel.AddThemeColorOverride("font_outline_color", Colors.Black);
+        warningLabel.Position = new Vector2(0, 10);
+        warningLabel.SetAnchorsPreset(Control.LayoutPreset.CenterTop);
+        warningPanel.AddChild(warningLabel);
+
+        // Progress bar
+        _possessionWarningBar = new ProgressBar();
+        _possessionWarningBar.Name = "PossessionWarningBar";
+        _possessionWarningBar.MinValue = 0;
+        _possessionWarningBar.MaxValue = 100;
+        _possessionWarningBar.Value = 0;
+        _possessionWarningBar.SetSize(new Vector2(360, 24));
+        _possessionWarningBar.Position = new Vector2(20, 60);
+
+        var bgStyle = new StyleBoxFlat
+        {
+            BgColor = new Color(0.1f, 0.05f, 0.05f),
+            BorderColor = new Color(0.8f, 0, 0),
+            BorderWidthLeft = 1,
+            BorderWidthRight = 1,
+            BorderWidthTop = 1,
+            BorderWidthBottom = 1
+        };
+        _possessionWarningBar.AddThemeStyleboxOverride("background", bgStyle);
+
+        var fillStyle = new StyleBoxFlat { BgColor = new Color(1, 0.2f, 0.2f) };
+        _possessionWarningBar.AddThemeStyleboxOverride("fill", fillStyle);
+
+        warningPanel.AddChild(_possessionWarningBar);
+        AddChild(warningPanel);
+
+        // Store reference to the whole panel so we can show/hide it
+        _possessionWarningPanel = warningPanel;
     }
 
 
@@ -1555,7 +1639,7 @@ public partial class HUD : Control
             {
                 var player = GetTree().Root.FindChild("Player", true, false) as Player;
                 var possession = player?.GetNodeOrNull<PlayerPossession>("PlayerPossession");
-                possession?.StartPossession();
+                possession?.StartPossessionCountdown();   // <-- now with countdown
             },
             GetDisplayValue = () =>
             {
@@ -1574,6 +1658,27 @@ public partial class HUD : Control
                 possession?.StopPossession();
             },
             GetDisplayValue = () => ""   // no display needed
+        });
+        _menuItems.Add(new ActionItem
+        {
+            Name = "Sanity Level",
+            OnAdjust = (dir) =>
+            {
+                var cycle = GetNodeOrNull<SanityCycle>("/root/SanityCycle");
+                if (cycle != null)
+                    cycle.SetSanityDebug(cycle.Sanity + dir * 5f);
+            },
+            SetValue = (val) =>
+            {
+                var cycle = GetNodeOrNull<SanityCycle>("/root/SanityCycle");
+                if (cycle != null)
+                    cycle.SetSanityDebug(val);
+            },
+            GetDisplayValue = () =>
+            {
+                var cycle = GetNodeOrNull<SanityCycle>("/root/SanityCycle");
+                return cycle != null ? cycle.Sanity.ToString("0") : "100";
+            }
         });
     }
 
@@ -2455,5 +2560,17 @@ public partial class HUD : Control
         string prefix = npc.IsDead ? "Dead " : "";
         ShowTooltipAtWorldPosition($"Talk to {prefix}{npc.NpcName}",
             npc.GetParent<CharacterBody3D>().GlobalPosition, "E");
+    }
+
+    private ProgressBar _possessionWarningBar;
+
+    private void OnPossessionCountdownChanged(float progress, bool active)
+    {
+        if (_possessionWarningPanel != null)
+        {
+            _possessionWarningPanel.Visible = active;
+            if (_possessionWarningBar != null)
+                _possessionWarningBar.Value = progress * 100f;
+        }
     }
 }

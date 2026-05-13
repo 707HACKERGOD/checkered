@@ -659,12 +659,12 @@ shape = SubResource("SphereShape3D_5ixxa")
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
 
 [node name="Skeleton3D" parent="syl_base_5/metarig" parent_id_path=PackedInt32Array(607563459, 1277451019) index="0" unique_id=1599754758]
-bones/0/position = Vector3(-0.0038439347, 0.8361658, 0.032115526)
+bones/0/position = Vector3(-0.011836486, 0.83483374, 0.032115523)
 bones/0/rotation = Quaternion(0.16563182, 7.9136875e-08, 1.3291164e-08, 0.9861877)
 bones/1/rotation = Quaternion(-0.18164173, -1.6633932e-08, -2.607924e-08, 0.9833648)
 bones/2/rotation = Quaternion(-0.06385426, -3.3459195e-08, -5.9468936e-09, 0.99795926)
-bones/3/rotation = Quaternion(-0.038381144, 0.001786188, 3.4387336e-05, 0.99926156)
-bones/4/rotation = Quaternion(0.11374348, 9.032828e-07, 1.8349036e-05, 0.99351025)
+bones/3/rotation = Quaternion(-0.063308306, 0.00178649, -1.0203695e-05, 0.9979924)
+bones/4/rotation = Quaternion(0.124476805, 2.8803083e-06, 5.6922214e-05, 0.9922226)
 bones/5/rotation = Quaternion(0.023930106, 1.7533196e-08, 1.2729309e-09, 0.9997137)
 bones/6/rotation = Quaternion(0.012781154, -8.914682e-08, -2.7187017e-10, 0.99991834)
 bones/7/rotation = Quaternion(0.003346608, 0.2045822, -0.7822588, 0.588393)
@@ -675,10 +675,10 @@ bones/11/rotation = Quaternion(0.0033465335, -0.20458223, 0.78225875, 0.58839285
 bones/12/position = Vector3(-0.008403519, 0.10204095, 0.0012207029)
 bones/12/rotation = Quaternion(0.03532062, -0.118171535, 0.49783382, 0.85845757)
 bones/13/rotation = Quaternion(0.18507953, 0.014332607, 0.02784625, 0.9822244)
-bones/17/rotation = Quaternion(0.9790155, 0.019827288, -0.002488599, 0.20280413)
-bones/18/rotation = Quaternion(0.109054685, 0.00030546475, 0.00492599, 0.9940235)
-bones/22/rotation = Quaternion(0.97879004, -0.016243923, 0.0021826737, 0.2042092)
-bones/23/rotation = Quaternion(0.11153164, -8.410497e-05, -0.0071956567, 0.99373484)
+bones/17/rotation = Quaternion(0.9775611, 0.024006128, -0.002732027, 0.20926201)
+bones/18/rotation = Quaternion(0.12067549, 0.0005436809, 0.0032286362, 0.9926867)
+bones/22/rotation = Quaternion(0.9769175, -0.013045205, 0.0018678659, 0.21321046)
+bones/23/rotation = Quaternion(0.12767246, 0.00015450038, -0.010570028, 0.99176013)
 
 [node name="eyepatch_002" parent="syl_base_5/metarig/Skeleton3D" index="0" unique_id=1559059956]
 layers = 8
@@ -748,7 +748,6 @@ script = ExtResource("29_kih0c")
 [node name="Head" type="Node" parent="Health" unique_id=1335270822]
 script = ExtResource("30_lyrkg")
 LimbName = "Head"
-Critical = true
 
 [node name="Torso" type="Node" parent="Health" unique_id=1765743681]
 script = ExtResource("30_lyrkg")

@@ -1,44 +1,41 @@
-shader_type spatial;
-render_mode unshaded, skip_vertex_transform;
+shader_type canvas_item;
+render_mode unshaded;
 
-uniform sampler2D screen_texture : hint_screen_texture, filter_nearest;
+uniform sampler2D SCREEN_TEXTURE : hint_screen_texture, filter_linear_mipmap;
 uniform vec2 resolution = vec2(320.0, 240.0);
-uniform float sanity = 1.0;
-uniform float distortion = 0.0;
-
-void vertex() {
-    // Snap vertices to grid for PS1 wobble (optional, usually done on models not screen)
-    POSITION = vec4(VERTEX, 1.0);
-}
+uniform float sanity : hint_range(0.0, 1.0) = 1.0;
+uniform float distortion : hint_range(0.0, 1.0) = 0.0;
 
 void fragment() {
     vec2 uv = SCREEN_UV;
-    
-    // Barrel distortion (insanity effect)
+
+    // 1. Distortion at low sanity or during countdown
     if (distortion > 0.0) {
-        vec2 center = uv - 0.5;
-        float dist = length(center);
-        uv = center * (1.0 + distortion * dist * dist) + 0.5;
+        uv.x += sin(uv.y * 20.0 + TIME * 3.0) * distortion * 0.02;
+        uv.y += cos(uv.x * 20.0 + TIME * 2.0) * distortion * 0.02;
     }
 
-    // Pixelate
-    vec2 grid_uv = floor(uv * resolution) / resolution;
-    
-    // Chromatic Aberration
-    vec3 color;
-    if (sanity < 0.7) {
-        float offset = (0.7 - sanity) * 0.01;
-        float r = texture(screen_texture, grid_uv + vec2(offset, 0.0)).r;
-        float g = texture(screen_texture, grid_uv).g;
-        float b = texture(screen_texture, grid_uv - vec2(offset, 0.0)).b;
-        color = vec3(r, g, b);
-    } else {
-        color = texture(screen_texture, grid_uv).rgb;
-    }
-    
-    // Color quantization (Color banding)
-    float levels = 32.0 - (1.0 - sanity) * 16.0;
+    // 2. Pixelate
+    vec2 pixel_uv = floor(uv * resolution) / resolution;
+    vec3 color = texture(SCREEN_TEXTURE, pixel_uv).rgb;
+
+    // 3. Color quantization (PS1 banding)
+    float levels = 32.0;
     color = floor(color * levels) / levels;
 
-    ALBEDO = color;
+    // 4. Scanlines
+    float scanline = sin(SCREEN_UV.y * resolution.y * 3.14159) * 0.03;
+    color -= scanline;
+
+    // 5. Vignette
+    vec2 vig_uv = SCREEN_UV - 0.5;
+    float vig = 1.0 - dot(vig_uv, vig_uv) * 0.5;
+    color *= vig;
+
+    // 6. Red tint at very low sanity
+    if (sanity < 0.3) {
+        color.r += (0.3 - sanity) * 0.2;
+    }
+
+    COLOR.rgb = color;
 }

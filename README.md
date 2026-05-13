@@ -36,15 +36,15 @@ Demo:
 - ✅ Inventory UI, picking up items
 - ✅ Combat and health system with limb health
 - ✅ Debug menu
-- 🚧 NPC aggressive and desensive behavior
-- 🚧 Possession system
+- ✅ NPC aggressive and desensive behavior
+- ✅ Possession system
 - 🚧 Sounds and music
 - 🚧 Animation and movement system: idle, walk, sprint, jump, crouch, crawl, turning around, climb, swim
 - 🚧 Sanity system (control over districts)
 - 🚧 5 NPCs in the first demo: Barkeeper, Rich truant, Phantom, Base_F, Base_M
-- Dialogue UI
-- Calendar UI
-- Open world map with 2 key buildings in demo: bar, trade school
+- 🚧 Dialogue UI
+- 🚧 Calendar UI
+- 🚧 Open world map with 2 key buildings in demo: bar, trade school
 - Intro story
 - Saving and loading
 
