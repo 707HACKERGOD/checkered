@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://b8h47e275iwhd"]
+
+[ext_resource type="PackedScene" uid="uid://b4ym1dmpihxgm" path="res://Assets/NPC/barkeep/barkeep_ai.glb" id="1_rt4mm"]
+
+[node name="barkeep_ai" unique_id=1637386290 instance=ExtResource("1_rt4mm")]

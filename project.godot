@@ -37,7 +37,7 @@ project/assembly_name="Checkered"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/project_dumper/plugin.cfg")
+enabled=PackedStringArray("res://addons/project_dumper/plugin.cfg", "res://addons/terrain_3d/plugin.cfg")
 
 [global_group]
 

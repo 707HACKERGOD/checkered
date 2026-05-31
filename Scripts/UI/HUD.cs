@@ -31,6 +31,10 @@ public partial class HUD : Control
     private TouchScreenButton _mobileInventoryButton;
 
     private ColorRect _pauseResumeContainer;
+    private float _debugRepeatTimer = 0f;
+    private const float DebugRepeatInitial = 0.35f; // delay before repeat starts
+    private const float DebugRepeatRate  = 0.05f;  // repeat every 50 ms
+    private string _debugHeldAction = "";           // "up","down","left","right"
 
     // ========== Menus ==========
     [ExportCategory("Menus")]
@@ -1197,45 +1201,53 @@ public partial class HUD : Control
 
         if (_isDebugOpen)
         {
-            // ` closes debug
             if (@event.IsActionPressed("toggle_debug"))
             {
                 ToggleDebug();
                 GetViewport().SetInputAsHandled();
                 return;
             }
-            // Escape also closes debug
             if (@event.IsActionPressed("ui_cancel"))
             {
                 ToggleDebug();
                 GetViewport().SetInputAsHandled();
                 return;
             }
-            
-            bool consumed = false;
+            if (@event.IsActionPressed("ui_accept"))
+            {
+                ExecuteCurrent();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            // Directions: execute once now, then repeat in _Process while held
+            bool dirPressed = false;
             if (@event.IsActionPressed("ui_down") || @event.IsActionPressed("move_back"))
             {
-                Navigate(1); consumed = true;
+                _debugHeldAction = "down"; _debugRepeatTimer = DebugRepeatInitial;
+                Navigate(1); dirPressed = true;
             }
             else if (@event.IsActionPressed("ui_up") || @event.IsActionPressed("move_forward"))
             {
-                Navigate(-1); consumed = true;
+                _debugHeldAction = "up"; _debugRepeatTimer = DebugRepeatInitial;
+                Navigate(-1); dirPressed = true;
             }
             else if (@event.IsActionPressed("ui_left") || @event.IsActionPressed("move_left"))
             {
-                AdjustCurrent(-1); consumed = true;
+                _debugHeldAction = "left"; _debugRepeatTimer = DebugRepeatInitial;
+                AdjustCurrent(-1); dirPressed = true;
             }
             else if (@event.IsActionPressed("ui_right") || @event.IsActionPressed("move_right"))
             {
-                AdjustCurrent(1); consumed = true;
-            }
-            else if (@event.IsActionPressed("ui_accept"))
-            {
-                ExecuteCurrent(); consumed = true;
+                _debugHeldAction = "right"; _debugRepeatTimer = DebugRepeatInitial;
+                AdjustCurrent(1); dirPressed = true;
             }
 
-            if (consumed)
+            if (dirPressed)
+            {
                 GetViewport().SetInputAsHandled();
+                return;
+            }
             return;
         }
 
@@ -1355,11 +1367,10 @@ public partial class HUD : Control
                 _debugControl.GetParent().MoveChild(_debugControl, -1);
                 CallDeferred(nameof(UpdateDebugScrollContainerRect));
                 RenderDebugMenu();
-                GetTree().Paused = true;
             }
             else if (!_isPaused)
             {
-                GetTree().Paused = false;
+                //deleted
             }
         }
 
@@ -1666,18 +1677,67 @@ public partial class HUD : Control
             {
                 var cycle = GetNodeOrNull<SanityCycle>("/root/SanityCycle");
                 if (cycle != null)
-                    cycle.SetSanityDebug(cycle.Sanity + dir * 5f);
+                    cycle.SetSanityDebug(Mathf.Clamp(cycle.Sanity + dir * 1f, 0f, 100f));
             },
             SetValue = (val) =>
             {
                 var cycle = GetNodeOrNull<SanityCycle>("/root/SanityCycle");
                 if (cycle != null)
-                    cycle.SetSanityDebug(val);
+                    cycle.SetSanityDebug(Mathf.Clamp(val, 0f, 100f));
             },
             GetDisplayValue = () =>
             {
                 var cycle = GetNodeOrNull<SanityCycle>("/root/SanityCycle");
-                return cycle != null ? cycle.Sanity.ToString("0") : "100";
+                return cycle != null ? cycle.Sanity.ToString("0.0") : "100.0";
+            }
+        });
+        _menuItems.Add(new HeaderItem("POST PROCESSING"));
+        _menuItems.Add(new ActionItem
+        {
+            Name = "Pixelation Strength",
+            OnAdjust = (dir) => {
+                var ppc = GetTree().Root.FindChild("PostProcessController", true, false) as PostProcessController;
+                ppc?.AdjustPixelationStrength(dir * 0.05f);
+            },
+            SetValue = (val) => {
+                var ppc = GetTree().Root.FindChild("PostProcessController", true, false) as PostProcessController;
+                ppc?.SetPixelationStrength(val);
+            },
+            GetDisplayValue = () => {
+                var ppc = GetTree().Root.FindChild("PostProcessController", true, false) as PostProcessController;
+                return ppc != null ? ppc.PixelationStrength.ToString("0.00") : "0.00";
+            }
+        });
+        _menuItems.Add(new ActionItem
+        {
+            Name = "Color Quantization",
+            OnAdjust = (dir) => {
+                var ppc = GetTree().Root.FindChild("PostProcessController", true, false) as PostProcessController;
+                if (ppc != null) ppc.Quantization = Mathf.Clamp(ppc.Quantization + dir * 0.05f, 0f, 1f);
+            },
+            SetValue = (val) => {
+                var ppc = GetTree().Root.FindChild("PostProcessController", true, false) as PostProcessController;
+                if (ppc != null) ppc.Quantization = Mathf.Clamp(val, 0f, 1f);
+            },
+            GetDisplayValue = () => {
+                var ppc = GetTree().Root.FindChild("PostProcessController", true, false) as PostProcessController;
+                return ppc != null ? ppc.Quantization.ToString("0.00") : "0.00";
+            }
+        });
+        _menuItems.Add(new ActionItem
+        {
+            Name = "Scanlines",
+            OnAdjust = (dir) => {
+                var ppc = GetTree().Root.FindChild("PostProcessController", true, false) as PostProcessController;
+                if (ppc != null) ppc.ScanlineIntensity = Mathf.Clamp(ppc.ScanlineIntensity + dir * 0.05f, 0f, 2f);
+            },
+            SetValue = (val) => {
+                var ppc = GetTree().Root.FindChild("PostProcessController", true, false) as PostProcessController;
+                if (ppc != null) ppc.ScanlineIntensity = Mathf.Clamp(val, 0f, 2f);
+            },
+            GetDisplayValue = () => {
+                var ppc = GetTree().Root.FindChild("PostProcessController", true, false) as PostProcessController;
+                return ppc != null ? ppc.ScanlineIntensity.ToString("0.00") : "0.00";
             }
         });
     }
@@ -2056,6 +2116,10 @@ public partial class HUD : Control
                 else if (action.Name.Contains("Wind Angle")) { max = 360; step = 15; }
                 else if (action.Name.Contains("Fog Density")) { max = 0.5f; step = 0.005f; }
                 else if (action.Name.Contains("Time Scale")) { min = 0; max = 10; step = 0.1f; }
+                else if (action.Name.Contains("Sanity Level")) { min = 0; max = 100; step = 0.1f; }
+                else if (action.Name.Contains("Pixelation Strength")) { min = 0; max = 1; step = 0.01f; }
+                else if (action.Name.Contains("Color Quantization"))   { min = 0; max = 1; step = 0.01f; }
+                else if (action.Name.Contains("Scanlines")) { min = 0; max = 2; step = 0.01f; }
 
                 slider.MinValue = min;
                 slider.MaxValue = max;
@@ -2182,6 +2246,39 @@ public partial class HUD : Control
     {
         if (_timeManager != null && _timeLabel != null)
             _timeLabel.Text = $"{_timeManager.CurrentSeason} | {_timeManager.GetDateString()} | {_timeManager.GetTimeString()}";
+        
+        // Debug menu key-repeat while held
+        if (_isDebugOpen && _debugHeldAction != null && _debugHeldAction != "")
+        {
+            bool stillHeld = false;
+            switch (_debugHeldAction)
+            {
+                case "down":  stillHeld = Input.IsActionPressed("ui_down")  || Input.IsActionPressed("move_back"); break;
+                case "up":    stillHeld = Input.IsActionPressed("ui_up")    || Input.IsActionPressed("move_forward"); break;
+                case "left":  stillHeld = Input.IsActionPressed("ui_left")  || Input.IsActionPressed("move_left"); break;
+                case "right": stillHeld = Input.IsActionPressed("ui_right") || Input.IsActionPressed("move_right"); break;
+            }
+
+            if (stillHeld)
+            {
+                _debugRepeatTimer -= (float)delta;
+                if (_debugRepeatTimer <= 0f)
+                {
+                    _debugRepeatTimer = DebugRepeatRate;
+                    switch (_debugHeldAction)
+                    {
+                        case "down":  Navigate(1); break;
+                        case "up":    Navigate(-1); break;
+                        case "left":  AdjustCurrent(-1); break;
+                        case "right": AdjustCurrent(1); break;
+                    }
+                }
+            }
+            else
+            {
+                _debugHeldAction = "";
+            }
+        }
     }
 
     public void ShowTooltipAtWorldPosition(string text, Vector3 worldPos, string key = "E")

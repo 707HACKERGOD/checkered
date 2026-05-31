@@ -3,34 +3,55 @@ using Godot;
 public partial class PostProcessController : ColorRect
 {
     private SanityCycle _sanityCycle;
-    private PlayerPossession _possession;
+    private float _shaderTime = 0.0f;
+
+    public float PixelationStrength { get; set; } = 0.0f;
+    public Vector2 PixelationResolution { get; set; } = new Vector2(320, 240);
+    public float Quantization { get; set; } = 0.0f;
+    public float ScanlineIntensity { get; set; } = 0.0f;   // was 1.0f
+    public float VignetteIntensity { get; set; } = 0.5f;
 
     public override void _Ready()
     {
         _sanityCycle = GetNode<SanityCycle>("/root/SanityCycle");
-        var player = GetTree().Root.FindChild("Player", true, false) as Player;
-        _possession = player?.GetNodeOrNull<PlayerPossession>("PlayerPossession");
     }
+
     public override void _Process(double delta)
     {
-        if (Material is ShaderMaterial shaderMaterial)
+        _shaderTime += (float)delta;
+
+        if (Material is ShaderMaterial mat)
         {
-            Vector2 viewportSize = GetViewportRect().Size;
-            shaderMaterial.SetShaderParameter("resolution", viewportSize);
+            mat.SetShaderParameter("time", _shaderTime);
 
-            // Update sanity and distortion
             float sanity = 1.0f;
-            float distortion = 0.0f;
-
             if (_sanityCycle != null)
-                sanity = _sanityCycle.Sanity / 100.0f;
+                sanity = Mathf.Clamp(_sanityCycle.Sanity / 100.0f, 0.0f, 1.0f);
 
-            // Intensify distortion during possession countdown or possession itself
-            if (_possession != null && (_possession.IsCountdownActive || _possession.IsPossessed))
-                distortion = 0.6f;
+            float distortion = (100.0f - (sanity * 100.0f)) / 500.0f;
 
-            shaderMaterial.SetShaderParameter("sanity", sanity);
-            shaderMaterial.SetShaderParameter("distortion", distortion);
+            mat.SetShaderParameter("sanity", sanity);
+            mat.SetShaderParameter("distortion", distortion);
+            mat.SetShaderParameter("pixelation_strength", PixelationStrength);
+            mat.SetShaderParameter("pixelation_resolution", PixelationResolution);
+            mat.SetShaderParameter("quantization", Quantization);
+            mat.SetShaderParameter("scanline_intensity", ScanlineIntensity);
+            mat.SetShaderParameter("vignette_intensity", VignetteIntensity);
         }
+    }
+
+    public void AdjustPixelationStrength(float delta)
+    {
+        PixelationStrength = Mathf.Clamp(PixelationStrength + delta, 0.0f, 1.0f);
+    }
+
+    public void SetPixelationStrength(float value)
+    {
+        PixelationStrength = Mathf.Clamp(value, 0.0f, 1.0f);
+    }
+
+    public void SetPixelationResolution(Vector2 res)
+    {
+        PixelationResolution = res;
     }
 }
