@@ -1,3 +1,344 @@
 [gd_scene format=3 uid="uid://dkcn8onkdovw3"]
 
+[ext_resource type="Terrain3DAssets" uid="uid://d2na6surobw22" path="res://Scenes/World/new_terrain_3d_assets.tres" id="1_fukp1"]
+[ext_resource type="Script" uid="uid://cviiqrw6gag2x" path="res://Scripts/World/TerrainManager.cs" id="3_kt8ql"]
+[ext_resource type="Texture2D" uid="uid://uqi6lxyhsyuj" path="res://Assets/256x256_Grid3.png" id="4_3qkd8"]
+[ext_resource type="Script" uid="uid://dysnoxgkwobwg" path="res://Scripts/World/TraceOverlay.cs" id="4_qchq1"]
+[ext_resource type="Sky" uid="uid://b4v8lwnmp6dow" path="res://Shaders/new_sky.tres" id="5_wbcdy"]
+[ext_resource type="Script" uid="uid://b68itvycy5kj4" path="res://Scripts/World/WorldEnvironmentManager.cs" id="6_hk1nl"]
+[ext_resource type="Script" uid="uid://btwx21m2ew4pv" path="res://Scripts/Systems/WeatherSystem.cs" id="7_84gfl"]
+[ext_resource type="Shader" uid="uid://c7fgxkety72km" path="res://Shaders/RainSnowParticles.gdshader" id="8_3cg40"]
+[ext_resource type="Material" uid="uid://bwr3lih60i377" path="res://Shaders/rain_material.tres" id="9_i1vrp"]
+[ext_resource type="Shader" uid="uid://cpbai2v77xg6l" path="res://Shaders/RainSplash.gdshader" id="10_d7a5k"]
+[ext_resource type="PackedScene" uid="uid://3s82rtv51ye2" path="res://Scenes/Player.tscn" id="11_ko5c8"]
+[ext_resource type="AudioStream" uid="uid://cyycmyol7cxys" path="res://Assets/Audio/Footsteps/footstep_snow_1.wav" id="12_chq35"]
+[ext_resource type="Texture2D" uid="uid://ulx78hwquplr" path="res://Assets/syl_base_5_256x256_Grid3.png" id="13_fmrl6"]
+[ext_resource type="Script" uid="uid://550ivwfkjtg8" path="res://Scripts/Tools/FoliageGenerator.cs" id="14_hfj0m"]
+[ext_resource type="ArrayMesh" uid="uid://kehnlnekp6q0" path="res://Assets/leaf_pile_leaves_1_arraymesh.tres" id="15_f4jq8"]
+[ext_resource type="QuadMesh" uid="uid://cxygfn82cbf3i" path="res://Assets/Leaf_1_mesh.tres" id="16_db4tn"]
+[ext_resource type="Shader" uid="uid://cwl3kyigrfbx6" path="res://Shaders/PS1Effect.gdshader" id="17_ajnu1"]
+[ext_resource type="Script" uid="uid://cckeuxicr7u61" path="res://Scenes/PostProcessController.cs" id="18_fppd4"]
+[ext_resource type="PackedScene" uid="uid://d3r85210kwu82" path="res://Scenes/HUD.tscn" id="19_lqiye"]
+[ext_resource type="Script" uid="uid://yjbssitadmo4" path="res://Scripts/UI/MobileUIController.cs" id="20_tfna0"]
+[ext_resource type="PackedScene" uid="uid://d1tjgr0nye78p" path="res://Assets/buildings/bar/bar_2.tscn" id="21_katbg"]
+
+[sub_resource type="Gradient" id="Gradient_5tvsu"]
+offsets = PackedFloat32Array(0.2, 1)
+colors = PackedColorArray(1, 1, 1, 1, 0, 0, 0, 1)
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_o7hfi"]
+noise_type = 2
+frequency = 0.03
+cellular_jitter = 3.0
+cellular_return_type = 0
+domain_warp_enabled = true
+domain_warp_type = 1
+domain_warp_amplitude = 50.0
+domain_warp_fractal_type = 2
+domain_warp_fractal_lacunarity = 1.5
+domain_warp_fractal_gain = 1.0
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_8iif8"]
+noise = SubResource("FastNoiseLite_o7hfi")
+color_ramp = SubResource("Gradient_5tvsu")
+seamless = true
+
+[sub_resource type="Terrain3DMaterial" id="Terrain3DMaterial_tm0n8"]
+_shader_parameters = {
+&"bias_distance": null,
+&"blend_sharpness": null,
+&"depth_blur": null,
+&"enable_macro_variation": null,
+&"enable_projection": null,
+&"flat_terrain_normals": null,
+&"macro_variation1": null,
+&"macro_variation2": null,
+&"macro_variation_slope": null,
+&"mipmap_bias": null,
+&"noise1_angle": null,
+&"noise1_offset": null,
+&"noise1_scale": null,
+&"noise2_scale": null,
+&"noise_texture": SubResource("NoiseTexture2D_8iif8"),
+&"projection_threshold": null
+}
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_katbg"]
+transparency = 1
+cull_mode = 2
+depth_draw_mode = 2
+shading_mode = 0
+albedo_texture = ExtResource("4_3qkd8")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_kt8ql"]
+size = Vector2(1280, 1280)
+
+[sub_resource type="Environment" id="Environment_wn2sc"]
+background_mode = 2
+sky = ExtResource("5_wbcdy")
+ssr_enabled = true
+glow_enabled = true
+volumetric_fog_emission_energy = 0.0
+volumetric_fog_ambient_inject = 1.11
+volumetric_fog_sky_affect = 0.329
+adjustment_contrast = 1.45
+
+[sub_resource type="Gradient" id="Gradient_xy64s"]
+offsets = PackedFloat32Array(0.008333334, 0.24583334, 0.53333336, 0.775, 1)
+colors = PackedColorArray(0.27058825, 0.33333334, 0.4, 1, 0.8098671, 0.41418132, 0.24886721, 1, 0.9604719, 0.9453166, 0.76112336, 1, 0.89016074, 0.48583883, 0.42715797, 1, 0.27058825, 0.33333334, 0.4, 1)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_67xny"]
+shader = ExtResource("8_3cg40")
+shader_parameter/direction = Vector3(0, -1, 0)
+shader_parameter/spread = 5.0000002375
+shader_parameter/scale_min = 1.0
+shader_parameter/scale_max = 2.0
+shader_parameter/color_value = Color(0.86033636, 0.9430385, 0.9597439, 0.6784314)
+shader_parameter/box_size = Vector3(20, 10, 20)
+shader_parameter/center_offset = Vector3(0, 5, 0)
+shader_parameter/light_intensity = 1.0
+shader_parameter/fall_speed_min = 1.0
+shader_parameter/fall_speed_max = 5.0
+shader_parameter/wind_force = Vector3(0, 0, 0)
+shader_parameter/drag = 0.3
+shader_parameter/ground_height = 0.0
+shader_parameter/is_snow = 1.0
+shader_parameter/do_recycle = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_a1s1a"]
+transparency = 1
+blend_mode = 1
+cull_mode = 2
+shading_mode = 0
+disable_ambient_light = true
+disable_specular_occlusion = true
+vertex_color_use_as_albedo = true
+albedo_color = Color(0.7823937, 0.8605251, 0.9315725, 0.12941177)
+texture_filter = 0
+disable_receive_shadows = true
+billboard_mode = 3
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+z_clip_scale = 0.59
+distance_fade_mode = 1
+
+[sub_resource type="QuadMesh" id="QuadMesh_yyhca"]
+material = SubResource("StandardMaterial3D_a1s1a")
+size = Vector2(0.05, 0.05)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_p2227"]
+shader = ExtResource("8_3cg40")
+shader_parameter/direction = Vector3(0, -1, 0)
+shader_parameter/spread = 0.0
+shader_parameter/scale_min = 0.2
+shader_parameter/scale_max = 0.5
+shader_parameter/color_value = Color(0.3355, 0.49104998, 0.61, 0.36078432)
+shader_parameter/box_size = Vector3(20, 10, 20)
+shader_parameter/center_offset = Vector3(0, 5, 0)
+shader_parameter/light_intensity = 1.0
+shader_parameter/fall_speed_min = 10.0
+shader_parameter/fall_speed_max = 15.0
+shader_parameter/wind_force = Vector3(0, 0, 0)
+shader_parameter/drag = 0.1
+shader_parameter/ground_height = 0.0
+shader_parameter/is_snow = 0.0
+shader_parameter/do_recycle = 1.0
+
+[sub_resource type="RibbonTrailMesh" id="RibbonTrailMesh_4v7b0"]
+material = ExtResource("9_i1vrp")
+shape = 0
+size = 0.2
+sections = 2
+section_length = 0.5
+section_segments = 1
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_6dlt0"]
+shader = ExtResource("10_d7a5k")
+shader_parameter/direction = Vector3(0, 1, 0)
+shader_parameter/spread = 25.0000011875
+shader_parameter/scale_min = 0.2
+shader_parameter/scale_max = 0.5
+shader_parameter/color_value = Color(0.8, 0.9, 1, 0.8)
+shader_parameter/spawn_area = Vector2(20, 20)
+shader_parameter/bounce_strength_min = 1.0
+shader_parameter/bounce_strength_max = 2.0
+shader_parameter/gravity = 15.0
+shader_parameter/wind_force = Vector3(0, 0, 0)
+shader_parameter/drag = 0.1
+shader_parameter/ground_height = 0.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5lhkp"]
+cull_mode = 2
+shading_mode = 0
+disable_ambient_light = true
+disable_specular_occlusion = true
+vertex_color_use_as_albedo = true
+albedo_color = Color(0.33333334, 0.4862745, 0.6431373, 0.45490196)
+texture_filter = 0
+disable_receive_shadows = true
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+
+[sub_resource type="QuadMesh" id="QuadMesh_nxprg"]
+material = SubResource("StandardMaterial3D_5lhkp")
+size = Vector2(0.05, 0.05)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_h1woh"]
+resource_name = "Eye_Mat"
+cull_mode = 2
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("13_fmrl6")
+roughness = 0.9
+texture_filter = 2
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_siwr5"]
+height = 3.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_d06fn"]
+shader = ExtResource("17_ajnu1")
+shader_parameter/resolution = Vector2(320, 240)
+shader_parameter/pixelation_resolution = Vector2(320, 240)
+shader_parameter/pixelation_strength = 1.0
+shader_parameter/sanity = 1.0
+shader_parameter/distortion = 0.0
+shader_parameter/time = 0.0
+shader_parameter/quantization = 0.0
+shader_parameter/scanline_intensity = 1.0
+shader_parameter/vignette_intensity = 0.5
+
 [node name="Node3D" type="Node3D" unique_id=1661618242]
+
+[node name="Terrain3D" type="Terrain3D" parent="." unique_id=100929599]
+data_directory = "res://terrain_data"
+material = SubResource("Terrain3DMaterial_tm0n8")
+assets = ExtResource("1_fukp1")
+collision_layer = 2
+collision_mask = 2
+top_level = true
+metadata/_edit_lock_ = true
+
+[node name="TerrainManager" type="Node3D" parent="Terrain3D" unique_id=1336042404]
+script = ExtResource("3_kt8ql")
+TerrainNodePath = NodePath("..")
+
+[node name="TraceOverlay" type="MeshInstance3D" parent="." unique_id=16773856]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 640, 80, 640)
+visible = false
+material_override = SubResource("StandardMaterial3D_katbg")
+mesh = SubResource("PlaneMesh_kt8ql")
+script = ExtResource("4_qchq1")
+SketchTexture = ExtResource("4_3qkd8")
+
+[node name="Zones" type="Node3D" parent="." unique_id=1166886973]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1435875565 groups=["world_env"]]
+environment = SubResource("Environment_wn2sc")
+
+[node name="WorldEnvironmentManager" type="Node" parent="." unique_id=800933053 node_paths=PackedStringArray("_sun", "_worldEnvironment")]
+script = ExtResource("6_hk1nl")
+_sun = NodePath("../DirectionalLight3D")
+_worldEnvironment = NodePath("../WorldEnvironment")
+_sunColorGradient = SubResource("Gradient_xy64s")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1505523432 groups=["sun"]]
+transform = Transform3D(1, -6.841778e-08, 5.4421957e-08, 0, 0.6225146, 0.7826082, 8.742278e-08, 0.7826082, -0.6225146, 9.885, 50, 0)
+shadow_enabled = true
+
+[node name="WeatherSystem" type="Node3D" parent="." unique_id=878532472]
+script = ExtResource("7_84gfl")
+
+[node name="SnowParticles" type="GPUParticles3D" parent="WeatherSystem" unique_id=1388767477]
+cast_shadow = 0
+emitting = false
+amount = 1000
+lifetime = 5.0
+preprocess = 1.0
+speed_scale = 0.5
+explosiveness = 0.05
+visibility_aabb = AABB(-20, 0, -20, 40, 40, 40)
+trail_lifetime = 0.01
+process_material = SubResource("ShaderMaterial_67xny")
+draw_pass_1 = SubResource("QuadMesh_yyhca")
+
+[node name="RainParticles" type="GPUParticles3D" parent="WeatherSystem" unique_id=1169215238]
+cast_shadow = 0
+emitting = false
+amount = 500
+lifetime = 5.0
+preprocess = 0.5
+fixed_fps = 25
+visibility_aabb = AABB(-20, 0, -20, 40, 40, 40)
+trail_lifetime = 0.01
+process_material = SubResource("ShaderMaterial_p2227")
+draw_pass_1 = SubResource("RibbonTrailMesh_4v7b0")
+
+[node name="RainSplashParticles" type="GPUParticles3D" parent="WeatherSystem" unique_id=695331210]
+emitting = false
+amount = 25
+lifetime = 0.2
+fixed_fps = 25
+visibility_aabb = AABB(-20, 0, -20, 40, 40, 40)
+process_material = SubResource("ShaderMaterial_6dlt0")
+draw_pass_1 = SubResource("QuadMesh_nxprg")
+
+[node name="Player" parent="." unique_id=434817830 instance=ExtResource("11_ko5c8")]
+_attackSound = ExtResource("12_chq35")
+
+[node name="Skeleton3D" parent="Player/syl_base_5/metarig" parent_id_path=PackedInt32Array(434817830, 607563459, 1277451019) index="0" unique_id=1599754758]
+bones/0/position = Vector3(-0.010012217, 0.8351378, 0.03211552)
+bones/3/rotation = Quaternion(-0.056421105, 0.0017865181, 2.1229007e-06, 0.99840546)
+bones/4/rotation = Quaternion(0.12197305, 2.4189526e-06, 4.7920224e-05, 0.99253345)
+bones/17/rotation = Quaternion(0.97787786, 0.0230715, -0.002682033, 0.20788373)
+bones/18/rotation = Quaternion(0.11813627, 0.00048791902, 0.003661288, 0.99299055)
+bones/22/rotation = Quaternion(0.97733223, -0.013776728, 0.0019300311, 0.21125445)
+bones/23/rotation = Quaternion(0.12407228, 9.732465e-05, -0.009730923, 0.99222547)
+
+[node name="MESH_002" parent="Player/syl_base_5/metarig/Skeleton3D" index="2" unique_id=93869840]
+surface_material_override/1 = SubResource("StandardMaterial3D_h1woh")
+
+[node name="LeafSpawnerTool" type="Node3D" parent="." unique_id=1548243136]
+script = ExtResource("14_hfj0m")
+_collisionShape = SubResource("CylinderShape3D_siwr5")
+_groundLeafMesh = ExtResource("15_f4jq8")
+_groundCountPerTree = 200
+_groundRadiusMax = 5.0
+_groundScale = 0.5
+_gustLeafMesh = ExtResource("15_f4jq8")
+_gustScale = 0.5
+_singleLeafMesh = ExtResource("16_db4tn")
+_canopyCountPerTree = 25
+_canopyRadiusMin = 0.3
+_canopyScale = 0.2
+_manualCanopyHeight = 3.0
+
+[node name="PostProcessLayer" type="CanvasLayer" parent="." unique_id=424708560]
+layer = -1
+
+[node name="PostProcessController" type="ColorRect" parent="PostProcessLayer" unique_id=1269059802]
+material = SubResource("ShaderMaterial_d06fn")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("18_fppd4")
+
+[node name="HUD" parent="." unique_id=2068370090 instance=ExtResource("19_lqiye")]
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=858904524]
+
+[node name="MobileUI" type="CanvasLayer" parent="." unique_id=941626247]
+layer = 128
+script = ExtResource("20_tfna0")
+
+[node name="bar2" parent="." unique_id=372356649 instance=ExtResource("21_katbg")]
+transform = Transform3D(0.8, 0, 0, 0, 0.8, 0, 0, 0, 0.8, -6.702073, 0, -11.074547)
+
+[editable path="Player"]
+[editable path="Player/syl_base_5"]
+[editable path="HUD"]

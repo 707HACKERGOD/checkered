@@ -44,7 +44,7 @@ Demo:
 - 🚧 5 NPCs in the first demo: Barkeeper, Rich truant, Phantom, Base_F, Base_M
 - 🚧 Dialogue UI
 - 🚧 Calendar UI
-- 🚧 Open world map with 2 key buildings in demo: bar, trade school
+- 🚧 Open world map with 2 key buildings in demo: cafe, trade school
 - Intro story
 - Saving and loading
 

@@ -26,6 +26,7 @@ GameState="*uid://da45shqjt7ivt"
 TimeManager="*res://Scripts/Systems/TimeManager.cs"
 WeatherManager="*uid://de7y7qmr4if0n"
 SanityCycle="*res://Scripts/Systems/SanityCycle.cs"
+WorldMapManager="*uid://bubai10gqlqt6"
 
 [dialogue_manager]
 
@@ -43,6 +44,8 @@ enabled=PackedStringArray("res://addons/project_dumper/plugin.cfg", "res://addon
 
 Player=""
 NPC=""
+sun=""
+world_env=""
 
 [input]
 
