@@ -625,6 +625,9 @@ graph_offset = Vector2(-105.57075, 0)
 
 [node name="Player" type="CharacterBody3D" unique_id=434817830 node_paths=PackedStringArray("PlayerCamera") groups=["Player"]]
 collision_mask = 3
+floor_constant_speed = true
+floor_max_angle = 1.2217305
+floor_snap_length = 0.3
 script = ExtResource("1_rpqav")
 PlayerCamera = NodePath("CameraGimbal/InnerGimbal/SpringArm/Camera")
 
@@ -659,12 +662,12 @@ shape = SubResource("SphereShape3D_5ixxa")
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
 
 [node name="Skeleton3D" parent="syl_base_5/metarig" parent_id_path=PackedInt32Array(607563459, 1277451019) index="0" unique_id=1599754758]
-bones/0/position = Vector3(-0.011836486, 0.83483374, 0.032115523)
+bones/0/position = Vector3(-0.011199802, 0.83493984, 0.03211553)
 bones/0/rotation = Quaternion(0.16563182, 7.9136875e-08, 1.3291164e-08, 0.9861877)
 bones/1/rotation = Quaternion(-0.18164173, -1.6633932e-08, -2.607924e-08, 0.9833648)
 bones/2/rotation = Quaternion(-0.06385426, -3.3459195e-08, -5.9468936e-09, 0.99795926)
-bones/3/rotation = Quaternion(-0.063308306, 0.00178649, -1.0203695e-05, 0.9979924)
-bones/4/rotation = Quaternion(0.124476805, 2.8803083e-06, 5.6922214e-05, 0.9922226)
+bones/3/rotation = Quaternion(-0.06224118, 0.0017864999, -8.293433e-06, 0.99805963)
+bones/4/rotation = Quaternion(0.12386672, 2.7679114e-06, 5.472855e-05, 0.9922989)
 bones/5/rotation = Quaternion(0.023930106, 1.7533196e-08, 1.2729309e-09, 0.9997137)
 bones/6/rotation = Quaternion(0.012781154, -8.914682e-08, -2.7187017e-10, 0.99991834)
 bones/7/rotation = Quaternion(0.003346608, 0.2045822, -0.7822588, 0.588393)
@@ -675,10 +678,10 @@ bones/11/rotation = Quaternion(0.0033465335, -0.20458223, 0.78225875, 0.58839285
 bones/12/position = Vector3(-0.008403519, 0.10204095, 0.0012207029)
 bones/12/rotation = Quaternion(0.03532062, -0.118171535, 0.49783382, 0.85845757)
 bones/13/rotation = Quaternion(0.18507953, 0.014332607, 0.02784625, 0.9822244)
-bones/17/rotation = Quaternion(0.9775611, 0.024006128, -0.002732027, 0.20926201)
-bones/18/rotation = Quaternion(0.12067549, 0.0005436809, 0.0032286362, 0.9926867)
-bones/22/rotation = Quaternion(0.9769175, -0.013045205, 0.0018678659, 0.21321046)
-bones/23/rotation = Quaternion(0.12767246, 0.00015450038, -0.010570028, 0.99176013)
+bones/17/rotation = Quaternion(0.9776699, 0.02368413, -0.0027160088, 0.2087902)
+bones/18/rotation = Quaternion(0.12007391, 0.00053014705, 0.0033406212, 0.9927593)
+bones/22/rotation = Quaternion(0.977016, -0.01322241, 0.0018820695, 0.21274753)
+bones/23/rotation = Quaternion(0.1272409, 0.00014733539, -0.010463452, 0.99181664)
 
 [node name="eyepatch_002" parent="syl_base_5/metarig/Skeleton3D" index="0" unique_id=1559059956]
 layers = 8

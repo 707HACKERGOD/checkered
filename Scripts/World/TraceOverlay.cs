@@ -4,31 +4,25 @@ using Godot;
 public partial class TraceOverlay : MeshInstance3D
 {
     [Export] public Texture2D SketchTexture;
-    [Export] public float MapSize = 1280f; // 5 * 256
-    [Export] public float YHeight = 80f;
-    [Export] public bool UpdateInEditor = false;
+    [Export] public float MapSize = 1280f;
+    [Export] public float YHeight = 150f;
+    [Export] public bool Refresh = false;
 
     public override void _Process(double delta)
     {
-        if (Engine.IsEditorHint() && UpdateInEditor)
+        if (Engine.IsEditorHint() && Refresh)
         {
-            UpdateInEditor = false;
-            BuildOverlay();
+            Refresh = false;
+            Build();
         }
     }
 
-    private void BuildOverlay()
+    private void Build()
     {
-        if (SketchTexture == null)
-        {
-            GD.PrintErr("TraceOverlay: No SketchTexture assigned!");
-            return;
-        }
+        if (SketchTexture == null) return;
 
-        // Create horizontal plane facing up
-        var plane = new PlaneMesh();
-        plane.Size = new Vector2(MapSize, MapSize);
-        this.Mesh = plane;
+        Mesh = new PlaneMesh { Size = new Vector2(MapSize, MapSize) };
+        Position = new Vector3(MapSize / 2f, YHeight, MapSize / 2f);
 
         var mat = new StandardMaterial3D();
         mat.AlbedoTexture = SketchTexture;
@@ -36,12 +30,7 @@ public partial class TraceOverlay : MeshInstance3D
         mat.ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded;
         mat.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
         mat.DepthDrawMode = BaseMaterial3D.DepthDrawModeEnum.Disabled;
-        this.MaterialOverride = mat;
 
-        // Center the overlay over the whole map
-        Position = new Vector3(MapSize / 2f, YHeight, MapSize / 2f);
-        Rotation = Vector3.Zero; // PlaneMesh is already horizontal
-
-        GD.Print($"TraceOverlay: Built {MapSize}m overlay at Y={YHeight}");
+        MaterialOverride = mat;
     }
 }

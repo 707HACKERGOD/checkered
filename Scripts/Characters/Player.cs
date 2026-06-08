@@ -28,6 +28,9 @@ public partial class Player : CharacterBody3D
 
     [Export] private HUD _hud;
     [Export] private float _interactDistance = 3.0f;
+
+    [Export] public float StepHeight = 0.4f;      // Max step to auto-climb without jump
+    [Export] public float StepCheckDistance = 0.3f; // How far ahead to check for steps
     private InteractableItem _currentInteractable;
 
     // Tracking nodes
@@ -80,6 +83,7 @@ public partial class Player : CharacterBody3D
 
         _springArm.SpringLength = _targetZoom;
         _cameraGimbal.TopLevel = true;
+        
 
         // Eye tracker
         _eyeTracker = GetNodeOrNull<NpcEyeTracker>("EyeTrackerComponent");
@@ -256,6 +260,37 @@ public partial class Player : CharacterBody3D
         {
             velocity.X = direction.X * speed;
             velocity.Z = direction.Z * speed;
+
+            // STAIR STEP-UP: Cast forward-down to detect steps
+            Vector3 stepOrigin = GlobalPosition + new Vector3(0, StepHeight, 0);
+            Vector3 stepEnd = stepOrigin + direction * StepCheckDistance;
+            
+            var stepQuery = PhysicsRayQueryParameters3D.Create(stepOrigin, stepEnd);
+            stepQuery.CollisionMask = 2; // Your terrain/building layer
+            var stepResult = GetWorld3D().DirectSpaceState.IntersectRay(stepQuery);
+            
+            if (stepResult.Count == 0)
+            {
+                // No wall ahead — also check if there's a floor below the step
+                Vector3 downOrigin = stepEnd;
+                Vector3 downEnd = downOrigin + Vector3.Down * (StepHeight + 0.1f);
+                var downQuery = PhysicsRayQueryParameters3D.Create(downOrigin, downEnd);
+                downQuery.CollisionMask = 2;
+                var downResult = GetWorld3D().DirectSpaceState.IntersectRay(downQuery);
+                
+                if (downResult.Count > 0)
+                {
+                    float floorY = downResult["position"].AsVector3().Y;
+                    float stepUp = floorY - GlobalPosition.Y;
+                    
+                    if (stepUp > 0.05f && stepUp <= StepHeight)
+                    {
+                        // Auto-step up
+                        GlobalPosition = new Vector3(GlobalPosition.X, floorY, GlobalPosition.Z);
+                        velocity.Y = 0; // Cancel gravity for this frame
+                    }
+                }
+            }
 
             bool isTurning = _stateMachine != null && _stateMachine.GetCurrentNode() == "Turn";
             if (!isTurning)

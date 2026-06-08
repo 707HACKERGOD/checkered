@@ -28,15 +28,16 @@ uniform vec3 cloud_tint : source_color = vec3(1.0);
 uniform float moon_size : hint_range(0.0, 0.5) = 0.05; 
 
 void sky() {
-    // 1. TIME & ORBIT
+	// 1. TIME & ORBIT
     float sun_angle = (time_of_day - 6.0) * (3.14159 / 12.0);
-    vec3 sun_dir = normalize(vec3(0.0, sin(sun_angle), cos(sun_angle)));
+    
+    // Original formula rotated: East → overhead → West
+    vec3 sun_dir = normalize(vec3(cos(sun_angle), sin(sun_angle), 0.0));
     vec3 moon_dir = -sun_dir; 
     
     float sun_mask = clamp(dot(EYEDIR, sun_dir), 0.0, 1.0);
     float base_moon = clamp(dot(EYEDIR, moon_dir), 0.0, 1.0);
     
-    // Cloud Glow Mask (Tight radius for lighting clouds)
     float moon_glow_mask = pow(base_moon, 50.0); 
 
     float day_amt = smoothstep(-0.1, 0.1, sin(sun_angle));
