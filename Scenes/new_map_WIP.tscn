@@ -11,7 +11,6 @@
 [ext_resource type="Shader" uid="uid://cpbai2v77xg6l" path="res://Shaders/RainSplash.gdshader" id="10_d7a5k"]
 [ext_resource type="PackedScene" uid="uid://3s82rtv51ye2" path="res://Scenes/Player.tscn" id="11_ko5c8"]
 [ext_resource type="AudioStream" uid="uid://cyycmyol7cxys" path="res://Assets/Audio/Footsteps/footstep_snow_1.wav" id="12_chq35"]
-[ext_resource type="Texture2D" uid="uid://ulx78hwquplr" path="res://Assets/syl_base_5_256x256_Grid3.png" id="13_fmrl6"]
 [ext_resource type="Script" uid="uid://550ivwfkjtg8" path="res://Scripts/Tools/FoliageGenerator.cs" id="14_hfj0m"]
 [ext_resource type="ArrayMesh" uid="uid://kehnlnekp6q0" path="res://Assets/leaf_pile_leaves_1_arraymesh.tres" id="15_f4jq8"]
 [ext_resource type="QuadMesh" uid="uid://cxygfn82cbf3i" path="res://Assets/Leaf_1_mesh.tres" id="16_db4tn"]
@@ -200,14 +199,6 @@ particles_anim_loop = false
 material = SubResource("StandardMaterial3D_5lhkp")
 size = Vector2(0.05, 0.05)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_h1woh"]
-resource_name = "Eye_Mat"
-cull_mode = 2
-vertex_color_use_as_albedo = true
-albedo_texture = ExtResource("13_fmrl6")
-roughness = 0.9
-texture_filter = 2
-
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_siwr5"]
 height = 3.0
 
@@ -306,18 +297,6 @@ draw_pass_1 = SubResource("QuadMesh_nxprg")
 transform = Transform3D(0.76379603, 0, -0.6454577, 0, 1, 0, 0.6454577, 0, 0.76379603, 554.6133, 0, 646.89343)
 _attackSound = ExtResource("12_chq35")
 
-[node name="Skeleton3D" parent="Player/syl_base_5/metarig" parent_id_path=PackedInt32Array(434817830, 607563459, 1277451019) index="0" unique_id=1599754758]
-bones/0/position = Vector3(-0.001817938, 0.8365035, 0.032115526)
-bones/3/rotation = Quaternion(-0.032360975, 0.0017859486, 4.5146946e-05, 0.9994747)
-bones/4/rotation = Quaternion(0.11100801, 3.9998127e-07, 8.5256615e-06, 0.99381953)
-bones/17/rotation = Quaternion(0.9794073, 0.0187491, -0.0024226299, 0.20100762)
-bones/18/rotation = Quaternion(0.10579882, 0.0002453778, 0.0053239553, 0.9943734)
-bones/22/rotation = Quaternion(0.9793009, -0.017072184, 0.0022772786, 0.20167579)
-bones/23/rotation = Quaternion(0.107007526, -0.00014413086, -0.006369851, 0.99423784)
-
-[node name="MESH_002" parent="Player/syl_base_5/metarig/Skeleton3D" index="2" unique_id=93869840]
-surface_material_override/1 = SubResource("StandardMaterial3D_h1woh")
-
 [node name="LeafSpawnerTool" type="Node3D" parent="." unique_id=1548243136]
 script = ExtResource("14_hfj0m")
 _collisionShape = SubResource("CylinderShape3D_siwr5")
@@ -358,5 +337,5 @@ script = ExtResource("20_tfna0")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1076.5281, 0, 444.583)
 
 [editable path="Player"]
-[editable path="Player/syl_base_5"]
+[editable path="Player/Syl"]
 [editable path="HUD"]

@@ -9,9 +9,9 @@ public partial class AnimationController : Node
     private AnimationNodeStateMachinePlayback _stateMachine;
     private Timer _turnResetTimer;
     
-    private const string STATE_IDLE = "Idle";
-    private const string STATE_RUN = "Run";
-    private const string STATE_TURN = "Turn";
+    private const string STATE_IDLE = "idle";
+    private const string STATE_RUN = "run";
+    private const string STATE_TURN = "turn";
     
     private string _currentState = STATE_IDLE;
 
@@ -26,15 +26,15 @@ public partial class AnimationController : Node
         _animTree.Active = true;
         _stateMachine = (AnimationNodeStateMachinePlayback)_animTree.Get("parameters/playback");
         
-        _animPlayer = _player.GetNode<AnimationPlayer>("syl_base_5/AnimationPlayer");
+        _animPlayer = _player.GetNode<AnimationPlayer>("Syl/AnimationPlayer");
         if (_animPlayer != null)
         {
-            if (_animPlayer.HasAnimation("Idle"))
-                _animPlayer.GetAnimation("Idle").LoopMode = Animation.LoopModeEnum.Linear;
-            if (_animPlayer.HasAnimation("Run"))
-                _animPlayer.GetAnimation("Run").LoopMode = Animation.LoopModeEnum.Linear;
-            if (_animPlayer.HasAnimation("Turn180Right"))
-                _animPlayer.GetAnimation("Turn180Right").LoopMode = Animation.LoopModeEnum.None;
+            if (_animPlayer.HasAnimation("idle"))
+                _animPlayer.GetAnimation("idle").LoopMode = Animation.LoopModeEnum.Linear;
+            if (_animPlayer.HasAnimation("run"))
+                _animPlayer.GetAnimation("run").LoopMode = Animation.LoopModeEnum.Linear;
+            if (_animPlayer.HasAnimation("turn180Right"))
+                _animPlayer.GetAnimation("turn180Right").LoopMode = Animation.LoopModeEnum.None;
         }
 
         _turnResetTimer = new Timer();
@@ -70,7 +70,7 @@ public partial class AnimationController : Node
         if (Input.IsActionJustPressed("turn_180") && onFloor && speed < 0.1f)
         {
             desired = STATE_TURN;
-            float turnLen = _animPlayer?.GetAnimation("Turn180Right")?.Length ?? 0.5f;
+            float turnLen = _animPlayer?.GetAnimation("turn180Right")?.Length ?? 0.5f;
             _turnResetTimer.Start(turnLen);
         }
         else if (_currentState == STATE_TURN && _turnResetTimer.TimeLeft > 0)

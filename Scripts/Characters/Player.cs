@@ -101,15 +101,15 @@ public partial class Player : CharacterBody3D
             _animTree.Active = true;
             _stateMachine = (AnimationNodeStateMachinePlayback)_animTree.Get("parameters/playback");
 
-            _animPlayer = GetNode<AnimationPlayer>("syl_base_5/AnimationPlayer");
+            _animPlayer = GetNode<AnimationPlayer>("Syl/AnimationPlayer");
             if (_animPlayer != null)
             {
-                if (_animPlayer.HasAnimation("Idle"))
-                    _animPlayer.GetAnimation("Idle").LoopMode = Animation.LoopModeEnum.Linear;
-                if (_animPlayer.HasAnimation("Run"))
-                    _animPlayer.GetAnimation("Run").LoopMode = Animation.LoopModeEnum.Linear;
-                if (_animPlayer.HasAnimation("Turn180Right"))
-                    _animPlayer.GetAnimation("Turn180Right").LoopMode = Animation.LoopModeEnum.None;
+                if (_animPlayer.HasAnimation("idle"))
+                    _animPlayer.GetAnimation("idle").LoopMode = Animation.LoopModeEnum.Linear;
+                if (_animPlayer.HasAnimation("run"))
+                    _animPlayer.GetAnimation("run").LoopMode = Animation.LoopModeEnum.Linear;
+                if (_animPlayer.HasAnimation("turn180Right"))
+                    _animPlayer.GetAnimation("turn180Right").LoopMode = Animation.LoopModeEnum.None;
             }
 
             _turnResetTimer = new Timer();

@@ -1,35 +1,39 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 public partial class NpcController : CharacterBody3D
 {
     [Export] public PackedScene ModelResource;
-    [Export] public Shape3D OverrideShape;          // optional per-NPC collision shape
+    [Export] public Shape3D OverrideShape;
     [Export] public string DisplayName = "Stranger";
     [Export] public bool IsDead = false;
+
+    public enum RigType { Mixamo, ARP_GLTB, Unknown }
+    private RigType _detectedRig = RigType.Unknown;
 
     private NpcEyeTracker _eyeTracker;
     private Area3D _visionArea;
 
-    // Limb definitions for combat colliders
-    private static readonly (string limbName, string boneName, Shape3D shape)[] LimbColliders = new (string, string, Shape3D)[]
+    // --- BONE NAME MAPS ---
+    // ARP_GLTB = standard GLTF export names (what you actually see)
+    private static readonly (string limb, string arpGltf, string mixamo, Shape3D shape)[] BoneMap = new (string, string, string, Shape3D)[]
     {
-        ("Head",      "mixamorig_Head",        new SphereShape3D   { Radius = 0.1f }),   // offset applied separately
-        ("Torso",     "mixamorig_Spine1",      new CapsuleShape3D  { Radius = 0.13f, Height = 0.6f }),
-        ("LeftArm",   "mixamorig_LeftForeArm", new CapsuleShape3D  { Radius = 0.04f, Height = 0.5f }),
-        ("LeftArm",   "mixamorig_LeftHand",    new CapsuleShape3D  { Radius = 0.03f, Height = 0.34f }), // much longer hand
-        ("RightArm",  "mixamorig_RightForeArm",new CapsuleShape3D  { Radius = 0.04f, Height = 0.5f }),
-        ("RightArm",  "mixamorig_RightHand",   new CapsuleShape3D  { Radius = 0.03f, Height = 0.34f }),
-        ("LeftLeg",   "mixamorig_LeftUpLeg",     new CapsuleShape3D  { Radius = 0.06f, Height = 0.35f }),
-        ("LeftLeg",   "mixamorig_LeftLeg",     new CapsuleShape3D  { Radius = 0.06f, Height = 0.45f }),
-        ("LeftLeg",   "mixamorig_LeftFoot",    new CapsuleShape3D  { Radius = 0.04f, Height = 0.3f }),
-        ("RightLeg",  "mixamorig_RightUpLeg",    new CapsuleShape3D  { Radius = 0.06f, Height = 0.35f }),
-        ("RightLeg",  "mixamorig_RightLeg",    new CapsuleShape3D  { Radius = 0.06f, Height = 0.45f }),
-        ("RightLeg",  "mixamorig_RightFoot",   new CapsuleShape3D  { Radius = 0.04f, Height = 0.3f })
+        ("Head",      "spine.006",           "mixamorig_Head",        new SphereShape3D   { Radius = 0.1f }),
+        ("Torso",     "spine.003",           "mixamorig_Spine1",      new CapsuleShape3D  { Radius = 0.13f, Height = 0.6f }),
+        ("LeftArm",   "forearm.L",           "mixamorig_LeftForeArm", new CapsuleShape3D  { Radius = 0.04f, Height = 0.5f }),
+        ("LeftArm",   "hand.L",              "mixamorig_LeftHand",    new CapsuleShape3D  { Radius = 0.03f, Height = 0.34f }),
+        ("RightArm",  "forearm.R",           "mixamorig_RightForeArm",new CapsuleShape3D  { Radius = 0.04f, Height = 0.5f }),
+        ("RightArm",  "hand.R",              "mixamorig_RightHand",   new CapsuleShape3D  { Radius = 0.03f, Height = 0.34f }),
+        ("LeftLeg",   "thigh.L",             "mixamorig_LeftUpLeg",   new CapsuleShape3D  { Radius = 0.06f, Height = 0.35f }),
+        ("LeftLeg",   "shin.L",              "mixamorig_LeftLeg",     new CapsuleShape3D  { Radius = 0.06f, Height = 0.45f }),
+        ("LeftLeg",   "foot.L",              "mixamorig_LeftFoot",    new CapsuleShape3D  { Radius = 0.04f, Height = 0.3f }),
+        ("RightLeg",  "thigh.R",             "mixamorig_RightUpLeg",  new CapsuleShape3D  { Radius = 0.06f, Height = 0.35f }),
+        ("RightLeg",  "shin.R",              "mixamorig_RightLeg",    new CapsuleShape3D  { Radius = 0.06f, Height = 0.45f }),
+        ("RightLeg",  "foot.R",              "mixamorig_RightFoot",   new CapsuleShape3D  { Radius = 0.04f, Height = 0.3f })
     };
 
-    // Maps limb names (used in combat) to the node names of imported split meshes.
     public static readonly Dictionary<string, string> LimbMeshNames = new()
     {
         { "Head",     "head" },
@@ -47,22 +51,22 @@ public partial class NpcController : CharacterBody3D
 
         Node3D model = null;
 
-        // Load and attach the model
         if (ModelResource != null)
         {
             model = ModelResource.Instantiate<Node3D>();
 
-            // --- prevent ragdoll on spawn ---
             var skeleton = FindChildOfTypeRecursive<Skeleton3D>(model);
             if (skeleton != null)
             {
-                var simulator = skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator3D");
-                if (simulator == null)
-                    simulator = skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator"); // fallback name
+                _detectedRig = DetectRigType(skeleton);
+                GD.Print($"NpcController: Detected rig type = {_detectedRig}");
+
+                var simulator = skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator3D")
+                    ?? skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator");
                 if (simulator != null)
                 {
-                    simulator.Active = false;                  // ensure simulator is off
-                    simulator.PhysicalBonesStopSimulation();   // also stop any lingering simulation
+                    simulator.Active = false;
+                    simulator.PhysicalBonesStopSimulation();
                 }
             }
 
@@ -71,24 +75,19 @@ public partial class NpcController : CharacterBody3D
             {
                 modelRoot.AddChild(model);
                 var animPlayer = model.FindChild("AnimationPlayer", recursive: true) as AnimationPlayer;
-                if (animPlayer != null)
-                {
-                    if (animPlayer.HasAnimation("idle"))
-                        animPlayer.Play("idle");
-                }
+                if (animPlayer != null && animPlayer.HasAnimation("idle"))
+                    animPlayer.Play("idle");
             }
             else
                 GD.PrintErr("NpcController: missing ModelRoot child");
         }
 
-        // Apply optional collision shape override
         if (OverrideShape != null)
         {
             var bodyShape = GetNodeOrNull<CollisionShape3D>("CollisionShape3D");
             if (bodyShape != null) bodyShape.Shape = OverrideShape;
         }
 
-        // Wire eye tracker
         _eyeTracker = GetNodeOrNull<NpcEyeTracker>("EyeTrackerComponent");
         if (_eyeTracker != null && model != null)
         {
@@ -102,7 +101,6 @@ public partial class NpcController : CharacterBody3D
             if (faceMesh != null) _eyeTracker.FaceMesh = faceMesh;
         }
 
-        // Interaction tooltip
         var interaction = GetNodeOrNull<NpcInteraction>("Interaction");
         if (interaction != null)
         {
@@ -110,17 +108,14 @@ public partial class NpcController : CharacterBody3D
             interaction.IsDead = IsDead;
         }
 
-        // Health – death logic
         var health = GetNodeOrNull<Health>("Health");
         if (health != null)
         {
-            // Capture model explicitly for the lambda
             Node3D capturedModel = model;
             health.Died += () =>
             {
                 IsDead = true;
 
-                // Freeze navigation
                 var navAgent = GetNodeOrNull<NavigationAgent3D>("NavAgentNPC");
                 if (navAgent != null)
                 {
@@ -129,7 +124,6 @@ public partial class NpcController : CharacterBody3D
                     navAgent.TargetPosition = GlobalPosition;
                 }
 
-                // Disable eye tracker
                 if (_eyeTracker != null)
                 {
                     _eyeTracker.EnableHeadTracking = false;
@@ -138,51 +132,43 @@ public partial class NpcController : CharacterBody3D
                     _eyeTracker.Target = null;
                 }
 
-                // Disable combat AI
                 var combat = GetNodeOrNull<Node>("NPCNavCombat");
                 if (combat != null)
                     combat.SetProcess(false);
 
-                // Update tooltip
                 if (interaction != null)
                 {
                     interaction.IsDead = true;
                     HUD.Instance?.RefreshNpcTooltip(interaction);
                 }
 
-                // --- RAGDOLL ACTIVATION ---
                 if (capturedModel != null)
                 {
                     var skeleton = FindChildOfTypeRecursive<Skeleton3D>(capturedModel);
                     if (skeleton != null)
                     {
-                        // Stop any animation – important!
                         var animPlayer = capturedModel.FindChild("AnimationPlayer", recursive: true) as AnimationPlayer;
                         if (animPlayer != null)
                             animPlayer.Active = false;
 
-                        // Release any bone pose override from animation blending
                         skeleton.ResetBonePoses();
 
-                        var simulator = skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator3D");
-                        if (simulator == null)
-                            simulator = skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator");
+                        var simulator = skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator3D")
+                            ?? skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator");
                         if (simulator != null)
                         {
-                            simulator.Active = true;          // enable the simulator
+                            simulator.Active = true;
                             simulator.PhysicalBonesStartSimulation();
                         }
                     }
                 }
 
-                // Apply gray material AFTER starting ragdoll so it's visible
                 var modelRoot = GetNodeOrNull<Node3D>("ModelRoot");
                 if (modelRoot != null)
                     OverrideAllMeshesGray(modelRoot);
             };
         }
 
-        // Vision area
         _visionArea = GetNodeOrNull<Area3D>("VisionArea");
         if (_visionArea != null)
         {
@@ -191,25 +177,78 @@ public partial class NpcController : CharacterBody3D
         }
     }
 
+    // --- RIG DETECTION ---
+    private RigType DetectRigType(Skeleton3D skeleton)
+    {
+        var allNames = new List<string>();
+        for (int i = 0; i < skeleton.GetBoneCount(); i++)
+            allNames.Add(skeleton.GetBoneName(i));
+
+        // ARP GLTF export: spine.001, spine.002, upper_arm.L, forearm.L, etc.
+        bool hasArpGltf = allNames.Any(n => n.StartsWith("spine.") && n.Contains("."))
+            && allNames.Any(n => n.EndsWith(".L") || n.EndsWith(".R"));
+
+        // Mixamo
+        bool hasMixamo = allNames.Any(n => n.Contains("mixamorig"));
+
+        if (hasArpGltf && !hasMixamo) return RigType.ARP_GLTB;
+        if (hasMixamo) return RigType.Mixamo;
+
+        return RigType.Unknown;
+    }
+
+    // --- RESOLVE BONE NAME ---
+    private string ResolveBoneName(string arpGltfName, string mixamoName)
+    {
+        return _detectedRig switch
+        {
+            RigType.ARP_GLTB => arpGltfName,
+            RigType.Mixamo => mixamoName,
+            _ => mixamoName
+        };
+    }
+
     private void SetupLimbColliders(Skeleton3D skeleton)
     {
-        foreach (var (limbName, boneName, shape) in LimbColliders)
+        foreach (var (limbName, arpGltfBone, mixamoBone, shape) in BoneMap)
         {
+            string boneName = ResolveBoneName(arpGltfBone, mixamoBone);
             int boneIdx = skeleton.FindBone(boneName);
+
             if (boneIdx == -1)
             {
-                GD.PrintErr($"NpcController: Bone '{boneName}' not found for limb '{limbName}'");
+                // Fuzzy fallback
+                string searchTerm = _detectedRig == RigType.ARP_GLTB
+                    ? arpGltfBone.Replace(".L", "").Replace(".R", "").Replace(".", "")
+                    : mixamoBone.Replace("mixamorig_", "").Replace("Left", "").Replace("Right", "");
+                
+                for (int i = 0; i < skeleton.GetBoneCount(); i++)
+                {
+                    string candidate = skeleton.GetBoneName(i).ToLower();
+                    if (candidate.Contains(searchTerm.ToLower()))
+                    {
+                        boneIdx = i;
+                        boneName = skeleton.GetBoneName(i);
+                        GD.Print($"NpcController: Fuzzy matched '{arpGltfBone}/{mixamoBone}' -> '{boneName}'");
+                        break;
+                    }
+                }
+            }
+
+            if (boneIdx == -1)
+            {
+                GD.PrintErr($"NpcController: Bone not found for limb '{limbName}' (tried ARP_GLTB:'{arpGltfBone}', Mixamo:'{mixamoBone}')");
                 continue;
             }
 
             var attachment = new BoneAttachment3D();
-            attachment.Name = $"{limbName}Collider_{boneName}";   // unique name
+            attachment.Name = $"{limbName}Collider_{boneName}";
             attachment.BoneName = boneName;
             skeleton.AddChild(attachment);
 
             var area = new Area3D();
-            area.Name = limbName;               // same limb name for multiple colliders
-            area.CollisionLayer = 1 << 4;       // layer 5 = BodyParts
+            area.Name = limbName;
+            area.CollisionLayer = 1 << 4;
             area.CollisionMask = 0;
             area.Monitorable = true;
             area.Monitoring = false;
@@ -218,18 +257,16 @@ public partial class NpcController : CharacterBody3D
             var collShape = new CollisionShape3D();
             collShape.Shape = shape;
             area.AddChild(collShape);
+
             if (limbName == "Head")
                 collShape.Position = new Vector3(0, 0.05f, 0);
             if (limbName == "Torso")
                 collShape.Position = new Vector3(0, -0.05f, 0);
-            if (boneName == "mixamorig_LeftUpLeg")
-                collShape.Position = new Vector3(0, 0.25f, 0);
-            if (boneName == "mixamorig_RightUpLeg")
+            if (boneName.ToLower().Contains("thigh") || boneName.ToLower().Contains("upleg"))
                 collShape.Position = new Vector3(0, 0.25f, 0);
         }
     }
 
-    // Helper to recursively find the first child of type T
     private T FindChildOfTypeRecursive<T>(Node node) where T : class
     {
         if (node is T t) return t;
@@ -278,7 +315,6 @@ public partial class NpcController : CharacterBody3D
         return best;
     }
 
-    // Helper to turn every MeshInstance3D gray
     private void OverrideAllMeshesGray(Node3D root)
     {
         var grayMat = new StandardMaterial3D

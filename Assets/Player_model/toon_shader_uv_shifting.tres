@@ -1,0 +1,15 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://rs1ca5l3tko1"]
+
+[ext_resource type="Shader" uid="uid://stkia4iiwmm4" path="res://Assets/Player_model/toon_shader_uv_shifting.gdshader" id="1_tsob5"]
+[ext_resource type="Texture2D" uid="uid://cjwpec6g0cwfo" path="res://Assets/Player_model/Syl_syl_texture.png" id="2_yo7im"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_tsob5")
+shader_parameter/albedo_tex = ExtResource("2_yo7im")
+shader_parameter/base_color = Color(1, 1, 1, 1)
+shader_parameter/eye_uv_offset = Vector2(0, 0)
+shader_parameter/shadow_threshold = 0.7800000845500001
+shader_parameter/shadow_softness = 0.01200000057
+shader_parameter/ambient_color = Color(0.4, 0.35, 0.45, 1)
+shader_parameter/ambient_strength = 0.0

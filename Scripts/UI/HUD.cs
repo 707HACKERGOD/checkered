@@ -50,6 +50,10 @@ public partial class HUD : Control
     [Export] private Label _tooltipKeyLabel;   
     [Export] private Label _tooltipTextLabel;  
 
+    // ========== Dialogue ==========
+    private Label _subtitleLabel;
+    private Tween _subtitleTween;
+
     // ========== Crosshair ==========
     private ColorRect _crosshair;
 
@@ -159,6 +163,22 @@ public partial class HUD : Control
         BuildCrosshair();
         HideTooltip();
         BuildInventoryUI();
+        _subtitleLabel = new Label();
+        _subtitleLabel.Name = "SubtitleLabel";
+        _subtitleLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        _subtitleLabel.VerticalAlignment = VerticalAlignment.Center;
+        _subtitleLabel.AnchorLeft = 0.5f;
+        _subtitleLabel.AnchorRight = 0.5f;
+        _subtitleLabel.AnchorTop = 0.5f;
+        _subtitleLabel.AnchorBottom = 0.5f;
+        _subtitleLabel.OffsetLeft = -300;
+        _subtitleLabel.OffsetRight = 300;
+        _subtitleLabel.OffsetTop = 200;
+        _subtitleLabel.OffsetBottom = 250;
+        _subtitleLabel.Modulate = Colors.Transparent;
+        _subtitleLabel.AddThemeColorOverride("font_color", Colors.White);
+        _subtitleLabel.AddThemeFontSizeOverride("font_size", 28);
+        AddChild(_subtitleLabel);
 
         // Pause menu (assigned in editor)
         if (_pauseMenu != null)
@@ -2669,5 +2689,19 @@ public partial class HUD : Control
             if (_possessionWarningBar != null)
                 _possessionWarningBar.Value = progress * 100f;
         }
+    }
+
+    public void ShowSubtitle(string text, float duration)
+    {
+        if (_subtitleLabel == null) return;
+        _subtitleLabel.Text = text;
+        _subtitleLabel.Modulate = Colors.White;
+        if (_subtitleTween != null && _subtitleTween.IsValid())
+            _subtitleTween.Kill();
+        _subtitleTween = CreateTween();
+        _subtitleTween.TweenProperty(_subtitleLabel, "modulate:a", 1.0f, 0.2f);
+        _subtitleTween.TweenInterval(duration);
+        _subtitleTween.TweenProperty(_subtitleLabel, "modulate:a", 0.0f, 0.5f);
+        _subtitleTween.TweenCallback(Callable.From(() => _subtitleLabel.Text = ""));
     }
 }
