@@ -1,11 +1,11 @@
 shader_type spatial;
-render_mode cull_disabled, depth_draw_always, specular_disabled, ambient_light_disabled;
+render_mode cull_disabled, depth_draw_always, specular_disabled;
 
 uniform sampler2D albedo_tex : source_color, filter_nearest;
 uniform vec4 base_color : source_color = vec4(1.0);
 
 // ── Toon Ramp ──
-uniform vec4 color_shadow : source_color = vec4(0.15, 0.12, 0.22, 1.0);
+uniform vec4 color_shadow : source_color = vec4(0.4, 0.35, 0.5, 1.0);
 uniform vec4 color_mid    : source_color = vec4(0.55, 0.50, 0.65, 1.0);
 uniform vec4 color_lit    : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform float threshold_shadow : hint_range(-1.0, 1.0) = -0.2;

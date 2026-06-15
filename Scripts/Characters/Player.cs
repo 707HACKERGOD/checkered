@@ -358,7 +358,12 @@ public partial class Player : CharacterBody3D
                     if (collider is InteractableItem item)
                         itemTarget = item;
                     else if (collider is CharacterBody3D body)
-                        npcTarget = body.GetNodeOrNull<NpcInteraction>("Interaction");
+                    {
+                        var npcInteract = body.GetNodeOrNull<NpcInteraction>("Interaction");
+                        // Only consider NPC if not in dialogue
+                        if (npcInteract != null && !npcInteract.IsInDialogue)
+                            npcTarget = npcInteract;
+                    }
                 }
             }
 

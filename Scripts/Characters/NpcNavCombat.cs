@@ -22,6 +22,9 @@ public partial class NpcNavCombat : Node
     private float _wanderTimer;
     private float _attackTimer;
 
+    private bool _inDialogue = false;
+    public bool IsInDialogue => _inDialogue;
+
     public override void _Ready()
     {
         _body = GetParent<CharacterBody3D>();
@@ -44,6 +47,26 @@ public partial class NpcNavCombat : Node
         if (_health.IsDead) return;
 
         float dt = (float)delta;
+
+        // ---- DIALOGUE MODE ----
+        if (_inDialogue && !_health.IsDead)
+        {
+            // Face player smoothly
+            if (_player != null)
+            {
+                Vector3 targetPos = new Vector3(_player.GlobalPosition.X, _body.GlobalPosition.Y, _player.GlobalPosition.Z);
+                Vector3 direction = (targetPos - _body.GlobalPosition).Normalized();
+                if (direction != Vector3.Zero)
+                {
+                    float targetYaw = Mathf.Atan2(direction.X, direction.Z);
+                    Vector3 rot = _body.Rotation;
+                    rot.Y = Mathf.LerpAngle(rot.Y, targetYaw, 10.0f * dt);
+                    _body.Rotation = rot;
+                }
+            }
+            _body.Velocity = Vector3.Zero;  // no movement
+            return;
+        }
 
         if (!_possessionActive)
         {
@@ -116,6 +139,29 @@ public partial class NpcNavCombat : Node
         _possessionActive = active;
         _attackTimer = 0f;
         if (!active && !_health.IsDead)   // return to wandering only if alive
+            PickWanderTarget();
+    }
+
+    public void StartDialogue()
+    {
+        if (_health.IsDead) return;
+        if (_inDialogue) return;
+        _inDialogue = true;
+        // Stop movement
+        if (_navAgent != null)
+            _navAgent.MaxSpeed = 0f;
+        // Cancel current navigation
+        _navAgent?.SetNewTarget(_body.GlobalPosition);
+    }
+
+    public void EndDialogue()
+    {
+        if (!_inDialogue) return;
+        _inDialogue = false;
+        if (_navAgent != null)
+            _navAgent.MaxSpeed = ChaseSpeed;
+        // Resume wandering if not possessed and not dead
+        if (!_possessionActive && !_health.IsDead)
             PickWanderTarget();
     }
 }
