@@ -38,15 +38,17 @@ Demo:
 - ✅ Debug menu
 - ✅ NPC aggressive and desensive behavior
 - ✅ Possession system
+- ✅ Sanity system (control over districts)
+- ✅ Open world map with 2 key buildings in demo: roadhouse, trade school
+- ✅ Dialogue UI
+- ✅ Intro story
+- 🚧 Calendar UI
+- 🚧 5 NPCs in the first demo: Barkeeper, Rich truant, Phantom, Base_F, Base_M
 - 🚧 Sounds and music
 - 🚧 Animation and movement system: idle, walk, sprint, jump, crouch, crawl, turning around, climb, swim
-- 🚧 Sanity system (control over districts)
-- 🚧 5 NPCs in the first demo: Barkeeper, Rich truant, Phantom, Base_F, Base_M
-- 🚧 Dialogue UI
-- 🚧 Calendar UI
-- 🚧 Open world map with 2 key buildings in demo: cafe, trade school
-- Intro story
-- Saving and loading
+- 🚧 Crafting system version 1: a list of presets; 3-deep menu for lattice manipulation on every material for the presets + on every material of the 2 buildings
+- 🚧 Saving and loading
+- Mind's Eye mode: predict monster's behavior and plan ahead
 
 Future plans:
 
