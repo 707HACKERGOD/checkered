@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://35jmxu4b7v8v"
+path="res://.godot/imported/friendly_f_3 - Part_4.ogg-760259f73beb1d69ffb1565ea0788deb.oggvorbisstr"
+
+[deps]
+
+source_file="res://Assets/Audio/Voice_lines/Friendly_F_ESFP/friendly_f_3 - Part_4.ogg"
+dest_files=["res://.godot/imported/friendly_f_3 - Part_4.ogg-760259f73beb1d69ffb1565ea0788deb.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

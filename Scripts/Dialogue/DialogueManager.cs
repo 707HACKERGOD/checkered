@@ -7,8 +7,9 @@ public partial class DialogueManager : Node
     public static DialogueManager Instance { get; private set; }
     private DialogueUI _ui;
 
+    [Signal] public delegate void DialogueEndedEventHandler();
+
     private Node3D _currentNpc;
-    private Node3D _currentLinearNpc;
     private string _currentTreeId;
     private string _currentNodeId;
     private DialogueNode _currentNode;
@@ -19,15 +20,13 @@ public partial class DialogueManager : Node
     private float _maxDistance = 10f;
     private string _nextNodeAfterAuto = null;
 
-    public bool IsDialogueActive => _currentNpc != null || _currentLinearNpc != null;
+    public bool IsDialogueActive => _currentNpc != null;
 
     private List<DialogueResponse> _originalResponses;
 
     public override void _Ready()
     {
         Instance = this;
-        
-        // NEW: build all branching trees from pure data
         Dialogues.RegisterAllTrees();
 
         _ui = new DialogueUI();
@@ -39,67 +38,16 @@ public partial class DialogueManager : Node
         AddChild(_distanceTimer);
     }
 
-    // LINEAR DIALOGUE
-    public void StartDialogue(string npcId, TimePeriod time, Node3D npc)
+    // UNIFIED: Single entry point for ALL dialogue
+    public void StartDialogue(string npcId, TimePeriod time, Node3D npc, float maxDistance = 10f, float totalTimeout = 60f)
     {
-        if (_currentLinearNpc != null && _currentLinearNpc != npc)
-        {
-            var oldInteraction = _currentLinearNpc.GetNodeOrNull<NpcInteraction>("Interaction");
-            oldInteraction?.ForceEndDialogue();
-        }
-
         if (_currentNpc != null)
         {
             ResetDialogueSystem();
-        }
-
-        _ui.DialogueClosed -= OnLinearDialogueClosed;
-        _ui.DialogueClosed += OnLinearDialogueClosed;
-        _currentLinearNpc = npc;
-
-        if (_ui == null) return;
-
-        List<string> lines;
-        if (Dialogues.TimeBased.TryGetValue(npcId, out var timeMap) && timeMap.TryGetValue(time, out var timeLines))
-        {
-            lines = timeLines;
-        }
-        else if (Dialogues.Fallback.TryGetValue(npcId, out var fallbackLines))
-        {
-            lines = fallbackLines;
-        }
-        else
-        {
-            lines = new() { "Hello." };
-        }
-
-        _ui.ShowDialogue(lines);
-    }
-
-    // BRANCHING DIALOGUE
-    // NEW: takes treeId (e.g. "kendall") instead of startNodeId, looks up the tree
-    public void StartBranchingDialogue(string treeId, Node3D npc, float maxDistance = 10f, float totalTimeout = 60f)
-    {
-        if (!Dialogues.BranchingTrees.TryGetValue(treeId, out var tree))
-        {
-            GD.PushError($"Dialogue tree '{treeId}' not found!");
-            return;
-        }
-
-        if (_currentNpc != null)
-        {
-            ResetDialogueSystem();
-        }
-
-        if (_currentLinearNpc != null)
-        {
-            var oldInteraction = _currentLinearNpc.GetNodeOrNull<NpcInteraction>("Interaction");
-            oldInteraction?.ForceEndDialogue();
-            _currentLinearNpc = null;
         }
 
         _currentNpc = npc;
-        _currentTreeId = treeId;
+        _currentTreeId = npcId;
         _maxDistance = maxDistance;
         _nextNodeAfterAuto = null;
         _repeatInserted = false;
@@ -114,15 +62,16 @@ public partial class DialogueManager : Node
 
         _distanceTimer.Start();
 
-        // NEW: every tree must have an "intro" or "start" node, or we look for treeId + "_intro1"
-        string startNode = tree.ContainsKey($"{treeId}_intro1") ? $"{treeId}_intro1" : $"{treeId}_start";
-        ShowNode(treeId, startNode);
-    }
+        // All NPCs have branching trees now
+        if (!Dialogues.BranchingTrees.TryGetValue(npcId, out var tree))
+        {
+            GD.PushError($"No dialogue tree found for NPC '{npcId}'");
+            EndDialogue();
+            return;
+        }
 
-    private void OnLinearDialogueClosed()
-    {
-        _ui.DialogueClosed -= OnLinearDialogueClosed;
-        _currentLinearNpc = null;
+        string startNode = tree.ContainsKey($"{npcId}_intro1") ? $"{npcId}_intro1" : $"{npcId}_start";
+        ShowNode(npcId, startNode);
     }
 
     private void ShowNode(string treeId, string nodeId)
@@ -136,7 +85,6 @@ public partial class DialogueManager : Node
             return;
         }
 
-        // NEW: generic time-text injection, no hardcoded IDs
         if (node.InjectTimeText && Dialogues.TimeBased.TryGetValue(treeId, out var timeMap))
         {
             TimePeriod currentTime = TimeManager.Instance?.CurrentPeriod ?? TimePeriod.MORNING;
@@ -144,10 +92,55 @@ public partial class DialogueManager : Node
             {
                 node.Text = lines[node.TimeTextIndex];
             }
+            else
+            {
+                // Skip empty node — advance to next if dummy auto, else end
+                string nextNodeId = node.Responses.Count > 0 ? node.Responses[0].NextNodeId : null;
+                if (!string.IsNullOrEmpty(nextNodeId))
+                {
+                    ShowNode(treeId, nextNodeId);
+                }
+                else
+                {
+                    EndDialogue();
+                }
+                return;
+            }
         }
 
         _currentNodeId = nodeId;
         _currentNode = node;
+
+        // VOICE
+        string audioPath = null;
+
+        if (node.InjectTimeText)
+        {
+            if (Dialogues.NpcVoiceProfiles.TryGetValue(treeId, out var profile))
+            {
+                TimePeriod currentTime = TimeManager.Instance?.CurrentPeriod ?? TimePeriod.MORNING;
+                int basePart = currentTime switch
+                {
+                    TimePeriod.MORNING   => 1,
+                    TimePeriod.AFTERNOON => 3,
+                    TimePeriod.EVENING   => 5,
+                    TimePeriod.NIGHT     => 7,
+                    _ => 1
+                };
+                int partNumber = basePart + node.TimeTextIndex;
+                string autoKey = VoiceLibrary.MakeAutoKey(profile.FilePrefix, partNumber);
+                audioPath = VoiceLibrary.ResolveAutoKey(autoKey);
+            }
+        }
+        else if (!string.IsNullOrEmpty(node.VoicePhraseKey))
+        {
+            audioPath = VoiceLibrary.ResolveAutoKey(node.VoicePhraseKey);
+        }
+
+        if (!string.IsNullOrEmpty(audioPath))
+        {
+            VoiceManager.Instance?.PlayVoice(audioPath);
+        }
 
         bool isDummyAuto = node.Responses.Count == 1 && string.IsNullOrEmpty(node.Responses[0].Text);
         if (isDummyAuto)
@@ -204,7 +197,6 @@ public partial class DialogueManager : Node
 
         var currentResponses = _ui.GetCurrentResponses();
 
-        // Check if repeat option was chosen
         if (index < currentResponses.Count && currentResponses[index].Text == "Sorry, what did you ask?")
         {
             var withoutRepeat = currentResponses.Where(r => r.Text != "Sorry, what did you ask?").ToList();
@@ -261,6 +253,8 @@ public partial class DialogueManager : Node
 
     private void EndDialogue()
     {
+        VoiceManager.Instance?.StopVoice();
+
         _distanceTimer.Stop();
         _totalTimeoutTimer?.Stop();
         _repeatTimer?.Stop();
@@ -269,15 +263,7 @@ public partial class DialogueManager : Node
         if (_currentNpc != null)
         {
             var interaction = _currentNpc.GetNodeOrNull<NpcInteraction>("Interaction");
-            interaction?.ForceEndDialogue();
             _currentNpc = null;
-        }
-
-        if (_currentLinearNpc != null)
-        {
-            var interaction = _currentLinearNpc.GetNodeOrNull<NpcInteraction>("Interaction");
-            interaction?.ForceEndDialogue();
-            _currentLinearNpc = null;
         }
 
         _currentTreeId = null;
@@ -286,12 +272,16 @@ public partial class DialogueManager : Node
         _nextNodeAfterAuto = null;
         _repeatInserted = false;
         _originalResponses = null;
+
+        EmitSignal(SignalName.DialogueEnded);
     }
 
     public DialogueUI GetUI() => _ui;
 
     private void ResetDialogueSystem()
     {
+        VoiceManager.Instance?.StopVoice();
+
         _distanceTimer?.Stop();
         _totalTimeoutTimer?.Stop();
         _repeatTimer?.Stop();
@@ -311,18 +301,13 @@ public partial class DialogueManager : Node
             _currentNpc = null;
         }
 
-        if (_currentLinearNpc != null)
-        {
-            var oldInteraction = _currentLinearNpc.GetNodeOrNull<NpcInteraction>("Interaction");
-            oldInteraction?.ForceEndDialogue();
-            _currentLinearNpc = null;
-        }
-
         _currentTreeId = null;
         _currentNode = null;
         _currentNodeId = null;
         _nextNodeAfterAuto = null;
         _repeatInserted = false;
         _originalResponses = null;
+
+        EmitSignal(SignalName.DialogueEnded);  // NEW
     }
 }

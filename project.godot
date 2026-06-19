@@ -20,6 +20,10 @@ config/features=PackedStringArray("4.6", "C#", "GL Compatibility")
 run/max_fps=120
 config/icon="res://icon.svg"
 
+[audio]
+
+buses/default_bus_layout="uid://wtl0i6kiy7tw"
+
 [autoload]
 
 GameState="*uid://da45shqjt7ivt"
@@ -28,6 +32,7 @@ WeatherManager="*uid://de7y7qmr4if0n"
 SanityCycle="*res://Scripts/Systems/SanityCycle.cs"
 WorldMapManager="*uid://bubai10gqlqt6"
 DialogueManager="*uid://dw5ui73ebnv6j"
+VoiceManager="*uid://yu0nk5kv8pto"
 
 [dialogue_manager]
 

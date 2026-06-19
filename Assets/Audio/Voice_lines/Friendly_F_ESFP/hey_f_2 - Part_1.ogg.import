@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://2qepheno0ite"
+path="res://.godot/imported/hey_f_2 - Part_1.ogg-d93a512e30da5332804b459b298f3dd2.oggvorbisstr"
+
+[deps]
+
+source_file="res://Assets/Audio/Voice_lines/Friendly_F_ESFP/hey_f_2 - Part_1.ogg"
+dest_files=["res://.godot/imported/hey_f_2 - Part_1.ogg-d93a512e30da5332804b459b298f3dd2.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

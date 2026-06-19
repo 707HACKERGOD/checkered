@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://qn3krajm2lba"
+path="res://.godot/imported/intro - Part_10.ogg-c15afb9f3252ab7d318a822228465d35.oggvorbisstr"
+
+[deps]
+
+source_file="res://Assets/Audio/Voice_lines/intro/intro - Part_10.ogg"
+dest_files=["res://.godot/imported/intro - Part_10.ogg-c15afb9f3252ab7d318a822228465d35.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

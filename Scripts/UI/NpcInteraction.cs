@@ -8,7 +8,6 @@ public partial class NpcInteraction : Node
     public bool IsInDialogue { get; private set; }
 
     private NpcController _npcController;
-    private DialogueUI _subscribedUI;
 
     public override void _Ready()
     {
@@ -37,24 +36,13 @@ public partial class NpcInteraction : Node
             string npcId = NpcName.Trim().ToLower();
             var npcNode = GetParent<Node3D>();
 
-            if (npcId == "kendall")
-            {
-                // NEW: pass tree ID, not raw node ID. Manager finds intro/start automatically.
-                DialogueManager.Instance.StartBranchingDialogue("kendall", npcNode, 10f, 60f);
-            }
-            else
-            {
-                TimePeriod currentTime = TimeManager.Instance?.CurrentPeriod ?? TimePeriod.AFTERNOON;
-                DialogueManager.Instance.StartDialogue(npcId, currentTime, npcNode);
-            }
+            // UNIFIED: All NPCs use StartDialogue now
+            TimePeriod currentTime = TimeManager.Instance?.CurrentPeriod ?? TimePeriod.AFTERNOON;
+            DialogueManager.Instance.StartDialogue(npcId, currentTime, npcNode);
 
-            _subscribedUI = DialogueManager.Instance.GetUI();
-
-            if (_subscribedUI != null)
-            {
-                _subscribedUI.DialogueClosed -= OnDialogueClosed;
-                _subscribedUI.DialogueClosed += OnDialogueClosed;
-            }
+            // Subscribe to DialogueManager's end event instead of UI signal
+            DialogueManager.Instance.DialogueEnded -= OnDialogueEnded;
+            DialogueManager.Instance.DialogueEnded += OnDialogueEnded;
         }
         else
         {
@@ -62,16 +50,12 @@ public partial class NpcInteraction : Node
         }
     }
 
-    private void OnDialogueClosed()
+    private void OnDialogueEnded()
     {
         IsInDialogue = false;
         NavCombat?.EndDialogue();
 
-        if (_subscribedUI != null)
-        {
-            _subscribedUI.DialogueClosed -= OnDialogueClosed;
-            _subscribedUI = null;
-        }
+        DialogueManager.Instance.DialogueEnded -= OnDialogueEnded;
     }
 
     public void ForceEndDialogue()
@@ -82,10 +66,6 @@ public partial class NpcInteraction : Node
             NavCombat?.EndDialogue();
         }
 
-        if (_subscribedUI != null)
-        {
-            _subscribedUI.DialogueClosed -= OnDialogueClosed;
-            _subscribedUI = null;
-        }
+        DialogueManager.Instance.DialogueEnded -= OnDialogueEnded;
     }
 }

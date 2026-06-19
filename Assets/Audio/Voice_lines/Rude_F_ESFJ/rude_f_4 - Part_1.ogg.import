@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://bmvfwnfmjge4o"
+path="res://.godot/imported/rude_f_4 - Part_1.ogg-d0afaad084a1ffc3c3e30c559a066e22.oggvorbisstr"
+
+[deps]
+
+source_file="res://Assets/Audio/Voice_lines/Rude_F_ESFJ/rude_f_4 - Part_1.ogg"
+dest_files=["res://.godot/imported/rude_f_4 - Part_1.ogg-d0afaad084a1ffc3c3e30c559a066e22.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

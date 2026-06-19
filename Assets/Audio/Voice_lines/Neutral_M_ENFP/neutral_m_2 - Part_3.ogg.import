@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://bgcsimwb21rfx"
+path="res://.godot/imported/neutral_m_2 - Part_3.ogg-ab076123b6027aef2e55daf29f02b504.oggvorbisstr"
+
+[deps]
+
+source_file="res://Assets/Audio/Voice_lines/Neutral_M_ENFP/neutral_m_2 - Part_3.ogg"
+dest_files=["res://.godot/imported/neutral_m_2 - Part_3.ogg-ab076123b6027aef2e55daf29f02b504.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

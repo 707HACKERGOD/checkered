@@ -34,21 +34,72 @@ Demo:
 - ✅ Weather system that's fully tied to a wind vector
 - ✅ 4 seasons with different day lengths, special effects and sky colors
 - ✅ Inventory UI, picking up items
-- ✅ Combat and health system with limb health
+- 🚧 Combat and health system with limb health
+        ✅ you fight NPCs
+        ✅ can kill NPCs
+        🚧 NPCs fight back
 - ✅ Debug menu
 - ✅ NPC aggressive and desensive behavior
 - ✅ Possession system
-- ✅ Sanity system (control over districts)
-- ✅ Open world map with 2 key buildings in demo: roadhouse, trade school
-- ✅ Dialogue UI
-- ✅ Intro story
+- 🚧 Sanity system (control over districts)
+        ✅ detection of districts
+        ✅ debug sanity controls
+        🚧 gameplay
+- 🚧 Open world map with 2 key buildings in demo: roadhouse, trade school
+        ✅ measuring scale, drawing the 2D map, installing plugin
+        🚧 making textures library for ground painting
+        - painting elevation+textures
+        - painting highways
+        - modeling lamps and foliage
+        - adding lamps and 3d roads
+        - adding trees and foliage
+        - adding water
+        - blocking out buildings
+        - polishing the roadhouse building
+        - polishing the college building
+        - more polishing in general
+        - recreating the pinterest references 1-to-1
+- 🚧 Dialogue UI
+        ✅ linear dialogue
+        ✅ conditional dialogue
+        ✅ branching dialogue
+        🚧 persistent memory
+        🚧 polishing UI to differentiate between MC and NPC; progress ring
+        🚧 writing dialogue for the main 2 characters
+- 🚧 Intro story
+        - leaving the woods, newspaper
+        - truant's quest
+        - Kimo's personality test
 - 🚧 Calendar UI
+        - clone from old demo
+        - add key character weeks
 - 🚧 5 NPCs in the first demo: Barkeeper, Rich truant, Phantom, Base_F, Base_M
 - 🚧 Sounds and music
+        - footsteps for everyone
+        - UI
+        - ambient rain, snow, strorm, seasonal
+        - a jingle at game start
+        - ambient horror sounds when sanity changes/possession cycles
+        - ambient sounds in different locations (bar music, waves at beach)
 - 🚧 Animation and movement system: idle, walk, sprint, jump, crouch, crawl, turning around, climb, swim
+        - basic state machine
+        - IK and smooth merging
+        - combat integration
 - 🚧 Crafting system version 1: a list of presets; 3-deep menu for lattice manipulation on every material for the presets + on every material of the 2 buildings
+        - UI on a wall
+        - apply to all 3d materials
+        - apply to items
+        - allow combining items
 - 🚧 Saving and loading
+        - remember time
+        - remember sanity, health, etc
+        - remember dialogue
+        - remember inventory
+        - remember items
+        - remember 3d objects
 - Mind's Eye mode: predict monster's behavior and plan ahead
+        - the UI and visuals
+        - slow down time and clone MC into a transparent phantom with special visuals
 
 Future plans:
 
