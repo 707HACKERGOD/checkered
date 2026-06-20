@@ -66,21 +66,10 @@ public partial class AnimationController : Node
         bool onFloor = _player.IsOnFloor();
         string desired = _currentState;
 
-        // Turn trigger
-        if (Input.IsActionJustPressed("turn_180") && onFloor && speed < 0.1f)
-        {
-            desired = STATE_TURN;
-            float turnLen = _animPlayer?.GetAnimation("turn180Right")?.Length ?? 0.5f;
-            _turnResetTimer.Start(turnLen);
-        }
-        else if (_currentState == STATE_TURN && _turnResetTimer.TimeLeft > 0)
-        {
-            desired = STATE_TURN;
-        }
         // Run trigger
         // FIX: Removed 'onFloor' and lowered threshold to 0.1f. 
         // This stops the engine from switching to Idle if velocity fluctuates or you step on a tiny bump.
-        else if (speed > 0.1f)
+        if (speed > 0.1f)
         {
             desired = STATE_RUN;
         }
