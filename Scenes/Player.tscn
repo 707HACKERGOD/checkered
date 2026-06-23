@@ -11,6 +11,7 @@
 [ext_resource type="Shader" uid="uid://stkia4iiwmm4" path="res://Assets/Player_model/toon_shader_uv_shifting.gdshader" id="8_avx33"]
 [ext_resource type="Script" uid="uid://bxerjk20hgn6k" path="res://Scenes/FootprintSpawner.cs" id="9_megsn"]
 [ext_resource type="Texture2D" uid="uid://cjwpec6g0cwfo" path="res://Assets/Player_model/Syl_syl_texture.png" id="9_rxg2u"]
+[ext_resource type="Script" uid="uid://i3npv2ppwpsp" path="res://Scripts/Characters/MeleeHitbox.cs" id="10_rxg2u"]
 [ext_resource type="PackedScene" uid="uid://ck7bcwxsjem3a" path="res://Assets/FootprintDecal.tscn" id="10_yoq75"]
 [ext_resource type="AudioStream" uid="uid://cyycmyol7cxys" path="res://Assets/Audio/Footsteps/footstep_snow_1.wav" id="11_i2e8t"]
 [ext_resource type="Script" uid="uid://d26r58iysjfev" path="res://Scripts/Effects/RainAudio.cs" id="11_ksbbd"]
@@ -211,7 +212,7 @@ metadata/extras = {
 "targetNames": ["Blink"]
 }
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_c43xd"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_xixlo"]
 render_priority = 0
 shader = ExtResource("8_avx33")
 shader_parameter/eye_uv_offset = Vector2(-0.0021820506, -0.003337256)
@@ -334,6 +335,9 @@ _surfaces = [{
 "vertex_data": PackedByteArray("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")
 }]
 blend_shape_mode = 0
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wija4"]
+size = Vector3(0.3, 0.3, 0.3)
 
 [sub_resource type="Animation" id="Animation_bc5ux"]
 resource_name = "idle"
@@ -1487,12 +1491,13 @@ graph_offset = Vector2(-105.57075, 0)
 height = 1.8172607
 radius = 2.008789
 
-[node name="Player" type="CharacterBody3D" unique_id=434817830 node_paths=PackedStringArray("PlayerCamera") groups=["Player"]]
+[node name="Player" type="CharacterBody3D" unique_id=434817830 node_paths=PackedStringArray("_rightHandHitbox", "PlayerCamera") groups=["Player"]]
 collision_mask = 3
 floor_constant_speed = true
 floor_max_angle = 1.2217305
 floor_snap_length = 0.3
 script = ExtResource("1_rpqav")
+_rightHandHitbox = NodePath("Syl/char_grp/rig/Skeleton3D/BoneAttachment3D/RightHandHitbox")
 PlayerCamera = NodePath("CameraGimbal/InnerGimbal/SpringArm/Camera")
 
 [node name="Inventory" type="Node" parent="." unique_id=731108639]
@@ -1763,7 +1768,7 @@ layers = 8
 mesh = SubResource("ArrayMesh_wcyqe")
 skin = SubResource("Skin_b3yxv")
 blend_shapes/Blink = 0.0
-surface_material_override/1 = SubResource("ShaderMaterial_c43xd")
+surface_material_override/1 = SubResource("ShaderMaterial_xixlo")
 
 [node name="left arm" type="MeshInstance3D" parent="Syl/char_grp/rig/Skeleton3D" unique_id=248775095]
 layers = 8
@@ -1789,6 +1794,17 @@ skin = SubResource("Skin_b3yxv")
 layers = 8
 mesh = SubResource("ArrayMesh_f3hf5")
 skin = SubResource("Skin_b3yxv")
+
+[node name="BoneAttachment3D" type="BoneAttachment3D" parent="Syl/char_grp/rig/Skeleton3D" unique_id=1781847985]
+transform = Transform3D(-0.1343008, -0.19600551, -0.9713624, -0.20683804, -0.9531067, 0.22091939, -0.9691134, 0.2305844, 0.08746165, -0.2266799, 0.79598397, 0.05736464)
+bone_name = "hand.r"
+bone_idx = 10
+
+[node name="RightHandHitbox" type="Area3D" parent="Syl/char_grp/rig/Skeleton3D/BoneAttachment3D" unique_id=466042545]
+script = ExtResource("10_rxg2u")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Syl/char_grp/rig/Skeleton3D/BoneAttachment3D/RightHandHitbox" unique_id=1598468239]
+shape = SubResource("BoxShape3D_wija4")
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="Syl" unique_id=830341027]
 libraries/ = SubResource("AnimationLibrary_lhhof")

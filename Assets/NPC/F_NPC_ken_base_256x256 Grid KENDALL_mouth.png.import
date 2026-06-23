@@ -4,9 +4,8 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://clkyi31wmddo"
 path.s3tc="res://.godot/imported/F_NPC_ken_base_256x256 Grid KENDALL_mouth.png-5a70e187126a52dcf80c5abdad33f9b3.s3tc.ctex"
-path.etc2="res://.godot/imported/F_NPC_ken_base_256x256 Grid KENDALL_mouth.png-5a70e187126a52dcf80c5abdad33f9b3.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"imported_formats": ["s3tc_bptc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -16,7 +15,7 @@ generator_parameters={
 [deps]
 
 source_file="res://Assets/NPC/F_NPC_ken_base_256x256 Grid KENDALL_mouth.png"
-dest_files=["res://.godot/imported/F_NPC_ken_base_256x256 Grid KENDALL_mouth.png-5a70e187126a52dcf80c5abdad33f9b3.s3tc.ctex", "res://.godot/imported/F_NPC_ken_base_256x256 Grid KENDALL_mouth.png-5a70e187126a52dcf80c5abdad33f9b3.etc2.ctex"]
+dest_files=["res://.godot/imported/F_NPC_ken_base_256x256 Grid KENDALL_mouth.png-5a70e187126a52dcf80c5abdad33f9b3.s3tc.ctex"]
 
 [params]
 

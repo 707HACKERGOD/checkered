@@ -20,16 +20,18 @@ collision_mask = 3
 script = ExtResource("1_0wweb")
 
 [node name="ModelRoot" type="Node3D" parent="." unique_id=129137055]
+transform = Transform3D(1.0000015, 0, 2.9802322e-08, 0, 1, 0, -2.9802322e-08, 0, 1.0000015, 0, 0, 0)
 
 [node name="EyeTrackerComponent" type="Node" parent="." unique_id=27164503]
 process_priority = 1
 script = ExtResource("1_w88vc")
 
 [node name="VisionArea" type="Area3D" parent="." unique_id=285309370]
+transform = Transform3D(1.0000015, 0, 2.9802322e-08, 0, 1, 0, -2.9802322e-08, 0, 1.0000015, 0, 0, 0)
 collision_layer = 0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="VisionArea" unique_id=1170269770]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8944702, 1.6525831)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8944702, -1.5300951)
 shape = ExtResource("4_j56hr")
 
 [node name="Interaction" type="Node" parent="." unique_id=1520865618]
@@ -65,7 +67,7 @@ script = ExtResource("7_amnef")
 LimbName = "RightLeg"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1646066617]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+transform = Transform3D(1.0000015, 0, 2.9802322e-08, 0, 1, 0, -2.9802322e-08, 0, 1.0000015, 0, 0.8, 0)
 shape = SubResource("CapsuleShape3D_j5xvs")
 
 [node name="NavAgentNPC" type="NavigationAgent3D" parent="." unique_id=458111228]

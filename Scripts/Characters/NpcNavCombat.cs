@@ -13,9 +13,10 @@ public partial class NpcNavCombat : Node
     [Export] public float WanderRadius = 10.0f;
     [Export] public float WanderInterval = 3.0f;
     [Export] public float FleeHealthFraction = 0.5f;
+    [Export] public bool FacesPositiveZ = false; // Match this with NavAgentNPC!
 
-    private NavAgentNPC _navAgent;          // sibling NavigationAgent3D
-    private CharacterBody3D _body;          // root CharacterBody3D
+    private NavAgentNPC _navAgent;          
+    private CharacterBody3D _body;          
     private Health _health;
     private Node3D _player;
     private bool _possessionActive;
@@ -56,21 +57,28 @@ public partial class NpcNavCombat : Node
         if (_health.IsDead || _inDialogue) return;
         float dt = (float)delta;
 
-        // Handle stun
         if (_isStunned)
         {
             _stunTimer -= dt;
             if (_stunTimer <= 0) _isStunned = false;
             _navAgent.MaxSpeed = 0;
-            return; // Can't act while stunned
+            return; 
         }
 
-        // Flee logic
+        if (!_possessionActive)
+        {
+            _wanderTimer -= dt;
+            if (_wanderTimer <= 0f)
+            {
+                PickWanderTarget();
+                _wanderTimer = WanderInterval;
+            }
+            return;   
+        }
+
         if ((_health.CurrentHealth / _health.MaxHealth) < FleeHealthFraction || _hasCalledForHelp)
         {
             FleeFromPlayer();
-            
-            // Call for help if not done already
             if (!_hasCalledForHelp)
             {
                 _hasCalledForHelp = true;
@@ -79,53 +87,6 @@ public partial class NpcNavCombat : Node
             return;
         }
 
-        // Chase logic
-        _navAgent.SetNewTarget(_player.GlobalPosition);
-        _navAgent.MaxSpeed = ChaseSpeed;
-
-        if (_body.GlobalPosition.DistanceTo(_player.GlobalPosition) < AttackRange)
-        {
-            _attackTimer -= dt;
-            if (_attackTimer <= 0f)
-            {
-                _attackTimer = AttackCooldown;
-                PerformWildHaymaker();
-            }
-        }
-
-        // ---- DIALOGUE MODE ----
-        if (_inDialogue && !_health.IsDead)
-        {
-            // Face player smoothly
-            if (_player != null)
-            {
-                Vector3 targetPos = new Vector3(_player.GlobalPosition.X, _body.GlobalPosition.Y, _player.GlobalPosition.Z);
-                Vector3 direction = (targetPos - _body.GlobalPosition).Normalized();
-                if (direction != Vector3.Zero)
-                {
-                    float targetYaw = Mathf.Atan2(direction.X, direction.Z);
-                    Vector3 rot = _body.Rotation;
-                    rot.Y = Mathf.LerpAngle(rot.Y, targetYaw, 10.0f * dt);
-                    _body.Rotation = rot;
-                }
-            }
-            _body.Velocity = Vector3.Zero;  // no movement
-            return;
-        }
-
-        if (!_possessionActive)
-        {
-            // Wander, ignore player
-            _wanderTimer -= dt;
-            if (_wanderTimer <= 0f)
-            {
-                PickWanderTarget();
-                _wanderTimer = WanderInterval;
-            }
-            return;   // NavAgentNPC handles movement
-        }
-
-        // ---- Possession active – choose behaviour ----
         switch (Persona)
         {
             case AiPersona.Strong:
@@ -155,8 +116,7 @@ public partial class NpcNavCombat : Node
             if (_attackTimer <= 0f)
             {
                 _attackTimer = AttackCooldown;
-                GD.Print($"[{Name}] Attacks player!");   // placeholder
-                // TODO: add actual combat move like pushback or punch animation
+                PerformWildHaymaker();
             }
         }
     }
@@ -166,12 +126,12 @@ public partial class NpcNavCombat : Node
         if (_player == null) return;
         Vector3 away = (_body.GlobalPosition - _player.GlobalPosition).Normalized();
         _navAgent.SetNewTarget(_body.GlobalPosition + away * FleeDistance);
-        _navAgent.MaxSpeed = ChaseSpeed;   // could be a faster flee speed
+        _navAgent.MaxSpeed = ChaseSpeed;   
     }
 
     private void PickWanderTarget()
     {
-        if (_health.IsDead) return;   // never wander when dead
+        if (_health.IsDead) return;   
         float angle = (float)GD.RandRange(0, Mathf.Tau);
         float dist = (float)GD.RandRange(WanderRadius * 0.5f, WanderRadius);
         Vector3 destination = _body.GlobalPosition + new Vector3(Mathf.Cos(angle) * dist, 0, Mathf.Sin(angle) * dist);
@@ -183,19 +143,15 @@ public partial class NpcNavCombat : Node
     {
         _possessionActive = active;
         _attackTimer = 0f;
-        if (!active && !_health.IsDead)   // return to wandering only if alive
+        if (!active && !_health.IsDead)   
             PickWanderTarget();
     }
 
     public void StartDialogue()
     {
-        if (_health.IsDead) return;
-        if (_inDialogue) return;
+        if (_health.IsDead || _inDialogue) return;
         _inDialogue = true;
-        // Stop movement
-        if (_navAgent != null)
-            _navAgent.MaxSpeed = 0f;
-        // Cancel current navigation
+        if (_navAgent != null) _navAgent.MaxSpeed = 0f;
         _navAgent?.SetNewTarget(_body.GlobalPosition);
     }
 
@@ -203,28 +159,53 @@ public partial class NpcNavCombat : Node
     {
         if (!_inDialogue) return;
         _inDialogue = false;
-        if (_navAgent != null)
-            _navAgent.MaxSpeed = ChaseSpeed;
-        // Resume wandering if not possessed and not dead
-        if (!_possessionActive && !_health.IsDead)
-            PickWanderTarget();
+        if (_navAgent != null) _navAgent.MaxSpeed = ChaseSpeed;
+        if (!_possessionActive && !_health.IsDead) PickWanderTarget();
+    }
+
+        private MeleeHitbox _npcMeleeHitbox; // Now set dynamically by NpcController
+
+    public void SetHitbox(MeleeHitbox hitbox)
+    {
+        _npcMeleeHitbox = hitbox;
     }
 
     private void PerformWildHaymaker()
     {
-        // Telegraph heavily. Play "haymaker_windup" anim.
-        // After 0.5s windup (handled via animation or timer), activate NPC's own MeleeHitbox
         GD.Print("NPC swings wildly!");
-        // Face the player exactly
         Vector3 dir = (_player.GlobalPosition - _body.GlobalPosition).Normalized();
         _body.Rotation = new Vector3(0, Mathf.Atan2(-dir.X, -dir.Z), 0);
+
+        // If the NPC has a real hitbox assigned, use it!
+        if (_npcMeleeHitbox != null)
+        {
+            _npcMeleeHitbox.StartSwing(ItemRegistry.GetWeapon(ImpactType.Fist));
+        }
+        else
+        {
+            // Fallback to distance check if hitbox failed to generate
+            float dist = _body.GlobalPosition.DistanceTo(_player.GlobalPosition);
+            if (dist <= AttackRange + 0.5f)
+            {
+                var playerHealth = _player.GetNodeOrNull<Health>("Health");
+                if (playerHealth != null && !playerHealth.IsDead)
+                {
+                    playerHealth.TakeDamage(10f, "Torso");
+                    var player = _player as CharacterBody3D;
+                    if (player != null)
+                    {
+                        Vector3 knockback = (_player.GlobalPosition - _body.GlobalPosition).Normalized();
+                        knockback.Y = 0;
+                        player.Velocity = new Vector3(player.Velocity.X + knockback.X * 4.0f, player.Velocity.Y, player.Velocity.Z + knockback.Z * 4.0f);
+                    }
+                }
+            }
+        }
     }
 
     private void CallForHelp()
     {
         GD.Print("NPC shouts for help!");
-        // Play shout animation
-        // Find nearby neutral NPCs and set their persona to Strong/Aggressive
         foreach (Node node in GetTree().GetNodesInGroup("NPC"))
         {
             if (node is CharacterBody3D npc && npc != _body)
@@ -234,7 +215,7 @@ public partial class NpcNavCombat : Node
                     var combat = npc.GetNodeOrNull<NpcNavCombat>("NPCNavCombat");
                     if (combat != null && combat.Persona == AiPersona.Neutral)
                     {
-                        combat.Persona = AiPersona.Strong; // Aggro nearby allies
+                        combat.Persona = AiPersona.Strong; 
                     }
                 }
             }

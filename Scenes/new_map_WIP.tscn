@@ -16,13 +16,13 @@
 [ext_resource type="Shader" uid="uid://cpbai2v77xg6l" path="res://Shaders/RainSplash.gdshader" id="10_d7a5k"]
 [ext_resource type="PackedScene" uid="uid://3s82rtv51ye2" path="res://Scenes/Player.tscn" id="11_ko5c8"]
 [ext_resource type="AudioStream" uid="uid://cyycmyol7cxys" path="res://Assets/Audio/Footsteps/footstep_snow_1.wav" id="12_chq35"]
-[ext_resource type="Shader" uid="uid://stkia4iiwmm4" path="res://Assets/Player_model/toon_shader_uv_shifting.gdshader" id="13_kt8ql"]
 [ext_resource type="Script" uid="uid://550ivwfkjtg8" path="res://Scripts/Tools/FoliageGenerator.cs" id="14_hfj0m"]
-[ext_resource type="Texture2D" uid="uid://cjwpec6g0cwfo" path="res://Assets/Player_model/Syl_syl_texture.png" id="14_qchq1"]
 [ext_resource type="ArrayMesh" uid="uid://kehnlnekp6q0" path="res://Assets/leaf_pile_leaves_1_arraymesh.tres" id="15_f4jq8"]
 [ext_resource type="QuadMesh" uid="uid://cxygfn82cbf3i" path="res://Assets/Leaf_1_mesh.tres" id="16_db4tn"]
 [ext_resource type="Shader" uid="uid://cwl3kyigrfbx6" path="res://Shaders/PS1Effect.gdshader" id="17_ajnu1"]
 [ext_resource type="Script" uid="uid://cckeuxicr7u61" path="res://Scenes/PostProcessController.cs" id="18_fppd4"]
+[ext_resource type="Shader" uid="uid://stkia4iiwmm4" path="res://Assets/Player_model/toon_shader_uv_shifting.gdshader" id="18_hfj0m"]
+[ext_resource type="Texture2D" uid="uid://cjwpec6g0cwfo" path="res://Assets/Player_model/Syl_syl_texture.png" id="19_f4jq8"]
 [ext_resource type="PackedScene" uid="uid://d3r85210kwu82" path="res://Scenes/HUD.tscn" id="19_lqiye"]
 [ext_resource type="PackedScene" uid="uid://bj7m52qir620q" path="res://Assets/npc.tscn" id="20_d7a5k"]
 [ext_resource type="Script" uid="uid://yjbssitadmo4" path="res://Scripts/UI/MobileUIController.cs" id="20_tfna0"]
@@ -34,7 +34,7 @@
 [ext_resource type="Script" uid="uid://7l0p6rasi8nd" path="res://Scripts/ItemSpawner.cs" id="32_hfj0m"]
 [ext_resource type="Script" uid="uid://dikvxhxmhitk0" path="res://Scripts/InteractableItem.cs" id="33_f4jq8"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_hfj0m"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_db4tn"]
 render_priority = 0
 shader = ExtResource("1_wbcdy")
 shader_parameter/shallow_color = Color(0, 0.45, 0.55, 0.8)
@@ -57,7 +57,7 @@ shader_parameter/specular = 0.8
 shader_parameter/beers_law = 4.0
 shader_parameter/depth_offset = 0.0
 
-[sub_resource type="PlaneMesh" id="PlaneMesh_f4jq8"]
+[sub_resource type="PlaneMesh" id="PlaneMesh_ajnu1"]
 size = Vector2(1792, 1024)
 subdivide_width = 100
 subdivide_depth = 100
@@ -265,11 +265,11 @@ particles_anim_loop = false
 material = SubResource("StandardMaterial3D_5lhkp")
 size = Vector2(0.05, 0.05)
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_db4tn"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_fppd4"]
 render_priority = 0
-shader = ExtResource("13_kt8ql")
+shader = ExtResource("18_hfj0m")
 shader_parameter/eye_uv_offset = Vector2(0.02, -0.0007675902)
-shader_parameter/albedo_tex = ExtResource("14_qchq1")
+shader_parameter/albedo_tex = ExtResource("19_f4jq8")
 shader_parameter/base_color = Color(1, 1, 1, 1)
 shader_parameter/color_shadow = Color(0.15, 0.12, 0.22, 1)
 shader_parameter/color_mid = Color(1, 1, 1, 1)
@@ -308,8 +308,8 @@ shader_parameter/vignette_intensity = 0.5
 
 [node name="Water" type="MeshInstance3D" parent="." unique_id=245575964]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 530, 1, 760)
-material_override = SubResource("ShaderMaterial_hfj0m")
-mesh = SubResource("PlaneMesh_f4jq8")
+material_override = SubResource("ShaderMaterial_db4tn")
+mesh = SubResource("PlaneMesh_ajnu1")
 script = ExtResource("2_hk1nl")
 Terrain3DPath = NodePath("../NavigationRegion3D/Terrain3D")
 ShaderPath = "res://Shaders/terrain3d_water.gdshader"
@@ -491,12 +491,18 @@ bones/30/rotation = Quaternion(-0.7431296, 0.15495679, 0.64988476, -0.037371803)
 bones/31/rotation = Quaternion(9.135388e-09, -0.12952448, -7.31035e-09, 0.99157625)
 
 [node name="head" parent="Player/Syl/char_grp/rig/Skeleton3D" index="1" unique_id=1619293818]
-surface_material_override/1 = SubResource("ShaderMaterial_db4tn")
+surface_material_override/1 = SubResource("ShaderMaterial_fppd4")
+
+[node name="BoneAttachment3D" parent="Player/Syl/char_grp/rig/Skeleton3D" index="7" unique_id=1781847985]
+transform = Transform3D(-0.14006333, -0.18798679, -0.9721332, -0.19561338, -0.9572068, 0.21328409, -0.9706272, 0.2200356, 0.09729697, -0.22751327, 0.800308, 0.055088907)
 
 [node name="NPC" parent="." unique_id=1191281047 instance=ExtResource("20_d7a5k")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 491.65262, 16.988266, 774.7813)
 ModelResource = ExtResource("21_d7a5k")
 DisplayName = "Kendall"
+
+[node name="CollisionShape3D" parent="NPC" index="5" unique_id=1646066617]
+transform = Transform3D(1.0000015, 0, 2.9802322e-08, 0, 1, 0, -2.9802322e-08, 0, 1.0000015, 0, 0.79999924, 0)
 
 [node name="NPC2" parent="." unique_id=252977576 instance=ExtResource("20_d7a5k")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 475.4874, 18.308575, 802.5872)

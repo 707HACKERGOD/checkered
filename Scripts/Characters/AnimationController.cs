@@ -8,11 +8,11 @@ public partial class AnimationController : Node
     private AnimationPlayer _animPlayer;
     private AnimationNodeStateMachinePlayback _stateMachine;
     private Timer _turnResetTimer;
-    
+
     private const string STATE_IDLE = "idle";
     private const string STATE_RUN = "run";
     private const string STATE_TURN = "turn";
-    
+
     private string _currentState = STATE_IDLE;
 
     public override void _Ready()
@@ -22,13 +22,15 @@ public partial class AnimationController : Node
 
         _animTree = _player.GetNode<AnimationTree>("AnimationTree");
         if (_animTree == null) return;
-        
+
         _animTree.Active = true;
         _stateMachine = (AnimationNodeStateMachinePlayback)_animTree.Get("parameters/playback");
-        
+
         _animPlayer = _player.GetNode<AnimationPlayer>("Syl/AnimationPlayer");
         if (_animPlayer != null)
         {
+            StripBlendShapeTracks();
+
             if (_animPlayer.HasAnimation("idle"))
                 _animPlayer.GetAnimation("idle").LoopMode = Animation.LoopModeEnum.Linear;
             if (_animPlayer.HasAnimation("run"))
@@ -39,21 +41,42 @@ public partial class AnimationController : Node
 
         _turnResetTimer = new Timer();
         _turnResetTimer.OneShot = true;
+        _turnResetTimer.Timeout += () => TravelToState(STATE_IDLE);
         AddChild(_turnResetTimer);
-        
+
         TravelToState(STATE_IDLE);
+    }
+
+    /// <summary>
+    /// Removes all BlendShape tracks from every animation.
+    /// Fixes: "Index p_blend_shape = 0 is out of bounds (blend_shape_tracks.size() = 0)"
+    /// </summary>
+    private void StripBlendShapeTracks()
+    {
+        if (_animPlayer == null) return;
+
+        string[] animNames = _animPlayer.GetAnimationList();
+        foreach (string animName in animNames)
+        {
+            Animation anim = _animPlayer.GetAnimation(animName);
+            if (anim == null) continue;
+
+            for (int i = anim.GetTrackCount() - 1; i >= 0; i--)
+            {
+                // ★ FIX: Use BlendShape, NOT TypeBlendShape
+                if (anim.TrackGetType(i) == Animation.TrackType.BlendShape)
+                {
+                    anim.RemoveTrack(i);
+                }
+            }
+        }
     }
 
     private void TravelToState(string newState)
     {
         if (newState == _currentState) return;
-        
-        // DEBUGGER: This will tell us EXACTLY why it snaps! 
-        // If this prints rapidly, your velocity is dropping. If it doesn't print but still snaps, your AnimationTree settings are wrong.
-        //GD.Print($"Changing State: {_currentState} -> {newState} | Current Speed: {new Vector3(_player.Velocity.X, 0, _player.Velocity.Z).Length()}");
-        
         _stateMachine.Travel(newState);
-        _currentState = newState; 
+        _currentState = newState;
     }
 
     public override void _PhysicsProcess(double delta)
@@ -62,22 +85,14 @@ public partial class AnimationController : Node
 
         Vector3 horizontalVelocity = new Vector3(_player.Velocity.X, 0, _player.Velocity.Z);
         float speed = horizontalVelocity.Length();
-        
-        bool onFloor = _player.IsOnFloor();
-        string desired = _currentState;
 
-        // Run trigger
-        // FIX: Removed 'onFloor' and lowered threshold to 0.1f. 
-        // This stops the engine from switching to Idle if velocity fluctuates or you step on a tiny bump.
-        if (speed > 0.1f)
-        {
-            desired = STATE_RUN;
-        }
-        else
-        {
-            desired = STATE_IDLE;
-        }
-
+        string desired = speed > 0.1f ? STATE_RUN : STATE_IDLE;
         TravelToState(desired);
+    }
+
+    public void PlayTurnAnimation()
+    {
+        TravelToState(STATE_TURN);
+        _turnResetTimer.Start(0.5f);
     }
 }

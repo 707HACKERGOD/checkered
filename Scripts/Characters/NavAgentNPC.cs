@@ -1,12 +1,15 @@
 using Godot;
+
 public partial class NavAgentNPC : NavigationAgent3D
 {
     [Export] public float MoveSpeed = 3.0f;
     [Export] public float TurnSpeed = 10.0f;
+    [Export] public bool FacesPositiveZ = false; // Set to false if your model faces -Z (Godot standard)
 
     [Export] public Vector3 KnockbackVelocity;
 
     private CharacterBody3D _owner;
+    private float _gravity = ProjectSettings.GetSetting("physics/3d/default_gravity").AsSingle();
 
     public override void _Ready()
     {
@@ -19,36 +22,57 @@ public partial class NavAgentNPC : NavigationAgent3D
     public override void _PhysicsProcess(double delta)
     {
         if (_owner == null) return;
-        if (IsNavigationFinished()) return;
+        float dt = (float)delta;
+        Vector3 velocity = _owner.Velocity;
 
-        Vector3 nextPos = GetNextPathPosition();
-        Vector3 dir = _owner.GlobalPosition.DirectionTo(nextPos);
-        _owner.Velocity = new Vector3(dir.X * MoveSpeed, _owner.Velocity.Y, dir.Z * MoveSpeed);
+        // FIX: APPLY GRAVITY! This stops them from flying away on stairs/slopes.
+        if (!_owner.IsOnFloor())
+        {
+            velocity.Y -= _gravity * dt;
+        }
+
+        if (KnockbackVelocity.LengthSquared() > 0.01f)
+        {
+            velocity.X = KnockbackVelocity.X;
+            velocity.Z = KnockbackVelocity.Z;
+            KnockbackVelocity = KnockbackVelocity.Lerp(Vector3.Zero, dt * 5f);
+        }
+        else if (!IsNavigationFinished())
+        {
+            Vector3 nextPos = GetNextPathPosition();
+            Vector3 dir = _owner.GlobalPosition.DirectionTo(nextPos);
+            velocity.X = dir.X * MoveSpeed;
+            velocity.Z = dir.Z * MoveSpeed;
+        }
+        else
+        {
+            velocity.X = 0;
+            velocity.Z = 0;
+        }
+
+        _owner.Velocity = velocity;
         _owner.MoveAndSlide();
 
         // Smooth rotation
-        Vector3 hv = new Vector3(_owner.Velocity.X, 0, _owner.Velocity.Z);
+        Vector3 hv = new Vector3(velocity.X, 0, velocity.Z);
         if (hv.Length() > 0.1f)
         {
             Vector3 moveDir = hv.Normalized();
-            Vector3 forward = _owner.GlobalTransform.Basis.Z;
-            float angle = forward.AngleTo(moveDir);
-            if (angle > 0.001f)
-            {
-                float turn = TurnSpeed * (float)delta;
-                float fraction = Mathf.Clamp(turn / angle, 0f, 1f);
-                _owner.Quaternion = _owner.Quaternion.Slerp(new Quaternion(Vector3.Back, moveDir), fraction);
-            }
-        }
-
-        if (KnockbackVelocity.Length() > 0.1f)
-        {
-            _owner.Velocity = KnockbackVelocity;
-            _owner.MoveAndSlide();
-            KnockbackVelocity = KnockbackVelocity.Lerp(Vector3.Zero, (float)delta * 5f);
-            return;
+            // FIX: Dynamic Atan2 based on which way the model faces
+            float targetYaw = FacesPositiveZ 
+                ? Mathf.Atan2(moveDir.X, moveDir.Z) 
+                : Mathf.Atan2(-moveDir.X, -moveDir.Z);
+                
+            float currentYaw = _owner.Rotation.Y;
+            _owner.Rotation = new Vector3(0, Mathf.LerpAngle(currentYaw, targetYaw, TurnSpeed * dt), 0);
         }
     }
 
     public void SetNewTarget(Vector3 destination) => TargetPosition = destination;
+
+    public void ApplyKnockback(Vector3 direction, float force)
+    {
+        direction.Y = 0.3f; 
+        KnockbackVelocity = direction.Normalized() * force;
+    }
 }

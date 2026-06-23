@@ -46,6 +46,9 @@ public class ItemData
     public float? KnockbackForce { get; set; }
     public float? HitstopDuration { get; set; }
     public float? CameraShake { get; set; }
+    public float? StumbleDuration { get; set; }
+    public float? AttackCooldown { get; set; }
+    public float? AttackRange { get; set; }
     public ImpactType? ImpactType { get; set; }
     public float? SwingRadius { get; set; }
 
@@ -64,7 +67,9 @@ public class ItemData
         Physics = physics;
     }
 
-    public ItemData AsWeapon(float damage, ImpactType impact, float knockback, float hitstop, float shake, float radius)
+    public ItemData AsWeapon(float damage, ImpactType impact, float knockback,
+        float hitstop, float shake, float radius,
+        float stumbleDuration = 0.3f, float attackCooldown = 0.4f, float attackRange = 1.5f)
     {
         Damage = damage;
         KnockbackForce = knockback;
@@ -72,6 +77,9 @@ public class ItemData
         CameraShake = shake;
         ImpactType = impact;
         SwingRadius = radius;
+        StumbleDuration = stumbleDuration;
+        AttackCooldown = attackCooldown;
+        AttackRange = attackRange;
         return this;
     }
 }
@@ -102,7 +110,6 @@ public static class ItemRegistry
 
     static ItemRegistry()
     {
-        // --- WEAPONS (only 3) ---
         RegisterItem(new ItemData(0, "Fist", "FI",
             ItemProperty.Blunt,
             new MaterialPhysics(LatticeType.Amorphous, 0f, 0f, 0f))
@@ -112,7 +119,10 @@ public static class ItemRegistry
                 knockback: 2f,
                 hitstop: 0.04f,
                 shake: 0.05f,
-                radius: 0.6f
+                radius: 0.6f,
+                stumbleDuration: 0.2f,
+                attackCooldown: 0.3f,
+                attackRange: 0.8f
             ));
 
         RegisterItem(new ItemData(1, "Pipe", "PI",
@@ -124,7 +134,10 @@ public static class ItemRegistry
                 knockback: 5f,
                 hitstop: 0.06f,
                 shake: 0.12f,
-                radius: 0.9f
+                radius: 0.9f,
+                stumbleDuration: 0.3f,
+                attackCooldown: 0.4f,
+                attackRange: 1.2f
             ));
 
         RegisterItem(new ItemData(2, "Chair", "CH",
@@ -136,10 +149,12 @@ public static class ItemRegistry
                 knockback: 8f,
                 hitstop: 0.1f,
                 shake: 0.2f,
-                radius: 1.2f
+                radius: 1.2f,
+                stumbleDuration: 0.5f,
+                attackCooldown: 0.6f,
+                attackRange: 1.5f
             ));
 
-        // --- NON-WEAPON ITEMS (start from ID 100 to keep weapons at 0-2) ---
         RegisterItem(new ItemData(100, "Cloth Rag", "CL",
             ItemProperty.Cloth | ItemProperty.Flammable,
             new MaterialPhysics(LatticeType.Amorphous, 200f, 100f, 300f)));
@@ -193,7 +208,6 @@ public static class ItemRegistry
         return Items[ItemKeys[randomIndex]];
     }
 
-    // Helper to get a weapon by impact type
     public static ItemData GetWeapon(ImpactType type)
     {
         foreach (var item in Items.Values)

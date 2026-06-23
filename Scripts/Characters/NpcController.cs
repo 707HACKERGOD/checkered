@@ -16,18 +16,12 @@ public partial class NpcController : CharacterBody3D
     private NpcEyeTracker _eyeTracker;
     private Area3D _visionArea;
 
-    // reaction control
-
-    private CharacterBody3D _body;
-    private NpcController _npcController;
-    
     // Stumble state
     private bool _isStumbling = false;
     private Vector3 _stumbleVelocity;
     private float _stumbleTimer;
 
     // --- BONE NAME MAPS ---
-    // ARP_GLTB = standard GLTF export names (what you actually see)
     private static readonly (string limb, string arpGltf, string mixamo, Shape3D shape)[] BoneMap = new (string, string, string, Shape3D)[]
     {
         ("Head",      "spine.006",           "mixamorig_Head",        new SphereShape3D   { Radius = 0.1f }),
@@ -54,6 +48,8 @@ public partial class NpcController : CharacterBody3D
         { "RightLeg", "right leg" }
     };
 
+    [Signal] public delegate void HitReceivedEventHandler(float damage, string limb);
+
     public override void _Ready()
     {
         if (!IsInGroup("NPC"))
@@ -70,6 +66,9 @@ public partial class NpcController : CharacterBody3D
             {
                 _detectedRig = DetectRigType(skeleton);
                 GD.Print($"NpcController: Detected rig type = {_detectedRig}");
+                
+                // Setup the hitbox on the right hand
+                SetupDynamicHitbox(skeleton);
 
                 var simulator = skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator3D")
                     ?? skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator");
@@ -85,11 +84,14 @@ public partial class NpcController : CharacterBody3D
             {
                 modelRoot.AddChild(model);
                 var animPlayer = model.FindChild("AnimationPlayer", recursive: true) as AnimationPlayer;
+                StripBlendShapeTracks(animPlayer);
                 if (animPlayer != null && animPlayer.HasAnimation("idle"))
                     animPlayer.Play("idle");
             }
             else
+            {
                 GD.PrintErr("NpcController: missing ModelRoot child");
+            }
         }
 
         if (OverrideShape != null)
@@ -125,6 +127,7 @@ public partial class NpcController : CharacterBody3D
             health.Died += () =>
             {
                 IsDead = true;
+                _isStumbling = false; // Stop any active stumble
 
                 var navAgent = GetNodeOrNull<NavigationAgent3D>("NavAgentNPC");
                 if (navAgent != null)
@@ -185,25 +188,139 @@ public partial class NpcController : CharacterBody3D
             _visionArea.BodyEntered += OnBodyEntered;
             _visionArea.BodyExited += OnBodyExited;
         }
+    }
 
-        //reaction control
+    // --- HIT REACTION ---
 
-        _body = GetParent<CharacterBody3D>();
-        _npcController = _body.GetNodeOrNull<NpcController>(".");
+    public void ApplyHit(ItemData weapon, Vector3 knockbackDir, string limb)
+    {
+        if (IsDead) return;
+
+        var navAgent = GetNodeOrNull<NavAgentNPC>("NavAgentNPC");
+        if (navAgent != null)
+        {
+            float force = weapon?.KnockbackForce ?? 5f;
+            navAgent.ApplyKnockback(knockbackDir, force);
+        }
+
+        StartStumble(knockbackDir, weapon?.StumbleDuration ?? 0.3f);
+        EmitSignal(SignalName.HitReceived, weapon?.Damage ?? 10f, limb);
+    }
+
+    private void StartStumble(Vector3 direction, float duration)
+    {
+        if (_isStumbling) return;
+        _isStumbling = true;
+        _stumbleVelocity = direction * 2.0f;
+        _stumbleTimer = duration;
+    }
+
+    private float _gravity = ProjectSettings.GetSetting("physics/3d/default_gravity").AsSingle();
+
+    public override void _PhysicsProcess(double delta)
+    {
+        if (IsDead) return;
+        if (!_isStumbling) return;
+
+        float dt = (float)delta;
+        Vector3 velocity = Velocity;
+
+        if (!IsOnFloor())
+        {
+            velocity.Y -= _gravity * dt;
+        }
+
+        if (_stumbleVelocity.LengthSquared() > 0.01f)
+        {
+            var spaceState = GetWorld3D().DirectSpaceState;
+            var query = PhysicsRayQueryParameters3D.Create(
+                GlobalPosition,
+                GlobalPosition + (_stumbleVelocity.Normalized() * 0.5f),
+                1u 
+            );
+            var result = spaceState.IntersectRay(query);
+
+            if (result.Count > 0)
+            {
+                _stumbleVelocity = Vector3.Zero;
+                _stumbleTimer = Mathf.Max(_stumbleTimer, 1.0f);
+            }
+        }
+
+        Velocity = new Vector3(_stumbleVelocity.X, velocity.Y, _stumbleVelocity.Z);
+        MoveAndSlide();
+        _stumbleVelocity = _stumbleVelocity.Lerp(Vector3.Zero, dt * 8f);
+        _stumbleTimer -= dt;
+
+        if (_stumbleTimer <= 0f)
+        {
+            _isStumbling = false;
+            _stumbleVelocity = Vector3.Zero;
+        }
+    }
+
+    // --- RAGDOLL ---
+
+    public void ActivateRagdoll(Vector3 impulse)
+    {
+        if (IsDead) return;
+
+        IsDead = true;
+        _isStumbling = false;
+
+        var navAgent = GetNodeOrNull<NavigationAgent3D>("NavAgentNPC");
+        if (navAgent != null)
+        {
+            navAgent.MaxSpeed = 0f;
+            navAgent.AvoidanceEnabled = false;
+        }
+
+        var combat = GetNodeOrNull<Node>("NPCNavCombat");
+        if (combat != null) combat.SetProcess(false);
+
+        var modelRoot = GetNodeOrNull<Node3D>("ModelRoot");
+        if (modelRoot != null)
+        {
+            var model = modelRoot.GetChild(0);
+            if (model != null)
+            {
+                var animPlayer = model.FindChild("AnimationPlayer", recursive: true) as AnimationPlayer;
+                if (animPlayer != null) animPlayer.Active = false;
+
+                var skeleton = FindChildOfTypeRecursive<Skeleton3D>(model);
+                if (skeleton != null)
+                {
+                    skeleton.ResetBonePoses();
+
+                    var simulator = skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator3D")
+                        ?? skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator");
+                    if (simulator != null)
+                    {
+                        simulator.Active = true;
+                        simulator.PhysicalBonesStartSimulation();
+
+                        foreach (var child in simulator.GetChildren())
+                        {
+                            if (child is PhysicalBone3D bone)
+                                bone.ApplyCentralImpulse(impulse);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // --- RIG DETECTION ---
+
     private RigType DetectRigType(Skeleton3D skeleton)
     {
         var allNames = new List<string>();
         for (int i = 0; i < skeleton.GetBoneCount(); i++)
             allNames.Add(skeleton.GetBoneName(i));
 
-        // ARP GLTF export: spine.001, spine.002, upper_arm.L, forearm.L, etc.
         bool hasArpGltf = allNames.Any(n => n.StartsWith("spine.") && n.Contains("."))
             && allNames.Any(n => n.EndsWith(".L") || n.EndsWith(".R"));
 
-        // Mixamo
         bool hasMixamo = allNames.Any(n => n.Contains("mixamorig"));
 
         if (hasArpGltf && !hasMixamo) return RigType.ARP_GLTB;
@@ -212,7 +329,6 @@ public partial class NpcController : CharacterBody3D
         return RigType.Unknown;
     }
 
-    // --- RESOLVE BONE NAME ---
     private string ResolveBoneName(string arpGltfName, string mixamoName)
     {
         return _detectedRig switch
@@ -223,6 +339,8 @@ public partial class NpcController : CharacterBody3D
         };
     }
 
+    // --- LIMB COLLIDERS ---
+
     private void SetupLimbColliders(Skeleton3D skeleton)
     {
         foreach (var (limbName, arpGltfBone, mixamoBone, shape) in BoneMap)
@@ -232,11 +350,10 @@ public partial class NpcController : CharacterBody3D
 
             if (boneIdx == -1)
             {
-                // Fuzzy fallback
                 string searchTerm = _detectedRig == RigType.ARP_GLTB
                     ? arpGltfBone.Replace(".L", "").Replace(".R", "").Replace(".", "")
                     : mixamoBone.Replace("mixamorig_", "").Replace("Left", "").Replace("Right", "");
-                
+
                 for (int i = 0; i < skeleton.GetBoneCount(); i++)
                 {
                     string candidate = skeleton.GetBoneName(i).ToLower();
@@ -282,16 +399,7 @@ public partial class NpcController : CharacterBody3D
         }
     }
 
-    private T FindChildOfTypeRecursive<T>(Node node) where T : class
-    {
-        if (node is T t) return t;
-        foreach (Node child in node.GetChildren())
-        {
-            var found = FindChildOfTypeRecursive<T>(child);
-            if (found != null) return found;
-        }
-        return null;
-    }
+    // --- VISION ---
 
     private void OnBodyEntered(Node3D body)
     {
@@ -303,6 +411,19 @@ public partial class NpcController : CharacterBody3D
     {
         if (body == _eyeTracker?.Target)
             _eyeTracker.Target = null;
+    }
+
+    // --- UTILITIES ---
+
+    private T FindChildOfTypeRecursive<T>(Node node) where T : class
+    {
+        if (node is T t) return t;
+        foreach (Node child in node.GetChildren())
+        {
+            var found = FindChildOfTypeRecursive<T>(child);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     private MeshInstance3D FindBestFaceMesh(Node startNode)
@@ -351,131 +472,79 @@ public partial class NpcController : CharacterBody3D
         return list;
     }
 
-
-    public void ApplyHit(ItemData weapon, Vector3 direction, string limb)
+    private void StripBlendShapeTracks(AnimationPlayer animPlayer)
     {
-        if (_npcController.IsDead) return;
-
-        float knockback = weapon.KnockbackForce ?? 5f;
-        _stumbleVelocity = direction * knockback;
-        
-        if (weapon.ImpactType == null) return;
-        switch (weapon.ImpactType.Value)
+        if (animPlayer == null) return;
+        string[] animNames = animPlayer.GetAnimationList();
+        foreach (string animName in animNames)
         {
-            case ImpactType.Fist:
-                _stumbleTimer = 0.3f;
-                // Play anim: "stagger_back"
-                break;
-            case ImpactType.Pipe:
-                _stumbleTimer = 0.6f;
-                _stumbleVelocity += Vector3.Up * 2f; // Pop them up a bit
-                // Play anim: "spin_fall"
-                break;
-            case ImpactType.Chair:
-                _stumbleTimer = 1.0f;
-                TriggerRagdoll(direction * knockback * 2f);
-                return; // Skip normal stumble, go straight to physics
-        }
-        
-        _isStumbling = true;
-        // Interrupt AI
-        var combat = _body.GetNodeOrNull<NpcNavCombat>("NPCNavCombat");
-        if (combat != null) combat.SetStunned(_stumbleTimer);
-    }
+            Animation anim = animPlayer.GetAnimation(animName);
+            if (anim == null) continue;
 
-    public override void _PhysicsProcess(double delta)
-    {
-        if (!_isStumbling || _npcController.IsDead) return;
-
-        float dt = (float)delta;
-        _stumbleTimer -= dt;
-        
-        if (_stumbleTimer <= 0)
-        {
-            _isStumbling = false;
-            return;
-        }
-
-        // Apply gravity
-        _stumbleVelocity.Y -= 9.8f * dt;
-
-        // Check for walls to lean on!
-        var spaceState = _body.GetWorld3D().DirectSpaceState;
-        var query = PhysicsRayQueryParameters3D.Create(
-            _body.GlobalPosition, 
-            _body.GlobalPosition + (_stumbleVelocity.Normalized() * 0.5f),
-            1 // Environment collision mask
-        );
-        var result = spaceState.IntersectRay(query);
-        
-        if (result.Count > 0)
-        {
-            // Hit a wall! Lean on it instead of sliding through
-            _stumbleVelocity = Vector3.Zero;
-            _stumbleTimer = Mathf.Max(_stumbleTimer, 1.0f); // Extend timer to "pin" them to wall
-            // Play anim: "wall_lean"
-            GD.Print("NPC pinned to wall!");
-        }
-
-        _body.Velocity = _stumbleVelocity;
-        _body.MoveAndSlide();
-    }
-
-    private void TriggerRagdoll(Vector3 impulse)
-    {
-        // Use your existing PhysicalBoneSimulator3D logic from NpcController
-        // Apply impulse to the bone that was hit!
-        _npcController.ActivateRagdoll(impulse);
-    }
-
-    public void ActivateRagdoll(Vector3 impulse)
-    {
-        if (IsDead) return;
-        
-        // Stop AI
-        var navAgent = GetNodeOrNull<NavigationAgent3D>("NavAgentNPC");
-        if (navAgent != null)
-        {
-            navAgent.MaxSpeed = 0f;
-            navAgent.AvoidanceEnabled = false;
-        }
-
-        var combat = GetNodeOrNull<Node>("NPCNavCombat");
-        if (combat != null) combat.SetProcess(false);
-
-        // Stop animations
-        var modelRoot = GetNodeOrNull<Node3D>("ModelRoot");
-        if (modelRoot != null)
-        {
-            var model = modelRoot.GetChild(0);
-            if (model != null)
+            for (int i = anim.GetTrackCount() - 1; i >= 0; i--)
             {
-                var animPlayer = model.FindChild("AnimationPlayer", recursive: true) as AnimationPlayer;
-                if (animPlayer != null) animPlayer.Active = false;
-
-                var skeleton = FindChildOfTypeRecursive<Skeleton3D>(model);
-                if (skeleton != null)
+                if (anim.TrackGetType(i) == Animation.TrackType.BlendShape)
                 {
-                    skeleton.ResetBonePoses();
-
-                    var simulator = skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator3D")
-                        ?? skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator");
-                    if (simulator != null)
-                    {
-                        simulator.Active = true;
-                        simulator.PhysicalBonesStartSimulation();
-                        
-                        // Apply impulse to physical bones
-                        foreach (var child in simulator.GetChildren())
-                        {
-                            if (child is PhysicalBone3D bone)
-                            {
-                                bone.ApplyCentralImpulse(impulse);
-                            }
-                        }
-                    }
+                    anim.TrackSetEnabled(i, false); 
                 }
             }
+        }
+    }
+
+    private void SetupDynamicHitbox(Skeleton3D skeleton)
+    {
+        string[] possibleNames = { "hand.R", "RightHand", "mixamorig_RightHand", "hand_R", "Right_ForeArm" };
+        int boneIdx = -1;
+        string boneName = "";
+
+        foreach (var name in possibleNames)
+        {
+            boneIdx = skeleton.FindBone(name);
+            if (boneIdx != -1)
+            {
+                boneName = name;
+                break;
+            }
+        }
+
+        if (boneIdx == -1)
+        {
+            for (int i = 0; i < skeleton.GetBoneCount(); i++)
+            {
+                string bn = skeleton.GetBoneName(i).ToLower();
+                if (bn.Contains("hand") && (bn.Contains(".r") || bn.Contains("right")))
+                {
+                    boneIdx = i;
+                    boneName = skeleton.GetBoneName(i);
+                    break;
+                }
+            }
+        }
+
+        if (boneIdx != -1)
+        {
+            var attachment = new BoneAttachment3D();
+            attachment.Name = "RightHandAttachment";
+            attachment.BoneName = boneName;
+            skeleton.AddChild(attachment);
+
+            var hitbox = new MeleeHitbox();
+            hitbox.Name = "NPCHitbox";
+            attachment.AddChild(hitbox);
+
+            var coll = new CollisionShape3D();
+            coll.Shape = new BoxShape3D { Size = new Vector3(0.4f, 0.4f, 0.4f) };
+            hitbox.AddChild(coll);
+
+            var combat = GetNodeOrNull<NpcNavCombat>("NPCNavCombat");
+            if (combat != null)
+            {
+                combat.SetHitbox(hitbox);
+            }
+        }
+        else
+        {
+            GD.PrintErr("NpcController: Could not find a right hand bone to attach the hitbox!");
         }
     }
 }

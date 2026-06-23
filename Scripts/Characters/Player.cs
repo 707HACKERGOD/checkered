@@ -117,6 +117,7 @@ public partial class Player : CharacterBody3D
             _stateMachine = (AnimationNodeStateMachinePlayback)_animTree.Get("parameters/playback");
 
             _animPlayer = GetNode<AnimationPlayer>("Syl/AnimationPlayer");
+            StripBlendShapeTracks(_animPlayer);
             if (_animPlayer != null)
             {
                 if (_animPlayer.HasAnimation("idle"))
@@ -608,39 +609,45 @@ public partial class Player : CharacterBody3D
         return HUD.Instance != null && HUD.Instance.IsPointInsideAnyMenu(startPos);
     }
 
-    public void PerformAttack()
-    {
-        // 1. Auto-Aim: Find nearest enemy within a 120-degree cone in front of player
-        Node3D nearestEnemy = FindNearestEnemy();
-        if (nearestEnemy != null)
+        public void PerformAttack()
         {
-            Vector3 dirToEnemy = (nearestEnemy.GlobalPosition - GlobalPosition).Normalized();
-            dirToEnemy.Y = 0;
-            float targetAngle = Mathf.Atan2(-dirToEnemy.X, -dirToEnemy.Z);
+            // 1. Auto-Aim: Find nearest enemy
+            Node3D nearestEnemy = FindNearestEnemy();
+            if (nearestEnemy != null)
+            {
+                Vector3 dirToEnemy = (nearestEnemy.GlobalPosition - GlobalPosition).Normalized();
+                dirToEnemy.Y = 0;
+                float targetAngle = Mathf.Atan2(-dirToEnemy.X, -dirToEnemy.Z); // -Z Forward
+                
+                // Snap rotation slightly toward enemy
+                Rotation = new Vector3(0, Mathf.LerpAngle(Rotation.Y, targetAngle, 0.5f), 0);
+            }
+
+            // 2. Trigger Animation
+            if (_animTree != null)
+            {
+                _animTree.Set("parameters/attack/request", (int)AnimationNodeOneShot.OneShotRequest.Fire);
+            }
+
+            // 3. FIX: Play Attack Sound!
+            if (_attackAudioPlayer != null && _attackSound != null)
+            {
+                _attackAudioPlayer.Stream = _attackSound;
+                _attackAudioPlayer.Play();
+            }
+
+            // 4. Trigger Hitbox directly instead of CallDeferred
+            EnableHitbox();
+        }
+
+        private async void EnableHitbox()
+        {
+            await ToSignal(GetTree().CreateTimer(0.1f), "timeout"); // Wait for wind-up
+            if (_rightHandHitbox != null) _rightHandHitbox.StartSwing(_currentWeapon);
             
-            // Snap rotation slightly toward enemy for forgiveness
-            Rotation = new Vector3(0, Mathf.LerpAngle(Rotation.Y, targetAngle, 0.5f), 0);
+            await ToSignal(GetTree().CreateTimer(0.2f), "timeout"); // Active frames duration
+            if (_rightHandHitbox != null) _rightHandHitbox.EndSwing();
         }
-
-        // 2. Trigger Animation (Assuming you have an Attack state in your AnimationTree)
-        if (_animTree != null)
-        {
-            _animTree.Set("parameters/attack/request", (int)AnimationNodeOneShot.OneShotRequest.Fire);
-        }
-
-        // 3. The AnimationTree will call EnableHitbox() during the swing via Animation Events
-        // For now, we can just trigger it manually with a slight delay to sync with the arm moving
-        CallDeferred("EnableHitbox");
-    }
-
-    private async void EnableHitbox()
-    {
-        await ToSignal(GetTree().CreateTimer(0.1f), "timeout"); // Wait for wind-up
-        if (_rightHandHitbox != null) _rightHandHitbox.StartSwing(_currentWeapon);
-        
-        await ToSignal(GetTree().CreateTimer(0.2f), "timeout"); // Active frames duration
-        if (_rightHandHitbox != null) _rightHandHitbox.EndSwing();
-    }
 
     private Node3D FindNearestEnemy()
     {
@@ -816,5 +823,25 @@ public partial class Player : CharacterBody3D
     public void EquipWeapon(ImpactType type)
     {
         _currentWeapon = ItemRegistry.GetWeapon(type);
+    }
+
+    private void StripBlendShapeTracks(AnimationPlayer animPlayer)
+    {
+        if (animPlayer == null) return;
+        string[] animNames = animPlayer.GetAnimationList();
+        foreach (string animName in animNames)
+        {
+            Animation anim = animPlayer.GetAnimation(animName);
+            if (anim == null) continue;
+
+            for (int i = anim.GetTrackCount() - 1; i >= 0; i--)
+            {
+                if (anim.TrackGetType(i) == Animation.TrackType.BlendShape)
+                {
+                    // Disabling is much safer and stops the engine error spam entirely
+                    anim.TrackSetEnabled(i, false); 
+                }
+            }
+        }
     }
 }
