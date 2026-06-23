@@ -1,22 +1,21 @@
 using Godot;
+using System;
 using System.Collections.Generic;
 
-// Add this enum near the top
 public enum LatticeType
 {
-    Amorphous,   // Glass, cloth, wood
+    Amorphous,
     SimpleCubic,
-    BCC,         // Body-Centered Cubic (iron)
-    FCC,         // Face-Centered Cubic (copper, aluminum)
-    Hexagonal    // Hexagonal Close-Packed (zinc)
+    BCC,
+    FCC,
+    Hexagonal
 }
 
-// Optional: a container for physics properties
 public class MaterialPhysics
 {
     public LatticeType Lattice { get; set; }
-    public float Enthalpy { get; set; }   // H – stored energy
-    public float Entropy { get; set; }    // S – disorder
+    public float Enthalpy { get; set; }
+    public float Entropy { get; set; }
     public float MeltingPoint { get; set; }
 
     public MaterialPhysics(LatticeType lattice, float enthalpy, float entropy, float meltingPoint)
@@ -28,6 +27,8 @@ public class MaterialPhysics
     }
 }
 
+public enum ImpactType { Fist, Pipe, Chair }
+
 public class ItemData
 {
     public int Id { get; set; }
@@ -38,11 +39,18 @@ public class ItemData
     public bool IsSolid { get; set; }
     public int Quantity { get; set; } = 1;
     public Dictionary<string, object> Modifiers { get; set; }
-
-    // --- NEW: Material physics ---
     public MaterialPhysics Physics { get; set; }
 
-    // Constructor updated to accept physics data (optional, defaults to null)
+    // Weapon stats (null if not a weapon)
+    public float? Damage { get; set; }
+    public float? KnockbackForce { get; set; }
+    public float? HitstopDuration { get; set; }
+    public float? CameraShake { get; set; }
+    public ImpactType? ImpactType { get; set; }
+    public float? SwingRadius { get; set; }
+
+    public bool IsWeapon => Damage.HasValue;
+
     public ItemData(int id, string name, string abbr, ItemProperty properties,
                     MaterialPhysics physics = null, bool isSolid = true)
     {
@@ -55,6 +63,36 @@ public class ItemData
         Modifiers = new Dictionary<string, object>();
         Physics = physics;
     }
+
+    public ItemData AsWeapon(float damage, ImpactType impact, float knockback, float hitstop, float shake, float radius)
+    {
+        Damage = damage;
+        KnockbackForce = knockback;
+        HitstopDuration = hitstop;
+        CameraShake = shake;
+        ImpactType = impact;
+        SwingRadius = radius;
+        return this;
+    }
+}
+
+[Flags]
+public enum ItemProperty : uint
+{
+    None = 0,
+    Cloth = 1 << 0,
+    Flammable = 1 << 1,
+    FireSource = 1 << 2,
+    Healing = 1 << 3,
+    Sharp = 1 << 4,
+    Handle = 1 << 5,
+    Metal = 1 << 6,
+    Container = 1 << 7,
+    Glass = 1 << 8,
+    Wood = 1 << 9,
+    Blunt = 1 << 10,
+    Rope = 1 << 11,
+    Conductive = 1 << 12,
 }
 
 public static class ItemRegistry
@@ -64,44 +102,81 @@ public static class ItemRegistry
 
     static ItemRegistry()
     {
-        // Now include physics data when registering items
-        RegisterItem(new ItemData(0, "Cloth Rag", "CL",
+        // --- WEAPONS (only 3) ---
+        RegisterItem(new ItemData(0, "Fist", "FI",
+            ItemProperty.Blunt,
+            new MaterialPhysics(LatticeType.Amorphous, 0f, 0f, 0f))
+            .AsWeapon(
+                damage: 10f,
+                impact: ImpactType.Fist,
+                knockback: 2f,
+                hitstop: 0.04f,
+                shake: 0.05f,
+                radius: 0.6f
+            ));
+
+        RegisterItem(new ItemData(1, "Pipe", "PI",
+            ItemProperty.Metal | ItemProperty.Blunt | ItemProperty.Handle,
+            new MaterialPhysics(LatticeType.FCC, 500f, 50f, 1500f))
+            .AsWeapon(
+                damage: 20f,
+                impact: ImpactType.Pipe,
+                knockback: 5f,
+                hitstop: 0.06f,
+                shake: 0.12f,
+                radius: 0.9f
+            ));
+
+        RegisterItem(new ItemData(2, "Chair", "CH",
+            ItemProperty.Wood | ItemProperty.Blunt,
+            new MaterialPhysics(LatticeType.Amorphous, 100f, 70f, 400f))
+            .AsWeapon(
+                damage: 35f,
+                impact: ImpactType.Chair,
+                knockback: 8f,
+                hitstop: 0.1f,
+                shake: 0.2f,
+                radius: 1.2f
+            ));
+
+        // --- NON-WEAPON ITEMS (start from ID 100 to keep weapons at 0-2) ---
+        RegisterItem(new ItemData(100, "Cloth Rag", "CL",
             ItemProperty.Cloth | ItemProperty.Flammable,
             new MaterialPhysics(LatticeType.Amorphous, 200f, 100f, 300f)));
 
-        RegisterItem(new ItemData(1, "Matches", "MA",
+        RegisterItem(new ItemData(101, "Matches", "MA",
             ItemProperty.FireSource | ItemProperty.Flammable,
             new MaterialPhysics(LatticeType.Amorphous, 400f, 150f, 200f)));
 
-        RegisterItem(new ItemData(2, "Bandage", "BA",
+        RegisterItem(new ItemData(102, "Bandage", "BA",
             ItemProperty.Cloth | ItemProperty.Healing,
             new MaterialPhysics(LatticeType.Amorphous, 100f, 80f, 250f)));
 
-        RegisterItem(new ItemData(3, "Newspaper", "NW",
+        RegisterItem(new ItemData(103, "Newspaper", "NW",
             ItemProperty.Flammable,
             new MaterialPhysics(LatticeType.Amorphous, 150f, 90f, 220f)));
 
-        RegisterItem(new ItemData(4, "Kitchen Knife", "KN",
+        RegisterItem(new ItemData(104, "Kitchen Knife", "KN",
             ItemProperty.Sharp | ItemProperty.Handle | ItemProperty.Metal,
             new MaterialPhysics(LatticeType.FCC, 500f, 50f, 1500f)));
 
-        RegisterItem(new ItemData(5, "Glass Bottle", "GB",
+        RegisterItem(new ItemData(105, "Glass Bottle", "GB",
             ItemProperty.Container | ItemProperty.Glass,
             new MaterialPhysics(LatticeType.Amorphous, 300f, 30f, 1000f)));
 
-        RegisterItem(new ItemData(6, "Wooden Stick", "WS",
+        RegisterItem(new ItemData(106, "Wooden Stick", "WS",
             ItemProperty.Wood | ItemProperty.Blunt | ItemProperty.Handle,
             new MaterialPhysics(LatticeType.Amorphous, 100f, 70f, 400f)));
 
-        RegisterItem(new ItemData(7, "Rope", "RO",
+        RegisterItem(new ItemData(107, "Rope", "RO",
             ItemProperty.Rope | ItemProperty.Cloth,
             new MaterialPhysics(LatticeType.Amorphous, 80f, 110f, 250f)));
 
-        RegisterItem(new ItemData(8, "Metal Can", "MC",
+        RegisterItem(new ItemData(108, "Metal Can", "MC",
             ItemProperty.Container | ItemProperty.Metal,
             new MaterialPhysics(LatticeType.FCC, 450f, 40f, 1200f)));
 
-        RegisterItem(new ItemData(9, "Copper Wire", "CW",
+        RegisterItem(new ItemData(109, "Copper Wire", "CW",
             ItemProperty.Rope | ItemProperty.Metal | ItemProperty.Conductive,
             new MaterialPhysics(LatticeType.FCC, 420f, 35f, 1350f)));
     }
@@ -116,5 +191,16 @@ public static class ItemRegistry
     {
         int randomIndex = GD.RandRange(0, ItemKeys.Count - 1);
         return Items[ItemKeys[randomIndex]];
+    }
+
+    // Helper to get a weapon by impact type
+    public static ItemData GetWeapon(ImpactType type)
+    {
+        foreach (var item in Items.Values)
+        {
+            if (item.ImpactType == type)
+                return item;
+        }
+        return null;
     }
 }

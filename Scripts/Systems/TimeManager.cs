@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Threading.Tasks;
 
 public enum TimePeriod { NIGHT, MORNING, AFTERNOON, EVENING, NIGHT2 }
 public enum Season { SPRING, SUMMER, AUTUMN, WINTER }
@@ -12,9 +13,16 @@ public partial class TimeManager : Node
     [Signal] public delegate void DayChangedEventHandler(int totalDays, int month, int calendarDay, int season);
     [Signal] public delegate void ClockTickEventHandler(int hour, int minute);
 
-    [Export] public float DayDuration = 600.0f; // Real seconds per game day
+    [Export] public float DayDuration = 600.0f;
     [Export] public float TimeScale = 1.0f;
     
+    // --- HITSTOP (new, doesn't affect existing logic) ---
+    [Export] public Node3D CameraShakeTarget;
+    private float _shakeAmount = 0f;
+    private double _engineTimeScaleBeforeHitstop = 1.0;
+    private bool _hitstopActive = false;
+    // ---
+
     public int Month { get; private set; } = 9;  
     public int Day { get; private set; } = 1;    
     public int Year { get; private set; } = 2004;
@@ -41,9 +49,28 @@ public partial class TimeManager : Node
 
     public override void _Process(double delta)
     {
+        // --- HITSTOP SHAKE ---
+        if (_shakeAmount > 0.01f && CameraShakeTarget != null)
+        {
+            Vector3 randomOffset = new Vector3(
+                (float)GD.RandRange(-_shakeAmount, _shakeAmount),
+                (float)GD.RandRange(-_shakeAmount, _shakeAmount),
+                0f
+            );
+            CameraShakeTarget.Position = randomOffset;
+            _shakeAmount = Mathf.MoveToward(_shakeAmount, 0f, (float)delta * 0.5f);
+        }
+        else if (CameraShakeTarget != null && CameraShakeTarget.Position != Vector3.Zero)
+        {
+            CameraShakeTarget.Position = Vector3.Zero;
+        }
+        // ---
+
+        if (_hitstopActive) return;
+
+        // --- EXISTING LOGIC ---
         if (Mathf.IsZeroApprox(TimeScale)) return;
 
-        // delta is already affected by Engine.TimeScale (global slow-mo)
         float dt = (float)delta * TimeScale;
         _timer += dt;
 
@@ -55,6 +82,25 @@ public partial class TimeManager : Node
                 AdvanceMinute();
             }
         }
+    }
+
+    // --- HITSTOP (new method, doesn't touch existing code) ---
+    public async void TriggerHitstop(float duration = 0.05f, float shakeIntensity = 0.1f)
+    {
+        if (_hitstopActive) return; // prevent stacking
+        
+        _hitstopActive = true;
+        _engineTimeScaleBeforeHitstop = Engine.TimeScale;
+        Engine.TimeScale = 0.05f;
+        _shakeAmount = shakeIntensity;
+
+        await ToSignal(
+            GetTree().CreateTimer(duration, processAlways: false, processInPhysics: false, ignoreTimeScale: true), 
+            "timeout"
+        );
+
+        Engine.TimeScale = _engineTimeScaleBeforeHitstop;
+        _hitstopActive = false;
     }
 
     // --- SMOOTH TIME ---

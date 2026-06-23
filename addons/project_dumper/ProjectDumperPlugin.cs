@@ -6,122 +6,88 @@ using System.Collections.Generic;
 [Tool]
 public partial class ProjectDumperPlugin : EditorPlugin
 {
+    // Only dump these file types
     private static readonly HashSet<string> TextExtensions = new HashSet<string>
     {
-        ".cs", ".gdshader"
+        ".cs", ".gd", ".gdshader"
+    };
+
+    // Skip directories that contain generated, build, or editor‑only data
+    private static readonly HashSet<string> SkippedDirs = new HashSet<string>
+    {
+        ".godot", ".git", "addons",
+        "android",      // Android export/build folder
+        "builds",       // Exported builds and screenshots
+        "terrain_data", // Terrain data files
+        ".gradle",      // Gradle cache
+        "build",        // Android build intermediates (top‑level, if any)
+        "libs",         // Native libraries (usually generated)
+        "res",          // Android resources
+        "src",          // Android Java sources (not relevant)
+        "outputs",      // Gradle outputs
+        "intermediates",// Gradle intermediates
+        "reports",      // Gradle reports
+        "tmp",          // Gradle temp
+        "generated",    // Generated code
+        "assets"        // Lower‑case Android assets (distinct from your Assets/ folder)
     };
 
     private bool _menuAdded = false;
 
-    public override void _EnterTree()
-    {
-        // Do nothing here – we'll add the menu in _Ready to ensure editor is fully initialized
-    }
+    public override void _EnterTree() { }
 
     public override void _Ready()
     {
         base._Ready();
-        CallDeferred(nameof(AddMenuLater)); // Use CallDeferred to avoid any timing issues
+        CallDeferred(nameof(AddMenuLater));
     }
 
     private void AddMenuLater()
     {
-        try
+        if (!_menuAdded)
         {
-            if (!_menuAdded)
-            {
-                AddToolMenuItem("Dump Project Info", new Callable(this, nameof(DumpProjectInfo)));
-                _menuAdded = true;
-                GD.Print("Project Dumper plugin initialized successfully.");
-            }
-        }
-        catch (System.Exception e)
-        {
-            GD.PrintErr($"Failed to add menu item: {e.Message}");
+            AddToolMenuItem("Dump Project Info", new Callable(this, nameof(DumpProjectInfo)));
+            _menuAdded = true;
         }
     }
 
     public override void _ExitTree()
     {
-        try
+        if (_menuAdded)
         {
-            if (_menuAdded)
-            {
-                RemoveToolMenuItem("Dump Project Info");
-                _menuAdded = false;
-            }
-        }
-        catch (System.Exception e)
-        {
-            GD.PrintErr($"Failed to remove menu item: {e.Message}");
+            RemoveToolMenuItem("Dump Project Info");
+            _menuAdded = false;
         }
     }
 
     private void DumpProjectInfo()
     {
-        try
+        StringBuilder output = new StringBuilder();
+        output.AppendLine("=== GODOT PROJECT CODE DUMP ===");
+        output.AppendLine($"Generated: {System.DateTime.Now}");
+        output.AppendLine();
+
+        DumpDirectory("res://", output, 0);
+
+        string filePath = "D:/project_code_dump.txt";
+        using var file = FileAccess.Open(filePath, FileAccess.ModeFlags.Write);
+        if (file == null)
         {
-            StringBuilder output = new StringBuilder();
-
-            output.AppendLine("=== GODOT PROJECT DUMP ===\n");
-            output.AppendLine($"Generated: {System.DateTime.Now}\n");
-
-            output.AppendLine("=== FILE TREE AND SOURCE CONTENTS ===\n");
-            DumpDirectory("res://", output, 0);
-
-            output.AppendLine("\n=== PROJECT SETTINGS ===\n");
-            foreach (var property in ProjectSettings.Singleton.GetPropertyList())
-            {
-                string name = property["name"].AsString();
-                var value = ProjectSettings.Singleton.GetSetting(name);
-                output.AppendLine($"{name} = {value}");
-            }
-
-            // Safely attempt to dump editor settings
-            if (Engine.IsEditorHint())
-            {
-                output.AppendLine("\n=== EDITOR SETTINGS ===\n");
-                var editorSettings = EditorInterface.Singleton.GetEditorSettings();
-                if (editorSettings != null)
-                {
-                    foreach (var property in editorSettings.GetPropertyList())
-                    {
-                        string name = property["name"].AsString();
-                        var value = editorSettings.Get(name);
-                        output.AppendLine($"{name} = {value}");
-                    }
-                }
-                else
-                {
-                    output.AppendLine("(Editor settings not available)");
-                }
-            }
-
-            // Save to D:\project_dump.txt
-            string filePath = "D:/project_dump.txt";
-            using var file = FileAccess.Open(filePath, FileAccess.ModeFlags.Write);
-            if (file == null)
-            {
-                GD.PrintErr($"Failed to open file for writing: {filePath}");
-                return;
-            }
-            file.StoreString(output.ToString());
-            GD.Print($"Project dump saved to: {filePath}");
+            GD.PrintErr($"Failed to open file for writing: {filePath}");
+            return;
         }
-        catch (System.Exception e)
-        {
-            GD.PrintErr($"Error during dump: {e.Message}\n{e.StackTrace}");
-        }
+        file.StoreString(output.ToString());
+        GD.Print($"Project code dump saved to: {filePath}");
     }
 
     private void DumpDirectory(string path, StringBuilder sb, int indentLevel)
     {
         using var dir = DirAccess.Open(path);
         if (dir == null)
-        {
-            sb.AppendLine($"{new string(' ', indentLevel * 2)}[Failed to open: {path}]");
             return;
-        }
+
+        var directories = new List<string>();
+        var files = new List<string>();
 
         dir.ListDirBegin();
         string fileName = dir.GetNext();
@@ -133,44 +99,51 @@ public partial class ProjectDumperPlugin : EditorPlugin
                 continue;
             }
 
-            // ✅ Simply concatenate – path already ends with '/'
-            string fullPath = path + fileName;
-            string indent = new string(' ', indentLevel * 2);
-
             if (dir.CurrentIsDir())
             {
-                sb.AppendLine($"{indent}+ {fileName}/");
-                // ✅ Pass the full path with a trailing slash for the next level
-                DumpDirectory(fullPath + "/", sb, indentLevel + 1);
+                if (!SkippedDirs.Contains(fileName))
+                    directories.Add(fileName);
             }
             else
             {
-                sb.AppendLine($"{indent}- {fileName}");
-
-                // Check extension using Godot's string method
-                string ext = fileName.GetExtension().ToLower();
-                if (!string.IsNullOrEmpty(ext) && TextExtensions.Contains("." + ext))
-                {
-                    string content = ReadFileContent(fullPath);  // fullPath is correct res://path
-                    if (content != null)
-                    {
-                        string[] lines = content.Split('\n');
-                        foreach (string line in lines)
-                        {
-                            sb.AppendLine($"{indent}  {line}");
-                        }
-                        sb.AppendLine();
-                    }
-                    else
-                    {
-                        sb.AppendLine($"{indent}  [Error reading file]");
-                    }
-                }
+                files.Add(fileName);
             }
 
             fileName = dir.GetNext();
         }
         dir.ListDirEnd();
+
+        string indent = new string(' ', indentLevel * 2);
+        directories.Sort();
+        files.Sort();
+
+        foreach (string dirName in directories)
+        {
+            sb.AppendLine($"{indent}+ {dirName}/");
+            DumpDirectory(path + dirName + "/", sb, indentLevel + 1);
+        }
+
+        foreach (string file in files)
+        {
+            sb.AppendLine($"{indent}- {file}");
+
+            string ext = file.GetExtension().ToLower();
+            if (!string.IsNullOrEmpty(ext) && TextExtensions.Contains("." + ext))
+            {
+                string content = ReadFileContent(path + file);
+                if (content != null)
+                {
+                    sb.AppendLine($"{indent}  ```");
+                    foreach (string line in content.Split('\n'))
+                        sb.AppendLine($"{indent}  {line}");
+                    sb.AppendLine($"{indent}  ```");
+                }
+                else
+                {
+                    sb.AppendLine($"{indent}  [Error reading file]");
+                }
+            }
+        }
     }
 
     private string ReadFileContent(string resPath)
@@ -178,7 +151,6 @@ public partial class ProjectDumperPlugin : EditorPlugin
         using var file = FileAccess.Open(resPath, FileAccess.ModeFlags.Read);
         if (file == null)
             return null;
-
         return file.GetAsText();
     }
 }

@@ -71,12 +71,30 @@ uniform float noise1_angle : hint_range(0, 6.283) = 0.;
 uniform vec2 noise1_offset = vec2(0.5);
 uniform float noise2_scale : hint_range(0.001, 1.) = 0.076;
 
-// --- WEATHER UNIFORMS (Migrated from your beautiful shader) ---
+// =========================================================================
+// --- WEATHER UNIFORMS & TWEAKS ---
+// =========================================================================
 global uniform float rain_amount : hint_range(0.0, 1.0) = 0.0;
 global uniform float snow_amount : hint_range(0.0, 1.0) = 0.0;
 global uniform vec3 wind_direction = vec3(0.0, 0.0, 1.0);
+
+// Masks
+uniform int no_snow_texture_id = -1; // Set this to your Road Texture ID to prevent snow on roads
+
+// Pile Settings
 uniform float snow_max_height : hint_range(0.0, 3.0) = 1.0;
 uniform float snow_slope_cutoff : hint_range(0.0, 1.0) = 0.5;
+uniform float pile_noise_scale_1 : hint_range(0.0001, 0.1) = 0.002;
+uniform float pile_noise_scale_2 : hint_range(0.0001, 0.1) = 0.008;
+uniform float pile_sparseness : hint_range(0.0, 1.0) = 0.6; // 0 = Dense, 1 = Very Sparse
+uniform float pile_smoothness : hint_range(0.01, 1.0) = 0.3; // 0.01 = Jagged, 1.0 = Very Smooth
+
+// Puddle Settings
+uniform float puddle_noise_scale : hint_range(0.001, 0.2) = 0.05;
+
+// Colors
+const vec3 SNOW_COLOR = vec3(0.6, 0.8, 0.95); // Slightly darker blue-white for better night lighting
+const vec3 PUDDLE_TINT = vec3(0.01, 0.02, 0.04);
 
 // Varyings & Types
 struct material {
@@ -89,7 +107,7 @@ struct material {
 
 varying float v_vertex_xz_dist;
 varying vec3 v_vertex;
-varying float v_pile_height; // Snow pile height
+varying float v_pile_height;
 
 ////////////////////////
 // Vertex
@@ -152,7 +170,7 @@ void vertex() {
         v_vertex.y = h;
     }
 
-    // --- SMOOTH SNOW PILES ---
+    // --- SNOW PILES ---
     v_pile_height = 0.0;
     if (snow_amount > 0.2) {
         ivec3 c_x = get_index_coord(start_pos + vec2(1.0, 0.0), VERTEX_PASS);
@@ -164,13 +182,13 @@ void vertex() {
         if (vert_normal.y >= snow_slope_cutoff) {
             float height_amount = clamp((snow_amount - 0.2) / 0.8, 0.0, 1.0);
             
-            float n1 = textureLod(noise_texture, v_vertex.xz * 0.002, 0.0).r; 
-            float n2 = textureLod(noise_texture, v_vertex.xz * 0.008 + vec2(100.0), 0.0).r; 
+            float n1 = textureLod(noise_texture, v_vertex.xz * pile_noise_scale_1, 0.0).r; 
+            float n2 = textureLod(noise_texture, v_vertex.xz * pile_noise_scale_2 + vec2(100.0), 0.0).r; 
             float pile_noise = max(n1, n2 * 0.5); 
             
-            // Smoothstep instead of step fixes the ugly sharp lines
-            float pile_cutoff = mix(0.8, 0.2, height_amount);
-            float pile_mask = smoothstep(pile_cutoff, pile_cutoff + 0.3, pile_noise);
+            // Sparseness pushes the cutoff higher so fewer piles spawn
+            float pile_cutoff = mix(0.2, 0.9, pile_sparseness) * (1.0 - height_amount * 0.5);
+            float pile_mask = smoothstep(pile_cutoff, pile_cutoff + pile_smoothness, pile_noise);
             
             v_pile_height = pile_mask * height_amount;
             v_vertex.y += v_pile_height * snow_max_height;
@@ -328,7 +346,8 @@ void fragment() {
 
     uint control_center = floatBitsToUint(texelFetch(_control_maps, index[3], 0).r);
     int base_id_center = int(control_center >> 27u & 0x1Fu);
-    bool is_road = (base_id_center >= 0 && base_id_center <= 7); 
+    int over_id_center = int(control_center >> 22u & 0x1Fu);
+    bool is_road = (base_id_center == no_snow_texture_id || over_id_center == no_snow_texture_id); 
 
     bool bilerp = region_mip < 0.0 && region_uv.z > -1. && !is_road;
     
@@ -343,6 +362,14 @@ void fragment() {
     index_normal[3] = normalize(vec3(h[3] - h[2] + u, _vertex_spacing, h[3] - h[0] + v));
 
     vec3 w_normal = index_normal[3];
+
+    // --- FIX FOR FLAT NOON SHADING ---
+    // If snow piles exist, recalculate normals based on the displaced vertex 
+    // so the lighting accurately hits the generated 3D geometry.
+    if (v_pile_height > 0.01) {
+        vec3 pile_normal = normalize(cross(dFdyCoarse(v_vertex), dFdxCoarse(v_vertex)));
+        w_normal = normalize(mix(w_normal, pile_normal, clamp(v_pile_height * 2.0, 0.0, 1.0)));
+    }
 
     float bias = mix(mipmap_bias,
         depth_blur + 1.,
@@ -384,6 +411,11 @@ void fragment() {
             index_normal[1] * weights[1] +
             index_normal[2] * weights[2] +
             index_normal[3] * weights[3] ;
+            
+        if (v_pile_height > 0.01) {
+            vec3 pile_normal = normalize(cross(dFdyCoarse(v_vertex), dFdxCoarse(v_vertex)));
+            w_normal = normalize(mix(w_normal, pile_normal, clamp(v_pile_height * 2.0, 0.0, 1.0)));
+        }
     }
 
     if (flat_terrain_normals) {
@@ -483,42 +515,47 @@ void fragment() {
     AO_LIGHT_AFFECT = (1.0 - mat.albedo_height.a) * clamp(mat.normal_rough.y, 0., 1.);
 
     // =========================================================================
-    // MIGRATED BEAUTIFUL WEATHER LOGIC
+    // WEATHER LOGIC
     // =========================================================================
     
-    // 1. Manual Paint Mask: Use Terrain3D Color Map Alpha channel. 
-    // Default is 0.5. We multiply by 2.0 so 0.5 = 1.0 (Full snow). 0.0 = No snow.
-    float snow_paint_mask = clamp(color_map.a * 2.0, 0.0, 1.0);
+    // Terrain3D's built-in Wetness brush modifies the Color Map's Alpha channel.
+    // Default alpha is 0.5. The Wetness brush raises it up to 1.0.
+    float puddle_paint_mask = smoothstep(0.6, 1.0, color_map.a);
     
-    float noise_val = texture(noise_texture, v_vertex.xz * 0.05).r;
+    float noise_val = texture(noise_texture, v_vertex.xz * puddle_noise_scale).r;
 
     // --- RAIN & PUDDLES ---
-    if (rain_amount > 0.01) {
+    if (rain_amount > 0.01 && puddle_paint_mask > 0.01) {
         float water_level = rain_amount * 0.7;
-        float puddle_mask = 1.0 - smoothstep(water_level - 0.05, water_level, noise_val);
+        float puddle_mask = (1.0 - smoothstep(water_level - 0.05, water_level, noise_val)) * puddle_paint_mask;
         
-        vec3 damp_albedo = ALBEDO * mix(1.0, 0.5, rain_amount);
-        vec3 wet_ground_dark = damp_albedo * 0.6;
-        vec3 puddle_tint = vec3(0.01, 0.02, 0.04); 
-        vec3 puddle_albedo = mix(wet_ground_dark, puddle_tint, 0.2);
-        
-        float water_rough = mix(0.02, 0.1, noise_val);
-        
-        float time_scale = TIME * 2.0; 
-        vec2 ripple_uv = v_vertex.xz * 0.2 + vec2(0.0, time_scale * 0.05);
-        float ripple = texture(noise_texture, ripple_uv).r;
-        
-        vec3 pixel_tilt = vec3(noise_val - 0.5, fract(noise_val * 10.0) - 0.5, 0.0);
-        vec3 water_normal_tangent = normalize(vec3(0.5, 0.5, 1.0) + (pixel_tilt * 0.15) + vec3(ripple * 0.1));
-        
-        ALBEDO = mix(damp_albedo, puddle_albedo, puddle_mask);
-        ROUGHNESS = mix(ROUGHNESS, water_rough, puddle_mask);
-        NORMAL_MAP = mix(NORMAL_MAP, water_normal_tangent, puddle_mask);
-        SPECULAR = mix(SPECULAR, 0.8, puddle_mask);
+        if (puddle_mask > 0.01) {
+            vec3 damp_albedo = ALBEDO * mix(1.0, 0.5, rain_amount);
+            vec3 wet_ground_dark = damp_albedo * 0.6;
+            vec3 puddle_albedo = mix(wet_ground_dark, PUDDLE_TINT, 0.2);
+            
+            float water_rough = mix(0.02, 0.1, noise_val);
+            
+            float time_scale = TIME * 2.0; 
+            vec2 ripple_uv = v_vertex.xz * 0.2 + vec2(0.0, time_scale * 0.05);
+            float ripple = texture(noise_texture, ripple_uv).r;
+            
+            vec3 pixel_tilt = vec3(noise_val - 0.5, fract(noise_val * 10.0) - 0.5, 0.0);
+            vec3 water_normal_tangent = normalize(vec3(0.5, 0.5, 1.0) + (pixel_tilt * 0.15) + vec3(ripple * 0.1));
+            
+            ALBEDO = mix(damp_albedo, puddle_albedo, puddle_mask);
+            ROUGHNESS = mix(ROUGHNESS, water_rough, puddle_mask);
+            NORMAL_MAP = mix(NORMAL_MAP, water_normal_tangent, puddle_mask);
+            SPECULAR = mix(SPECULAR, 0.8, puddle_mask);
+        } else {
+            // Dampen non-puddle ground slightly when raining
+            ALBEDO *= mix(1.0, 0.8, rain_amount);
+            ROUGHNESS = mix(ROUGHNESS, 0.6, rain_amount * 0.5);
+        }
     }
 
     // --- SNOW ---
-    if (snow_amount > 0.01) {
+    if (snow_amount > 0.01 && !is_road) {
         float snow_timeline = smoothstep(0.0, 0.6, snow_amount);
         float chunk_noise = floor(noise_val * 8.0) / 8.0;
         float start_fade = 1.0 - chunk_noise;
@@ -528,17 +565,16 @@ void fragment() {
         float surface_exposure = dot(w_normal, snow_bias_vec);
         float slope_mask = step(0.3, surface_exposure); 
         
-        float final_snow_mask = chunk_alpha * slope_mask * snow_paint_mask * 0.95;
+        float final_snow_mask = chunk_alpha * slope_mask * 0.95;
         
-        // Force snow to be fully solid on vertex 3D piles
+        // Force solid snow on 3D vertex piles
         if (v_pile_height > 0.01) {
             final_snow_mask = 1.0;
         }
         
-        vec3 snow_color = vec3(0.7, 0.9, 0.98); // Beautiful blueish white
-        ALBEDO = mix(ALBEDO, snow_color, final_snow_mask);
+        ALBEDO = mix(ALBEDO, SNOW_COLOR, final_snow_mask);
         ROUGHNESS = mix(ROUGHNESS, 1.0, final_snow_mask);
         NORMAL_MAP = mix(NORMAL_MAP, vec3(0.5, 0.5, 1.0), final_snow_mask);
         SPECULAR = mix(SPECULAR, 0.1, final_snow_mask);
     }
-}
+} 

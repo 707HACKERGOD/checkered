@@ -4,6 +4,8 @@ public partial class NavAgentNPC : NavigationAgent3D
     [Export] public float MoveSpeed = 3.0f;
     [Export] public float TurnSpeed = 10.0f;
 
+    [Export] public Vector3 KnockbackVelocity;
+
     private CharacterBody3D _owner;
 
     public override void _Ready()
@@ -37,6 +39,14 @@ public partial class NavAgentNPC : NavigationAgent3D
                 float fraction = Mathf.Clamp(turn / angle, 0f, 1f);
                 _owner.Quaternion = _owner.Quaternion.Slerp(new Quaternion(Vector3.Back, moveDir), fraction);
             }
+        }
+
+        if (KnockbackVelocity.Length() > 0.1f)
+        {
+            _owner.Velocity = KnockbackVelocity;
+            _owner.MoveAndSlide();
+            KnockbackVelocity = KnockbackVelocity.Lerp(Vector3.Zero, (float)delta * 5f);
+            return;
         }
     }
 

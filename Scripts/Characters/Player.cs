@@ -20,6 +20,14 @@ public partial class Player : CharacterBody3D
     [Export] public float MinPitch = -Mathf.Pi / 3;
     [Export] public float MaxPitch = Mathf.Pi / 4;
 
+    [Export] private MeleeHitbox _rightHandHitbox;
+
+    private ItemData _fistWeapon;
+    private ItemData _pipeWeapon;
+    private ItemData _chairWeapon;
+
+    private ItemData _currentWeapon;
+
     // Nodes
     private Node3D _cameraGimbal;
     private Node3D _innerGimbal;
@@ -73,6 +81,13 @@ public partial class Player : CharacterBody3D
 
     public override void _Ready()
     {
+        // FORCE REST POSE FIRST
+        var skeleton = GetNodeOrNull<Skeleton3D>("Syl/char_grp/rig/Skeleton3D");
+        if (skeleton != null)
+        {
+            for (int i = 0; i < skeleton.GetBoneCount(); i++)
+                skeleton.ResetBonePose(i);
+        }
         _possession = GetNodeOrNull<PlayerPossession>("PlayerPossession");
         
         Input.MouseMode = Input.MouseModeEnum.Captured;
@@ -123,6 +138,13 @@ public partial class Player : CharacterBody3D
                 AddChild(_attackAudioPlayer);
             }
         }
+
+        _fistWeapon = ItemRegistry.GetWeapon(ImpactType.Fist);
+        _pipeWeapon = ItemRegistry.GetWeapon(ImpactType.Pipe);
+        _chairWeapon = ItemRegistry.GetWeapon(ImpactType.Chair);
+        _currentWeapon = ItemRegistry.GetWeapon(ImpactType.Fist);
+        if (TimeManager.Instance != null)
+            TimeManager.Instance.CameraShakeTarget = _innerGimbal;
     }
 
     public override void _Input(InputEvent @event)
@@ -588,69 +610,115 @@ public partial class Player : CharacterBody3D
 
     public void PerformAttack()
     {
-        // Play swing sound (always, even if none hit)
-        if (_attackAudioPlayer != null && _attackSound != null)
+        // 1. Auto-Aim: Find nearest enemy within a 120-degree cone in front of player
+        Node3D nearestEnemy = FindNearestEnemy();
+        if (nearestEnemy != null)
         {
-            _attackAudioPlayer.Stream = _attackSound;
-            _attackAudioPlayer.Play();
+            Vector3 dirToEnemy = (nearestEnemy.GlobalPosition - GlobalPosition).Normalized();
+            dirToEnemy.Y = 0;
+            float targetAngle = Mathf.Atan2(-dirToEnemy.X, -dirToEnemy.Z);
+            
+            // Snap rotation slightly toward enemy for forgiveness
+            Rotation = new Vector3(0, Mathf.LerpAngle(Rotation.Y, targetAngle, 0.5f), 0);
         }
 
-        if (PlayerCamera == null) return;
-
-        var spaceState = GetWorld3D().DirectSpaceState;
-        Vector3 origin = PlayerCamera.GlobalPosition;
-        Vector3 end = origin - PlayerCamera.GlobalTransform.Basis.Z * 100.0f;
-
-        var query = PhysicsRayQueryParameters3D.Create(origin, end);
-        query.CollisionMask = 1 << 4; // layer 5 = BodyParts
-        query.CollideWithAreas = true;
-        query.CollideWithBodies = false;
-        query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-
-        var result = spaceState.IntersectRay(query);
-        if (result.Count > 0)
+        // 2. Trigger Animation (Assuming you have an Attack state in your AnimationTree)
+        if (_animTree != null)
         {
-            Area3D hitArea = result["collider"].As<Area3D>();
-            if (hitArea == null) return;
+            _animTree.Set("parameters/attack/request", (int)AnimationNodeOneShot.OneShotRequest.Fire);
+        }
 
-            string limbName = hitArea.Name; // we named the Area3D after the limb in NpcController
-            if (string.IsNullOrEmpty(limbName)) return;
+        // 3. The AnimationTree will call EnableHitbox() during the swing via Animation Events
+        // For now, we can just trigger it manually with a slight delay to sync with the arm moving
+        CallDeferred("EnableHitbox");
+    }
 
-            // Find the NPC
-            Node current = hitArea.GetParent();   // BoneAttachment3D
-            current = current?.GetParent();       // Skeleton3D
-            while (current != null && !(current is CharacterBody3D))
-                current = current.GetParent();
-            var npc = current as CharacterBody3D;
-            if (npc == null || npc.GetNodeOrNull<NpcController>(".")?.IsDead == true) return;
+    private async void EnableHitbox()
+    {
+        await ToSignal(GetTree().CreateTimer(0.1f), "timeout"); // Wait for wind-up
+        if (_rightHandHitbox != null) _rightHandHitbox.StartSwing(_currentWeapon);
+        
+        await ToSignal(GetTree().CreateTimer(0.2f), "timeout"); // Active frames duration
+        if (_rightHandHitbox != null) _rightHandHitbox.EndSwing();
+    }
 
-            var health = npc.GetNodeOrNull<Health>("Health");
-            if (health == null) return;
-
-            // Get the specific limb health
-            LimbHealth limbHealth = null;
-            foreach (Node child in health.GetChildren())
+    private Node3D FindNearestEnemy()
+    {
+        Node3D best = null;
+        float bestDist = 5.0f; // Max auto-aim distance
+        
+        // Simple overlap check (you can use your InterestArea for this)
+        foreach (Node node in GetTree().GetNodesInGroup("NPC"))
+        {
+            if (node is CharacterBody3D npc && !npc.GetNode<Health>("Health").IsDead)
             {
-                if (child is LimbHealth lh && lh.Name == limbName)
+                float dist = GlobalPosition.DistanceTo(npc.GlobalPosition);
+                if (dist < bestDist)
                 {
-                    limbHealth = lh;
-                    break;
+                    // Check if they are roughly in front of us
+                    Vector3 dirToNpc = (npc.GlobalPosition - GlobalPosition).Normalized();
+                    if (GlobalTransform.Basis.Z.Dot(dirToNpc) < -0.3f) // ~110 degree cone
+                    {
+                        bestDist = dist;
+                        best = npc;
+                    }
                 }
             }
-
-            float damage = limbHealth != null ? limbHealth.MaxHealth * 0.2f : 20f; // fallback
-            health.TakeDamage(damage, limbName);
-
-            float currentHealth = limbHealth?.CurrentHealth ?? 0;
-            // Get NPC controller and display name
-            var npcController = npc.GetNodeOrNull<NpcController>(".");
-            string npcName = npcController != null ? npcController.DisplayName : "Unknown";
-            string status = npcController != null && npcController.IsDead ? "DEAD" : "alive";
-
-            GD.Print($"[{npcName}] {status} | Total Health: {health.CurrentHealth:F1}/{health.MaxHealth:F1} | Hit {limbName} for {damage:F1} damage. {limbName} HP: {currentHealth:F1}/{limbHealth?.MaxHealth ?? 0:F1}");
-            // Flash the hit limb (or whole body for old NPCs)
-            FlashLimb(npc, limbName);
         }
+        return best;
+    }
+
+    // Add input handling for swapping weapons in _Input
+    // if (@event.IsActionPressed("swap_weapon_1")) _currentWeapon = _fistWeapon;
+    // if (@event.IsActionPressed("swap_weapon_2")) _currentWeapon = _pipeWeapon;
+
+    private void CheckMeleeHits(Area3D arc, ItemData weapon, List<Rid> hitBodies)
+    {
+        foreach (var body in arc.GetOverlappingAreas())
+        {
+            if (body is Area3D hitArea)
+            {
+                var npc = FindNpcFromLimbArea(hitArea);
+                if (npc == null || hitBodies.Contains(npc.GetRid())) continue;
+                hitBodies.Add(npc.GetRid());
+
+                string limbName = hitArea.Name;
+                var health = npc.GetNodeOrNull<Health>("Health");
+                if (health == null) continue;
+
+                // Apply damage
+                health.TakeDamage(weapon.Damage.Value, limbName);
+
+                // Apply knockback
+                Vector3 knockbackDir = (npc.GlobalPosition - GlobalPosition).Normalized();
+                knockbackDir.Y = 0.5f;
+                float knockbackForce = weapon.KnockbackForce ?? 5f;
+                ApplyKnockbackToNpc(npc, knockbackDir * knockbackForce);
+
+                // Hit effects
+                TimeManager.Instance?.TriggerHitstop(weapon.HitstopDuration ?? 0.05f, weapon.CameraShake ?? 0.1f);
+                FlashLimb(npc, limbName);
+            }
+        }
+
+        // Clean up arc after one frame
+        arc.QueueFree();
+    }
+
+    private CharacterBody3D FindNpcFromLimbArea(Area3D limbArea)
+    {
+        Node current = limbArea.GetParent(); // BoneAttachment3D
+        current = current?.GetParent(); // Skeleton3D
+        while (current != null && !(current is CharacterBody3D))
+            current = current.GetParent();
+        return current as CharacterBody3D;
+    }
+
+    private void ApplyKnockbackToNpc(CharacterBody3D npc, Vector3 force)
+    {
+        var navAgent = npc.GetNodeOrNull<NavAgentNPC>("NavAgentNPC");
+        if (navAgent != null)
+            navAgent.KnockbackVelocity = force;
     }
 
     private async void FlashLimb(CharacterBody3D npc, string limbName)
@@ -743,5 +811,10 @@ public partial class Player : CharacterBody3D
             if (found != null) return found;
         }
         return null;
+    }
+
+    public void EquipWeapon(ImpactType type)
+    {
+        _currentWeapon = ItemRegistry.GetWeapon(type);
     }
 }

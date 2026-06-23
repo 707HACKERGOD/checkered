@@ -16,6 +16,16 @@ public partial class NpcController : CharacterBody3D
     private NpcEyeTracker _eyeTracker;
     private Area3D _visionArea;
 
+    // reaction control
+
+    private CharacterBody3D _body;
+    private NpcController _npcController;
+    
+    // Stumble state
+    private bool _isStumbling = false;
+    private Vector3 _stumbleVelocity;
+    private float _stumbleTimer;
+
     // --- BONE NAME MAPS ---
     // ARP_GLTB = standard GLTF export names (what you actually see)
     private static readonly (string limb, string arpGltf, string mixamo, Shape3D shape)[] BoneMap = new (string, string, string, Shape3D)[]
@@ -175,6 +185,11 @@ public partial class NpcController : CharacterBody3D
             _visionArea.BodyEntered += OnBodyEntered;
             _visionArea.BodyExited += OnBodyExited;
         }
+
+        //reaction control
+
+        _body = GetParent<CharacterBody3D>();
+        _npcController = _body.GetNodeOrNull<NpcController>(".");
     }
 
     // --- RIG DETECTION ---
@@ -334,5 +349,133 @@ public partial class NpcController : CharacterBody3D
         foreach (Node child in node.GetChildren())
             FindAllMeshes(child, list);
         return list;
+    }
+
+
+    public void ApplyHit(ItemData weapon, Vector3 direction, string limb)
+    {
+        if (_npcController.IsDead) return;
+
+        float knockback = weapon.KnockbackForce ?? 5f;
+        _stumbleVelocity = direction * knockback;
+        
+        if (weapon.ImpactType == null) return;
+        switch (weapon.ImpactType.Value)
+        {
+            case ImpactType.Fist:
+                _stumbleTimer = 0.3f;
+                // Play anim: "stagger_back"
+                break;
+            case ImpactType.Pipe:
+                _stumbleTimer = 0.6f;
+                _stumbleVelocity += Vector3.Up * 2f; // Pop them up a bit
+                // Play anim: "spin_fall"
+                break;
+            case ImpactType.Chair:
+                _stumbleTimer = 1.0f;
+                TriggerRagdoll(direction * knockback * 2f);
+                return; // Skip normal stumble, go straight to physics
+        }
+        
+        _isStumbling = true;
+        // Interrupt AI
+        var combat = _body.GetNodeOrNull<NpcNavCombat>("NPCNavCombat");
+        if (combat != null) combat.SetStunned(_stumbleTimer);
+    }
+
+    public override void _PhysicsProcess(double delta)
+    {
+        if (!_isStumbling || _npcController.IsDead) return;
+
+        float dt = (float)delta;
+        _stumbleTimer -= dt;
+        
+        if (_stumbleTimer <= 0)
+        {
+            _isStumbling = false;
+            return;
+        }
+
+        // Apply gravity
+        _stumbleVelocity.Y -= 9.8f * dt;
+
+        // Check for walls to lean on!
+        var spaceState = _body.GetWorld3D().DirectSpaceState;
+        var query = PhysicsRayQueryParameters3D.Create(
+            _body.GlobalPosition, 
+            _body.GlobalPosition + (_stumbleVelocity.Normalized() * 0.5f),
+            1 // Environment collision mask
+        );
+        var result = spaceState.IntersectRay(query);
+        
+        if (result.Count > 0)
+        {
+            // Hit a wall! Lean on it instead of sliding through
+            _stumbleVelocity = Vector3.Zero;
+            _stumbleTimer = Mathf.Max(_stumbleTimer, 1.0f); // Extend timer to "pin" them to wall
+            // Play anim: "wall_lean"
+            GD.Print("NPC pinned to wall!");
+        }
+
+        _body.Velocity = _stumbleVelocity;
+        _body.MoveAndSlide();
+    }
+
+    private void TriggerRagdoll(Vector3 impulse)
+    {
+        // Use your existing PhysicalBoneSimulator3D logic from NpcController
+        // Apply impulse to the bone that was hit!
+        _npcController.ActivateRagdoll(impulse);
+    }
+
+    public void ActivateRagdoll(Vector3 impulse)
+    {
+        if (IsDead) return;
+        
+        // Stop AI
+        var navAgent = GetNodeOrNull<NavigationAgent3D>("NavAgentNPC");
+        if (navAgent != null)
+        {
+            navAgent.MaxSpeed = 0f;
+            navAgent.AvoidanceEnabled = false;
+        }
+
+        var combat = GetNodeOrNull<Node>("NPCNavCombat");
+        if (combat != null) combat.SetProcess(false);
+
+        // Stop animations
+        var modelRoot = GetNodeOrNull<Node3D>("ModelRoot");
+        if (modelRoot != null)
+        {
+            var model = modelRoot.GetChild(0);
+            if (model != null)
+            {
+                var animPlayer = model.FindChild("AnimationPlayer", recursive: true) as AnimationPlayer;
+                if (animPlayer != null) animPlayer.Active = false;
+
+                var skeleton = FindChildOfTypeRecursive<Skeleton3D>(model);
+                if (skeleton != null)
+                {
+                    skeleton.ResetBonePoses();
+
+                    var simulator = skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator3D")
+                        ?? skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator");
+                    if (simulator != null)
+                    {
+                        simulator.Active = true;
+                        simulator.PhysicalBonesStartSimulation();
+                        
+                        // Apply impulse to physical bones
+                        foreach (var child in simulator.GetChildren())
+                        {
+                            if (child is PhysicalBone3D bone)
+                            {
+                                bone.ApplyCentralImpulse(impulse);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

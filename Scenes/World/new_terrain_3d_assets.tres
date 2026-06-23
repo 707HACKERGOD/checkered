@@ -5,7 +5,8 @@
 [ext_resource type="Texture2D" uid="uid://bfooe77005wvs" path="res://Assets/textures/road_10.png" id="3_q43v6"]
 [ext_resource type="Texture2D" uid="uid://dpl8oiypxu2wm" path="res://Assets/textures/road_6.png" id="4_yilpr"]
 [ext_resource type="Texture2D" uid="uid://dwhvj5ebavrr2" path="res://Assets/textures/road_7.png" id="5_f8xg7"]
-[ext_resource type="Texture2D" uid="uid://dcll2i1vffv73" path="res://Assets/textures/grass_1.png" id="6_q43v6"]
+[ext_resource type="Texture2D" uid="uid://dh3odkkie4mpm" path="res://Assets/textures/grass_2.png" id="6_yilpr"]
+[ext_resource type="Texture2D" uid="uid://cxoo2aygcgm2m" path="res://Assets/textures/grass_2_normal.png" id="7_f8xg7"]
 
 [sub_resource type="Terrain3DMeshAsset" id="Terrain3DMeshAsset_a3moi"]
 name = "pine"
@@ -42,8 +43,8 @@ normal_texture = ExtResource("5_f8xg7")
 [sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_8m8j6"]
 name = "new_terrain_3d_assets"
 id = 4
-albedo_texture = ExtResource("6_q43v6")
-normal_texture = ExtResource("6_q43v6")
+albedo_texture = ExtResource("6_yilpr")
+normal_texture = ExtResource("7_f8xg7")
 
 [resource]
 mesh_list = Array[Terrain3DMeshAsset]([SubResource("Terrain3DMeshAsset_a3moi")])

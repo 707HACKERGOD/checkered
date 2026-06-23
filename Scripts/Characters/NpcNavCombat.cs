@@ -21,6 +21,15 @@ public partial class NpcNavCombat : Node
     private bool _possessionActive;
     private float _wanderTimer;
     private float _attackTimer;
+    private bool _isStunned = false;
+    private float _stunTimer = 0f;
+    private bool _hasCalledForHelp = false;
+
+    public void SetStunned(float duration)
+    {
+        _isStunned = true;
+        _stunTimer = duration;
+    }
 
     private bool _inDialogue = false;
     public bool IsInDialogue => _inDialogue;
@@ -44,9 +53,45 @@ public partial class NpcNavCombat : Node
 
     public override void _PhysicsProcess(double delta)
     {
-        if (_health.IsDead) return;
-
+        if (_health.IsDead || _inDialogue) return;
         float dt = (float)delta;
+
+        // Handle stun
+        if (_isStunned)
+        {
+            _stunTimer -= dt;
+            if (_stunTimer <= 0) _isStunned = false;
+            _navAgent.MaxSpeed = 0;
+            return; // Can't act while stunned
+        }
+
+        // Flee logic
+        if ((_health.CurrentHealth / _health.MaxHealth) < FleeHealthFraction || _hasCalledForHelp)
+        {
+            FleeFromPlayer();
+            
+            // Call for help if not done already
+            if (!_hasCalledForHelp)
+            {
+                _hasCalledForHelp = true;
+                CallForHelp();
+            }
+            return;
+        }
+
+        // Chase logic
+        _navAgent.SetNewTarget(_player.GlobalPosition);
+        _navAgent.MaxSpeed = ChaseSpeed;
+
+        if (_body.GlobalPosition.DistanceTo(_player.GlobalPosition) < AttackRange)
+        {
+            _attackTimer -= dt;
+            if (_attackTimer <= 0f)
+            {
+                _attackTimer = AttackCooldown;
+                PerformWildHaymaker();
+            }
+        }
 
         // ---- DIALOGUE MODE ----
         if (_inDialogue && !_health.IsDead)
@@ -163,5 +208,36 @@ public partial class NpcNavCombat : Node
         // Resume wandering if not possessed and not dead
         if (!_possessionActive && !_health.IsDead)
             PickWanderTarget();
+    }
+
+    private void PerformWildHaymaker()
+    {
+        // Telegraph heavily. Play "haymaker_windup" anim.
+        // After 0.5s windup (handled via animation or timer), activate NPC's own MeleeHitbox
+        GD.Print("NPC swings wildly!");
+        // Face the player exactly
+        Vector3 dir = (_player.GlobalPosition - _body.GlobalPosition).Normalized();
+        _body.Rotation = new Vector3(0, Mathf.Atan2(-dir.X, -dir.Z), 0);
+    }
+
+    private void CallForHelp()
+    {
+        GD.Print("NPC shouts for help!");
+        // Play shout animation
+        // Find nearby neutral NPCs and set their persona to Strong/Aggressive
+        foreach (Node node in GetTree().GetNodesInGroup("NPC"))
+        {
+            if (node is CharacterBody3D npc && npc != _body)
+            {
+                if (_body.GlobalPosition.DistanceTo(npc.GlobalPosition) < 15f)
+                {
+                    var combat = npc.GetNodeOrNull<NpcNavCombat>("NPCNavCombat");
+                    if (combat != null && combat.Persona == AiPersona.Neutral)
+                    {
+                        combat.Persona = AiPersona.Strong; // Aggro nearby allies
+                    }
+                }
+            }
+        }
     }
 }
