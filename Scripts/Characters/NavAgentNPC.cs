@@ -22,6 +22,11 @@ public partial class NavAgentNPC : NavigationAgent3D
     public override void _PhysicsProcess(double delta)
     {
         if (_owner == null) return;
+        // Skip if NpcController is handling physics (stumble/dead)
+        var npcCtrl = _owner.GetNodeOrNull<NpcController>(".");
+        if (npcCtrl != null && (npcCtrl.IsStumbling || npcCtrl.IsDead))
+            return;
+            
         float dt = (float)delta;
         Vector3 velocity = _owner.Velocity;
 
@@ -35,6 +40,9 @@ public partial class NavAgentNPC : NavigationAgent3D
         {
             velocity.X = KnockbackVelocity.X;
             velocity.Z = KnockbackVelocity.Z;
+            // Apply upward component when airborne or launching
+            if (!_owner.IsOnFloor() || KnockbackVelocity.Y > 0.1f)
+                velocity.Y = KnockbackVelocity.Y;
             KnockbackVelocity = KnockbackVelocity.Lerp(Vector3.Zero, dt * 5f);
         }
         else if (!IsNavigationFinished())

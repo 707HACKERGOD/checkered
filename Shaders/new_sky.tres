@@ -2,8 +2,8 @@
 
 [ext_resource type="Shader" uid="uid://b04qwiljkk51s" path="res://Shaders/Sky.gdshader" id="1_5n1r3"]
 [ext_resource type="Texture2D" uid="uid://kfjltn0d3icg" path="res://Assets/6da3c4228b17b9357ce6c3bd42a4c665.jpg" id="2_mmasv"]
-[ext_resource type="Texture2D" uid="uid://dk0srpy2jevj4" path="res://Assets/Skybox_night_clear_bw.jpg" id="3_1a8g7"]
-[ext_resource type="Texture2D" uid="uid://n7hd4ockb1bs" path="res://Assets/moon.png" id="3_mmasv"]
+[ext_resource type="Texture2D" uid="uid://n7hd4ockb1bs" path="res://Assets/moon.png" id="3_1a8g7"]
+[ext_resource type="Texture2D" uid="uid://dk0srpy2jevj4" path="res://Assets/Skybox_night_clear_bw.jpg" id="4_2y1f8"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_hd3un"]
 shader = ExtResource("1_5n1r3")
@@ -16,8 +16,8 @@ shader_parameter/lightning_strength = 0.0
 shader_parameter/lightning_color = Color(0.8, 0.9, 1, 1)
 shader_parameter/wind_offset = Vector2(0, 0)
 shader_parameter/cloud_texture = ExtResource("2_mmasv")
-shader_parameter/star_texture = ExtResource("3_1a8g7")
-shader_parameter/moon_texture = ExtResource("3_mmasv")
+shader_parameter/star_texture = ExtResource("4_2y1f8")
+shader_parameter/moon_texture = ExtResource("3_1a8g7")
 shader_parameter/time_of_day = 12.0
 shader_parameter/cloud_scale = 0.4
 shader_parameter/cloud_coverage = 0.5

@@ -1,3 +1,23 @@
 [gd_resource type="Sky" format=3 uid="uid://c13sjjhlfwq1b"]
 
+[ext_resource type="Shader" uid="uid://b04qwiljkk51s" path="res://Shaders/Sky.gdshader" id="1_121yh"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_mu2hd"]
+shader = ExtResource("1_121yh")
+shader_parameter/sky_top_color = Color(0.1, 0.4, 0.8, 1)
+shader_parameter/sky_horizon_color = Color(0.4, 0.6, 0.9, 1)
+shader_parameter/sky_night_color = Color(0.02, 0.02, 0.05, 1)
+shader_parameter/sun_color = Color(1, 0.9, 0.7, 1)
+shader_parameter/moon_color = Color(0.9, 0.95, 1, 1)
+shader_parameter/lightning_strength = 0.0
+shader_parameter/lightning_color = Color(0.8, 0.9, 1, 1)
+shader_parameter/wind_offset = Vector2(0, 0)
+shader_parameter/time_of_day = 12.0
+shader_parameter/cloud_scale = 0.4
+shader_parameter/cloud_coverage = 0.5
+shader_parameter/cloud_softness = 0.5
+shader_parameter/cloud_tint = Color(1, 1, 1, 1)
+shader_parameter/moon_size = 0.05
+
 [resource]
+sky_material = SubResource("ShaderMaterial_mu2hd")

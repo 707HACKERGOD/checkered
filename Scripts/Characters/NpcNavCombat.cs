@@ -172,9 +172,14 @@ public partial class NpcNavCombat : Node
 
     private void PerformWildHaymaker()
     {
-        GD.Print("NPC swings wildly!");
         Vector3 dir = (_player.GlobalPosition - _body.GlobalPosition).Normalized();
-        _body.Rotation = new Vector3(0, Mathf.Atan2(-dir.X, -dir.Z), 0);
+        dir.Y = 0;
+        
+        // same rotation logic as NavAgentNPC
+        float targetYaw = _navAgent.FacesPositiveZ 
+            ? Mathf.Atan2(dir.X, dir.Z) 
+            : Mathf.Atan2(-dir.X, -dir.Z);
+        _body.Rotation = new Vector3(0, targetYaw, 0);
 
         // If the NPC has a real hitbox assigned, use it!
         if (_npcMeleeHitbox != null)

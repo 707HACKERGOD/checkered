@@ -51,26 +51,7 @@ public partial class AnimationController : Node
     /// Removes all BlendShape tracks from every animation.
     /// Fixes: "Index p_blend_shape = 0 is out of bounds (blend_shape_tracks.size() = 0)"
     /// </summary>
-    private void StripBlendShapeTracks()
-    {
-        if (_animPlayer == null) return;
-
-        string[] animNames = _animPlayer.GetAnimationList();
-        foreach (string animName in animNames)
-        {
-            Animation anim = _animPlayer.GetAnimation(animName);
-            if (anim == null) continue;
-
-            for (int i = anim.GetTrackCount() - 1; i >= 0; i--)
-            {
-                // ★ FIX: Use BlendShape, NOT TypeBlendShape
-                if (anim.TrackGetType(i) == Animation.TrackType.BlendShape)
-                {
-                    anim.RemoveTrack(i);
-                }
-            }
-        }
-    }
+    private void StripBlendShapeTracks() => AnimationFixer.StripBlendShapeTracks(_animPlayer);
 
     private void TravelToState(string newState)
     {

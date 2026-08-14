@@ -14,7 +14,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
-config/name="Checkered v0.15"
+config/name="Checkered v0.16"
 run/main_scene="uid://c3bouadlvlqxl"
 config/features=PackedStringArray("4.7", "C#", "GL Compatibility")
 run/max_fps=120
@@ -44,7 +44,7 @@ project/assembly_name="Checkered"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/project_dumper/plugin.cfg", "res://addons/terrain_3d/plugin.cfg")
+enabled=PackedStringArray("res://addons/project_dumper/plugin.cfg", "res://addons/terrain_3d/plugin.cfg", "res://addons/terrain_3d_line_helper/plugin.cfg")
 
 [global_group]
 

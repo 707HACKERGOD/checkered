@@ -37,3 +37,8 @@ android/
 builds/exes
 addons/
 Assets/imported_to_replace/
+Assets/
+res/Assets/
+.godot/
+terrain_data/
+Scenes/

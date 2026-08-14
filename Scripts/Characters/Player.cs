@@ -211,6 +211,9 @@ public partial class Player : CharacterBody3D
 
     public override void _PhysicsProcess(double delta)
     {
+        if (_attackCooldownTimer > 0f)
+            _attackCooldownTimer -= (float)delta;
+
         float dt = (float)delta; // Engine.TimeScale is applied automatically by Godot
 
         _cameraGimbal.GlobalPosition = GlobalPosition + new Vector3(0, 1.5f, 0);
@@ -611,6 +614,9 @@ public partial class Player : CharacterBody3D
 
         public void PerformAttack()
         {
+            if (_attackCooldownTimer > 0f) return;
+            _attackCooldownTimer = _currentWeapon?.AttackCooldown ?? 0.4f;
+
             // 1. Auto-Aim: Find nearest enemy
             Node3D nearestEnemy = FindNearestEnemy();
             if (nearestEnemy != null)
@@ -640,14 +646,16 @@ public partial class Player : CharacterBody3D
             EnableHitbox();
         }
 
-        private async void EnableHitbox()
+    private async void EnableHitbox()
+    {
+        await ToSignal(GetTree().CreateTimer(0.1f), "timeout");
+        if (_rightHandHitbox != null && IsInstanceValid(_rightHandHitbox))
         {
-            await ToSignal(GetTree().CreateTimer(0.1f), "timeout"); // Wait for wind-up
-            if (_rightHandHitbox != null) _rightHandHitbox.StartSwing(_currentWeapon);
-            
-            await ToSignal(GetTree().CreateTimer(0.2f), "timeout"); // Active frames duration
-            if (_rightHandHitbox != null) _rightHandHitbox.EndSwing();
+            _rightHandHitbox.StartSwing(_currentWeapon);
         }
+    }
+
+    private float _attackCooldownTimer = 0f;
 
     private Node3D FindNearestEnemy()
     {
@@ -825,23 +833,5 @@ public partial class Player : CharacterBody3D
         _currentWeapon = ItemRegistry.GetWeapon(type);
     }
 
-    private void StripBlendShapeTracks(AnimationPlayer animPlayer)
-    {
-        if (animPlayer == null) return;
-        string[] animNames = animPlayer.GetAnimationList();
-        foreach (string animName in animNames)
-        {
-            Animation anim = animPlayer.GetAnimation(animName);
-            if (anim == null) continue;
-
-            for (int i = anim.GetTrackCount() - 1; i >= 0; i--)
-            {
-                if (anim.TrackGetType(i) == Animation.TrackType.BlendShape)
-                {
-                    // Disabling is much safer and stops the engine error spam entirely
-                    anim.TrackSetEnabled(i, false); 
-                }
-            }
-        }
-    }
+    private void StripBlendShapeTracks(AnimationPlayer animPlayer) => AnimationFixer.StripBlendShapeTracks(animPlayer);
 }

@@ -20,6 +20,7 @@ public partial class NpcController : CharacterBody3D
     private bool _isStumbling = false;
     private Vector3 _stumbleVelocity;
     private float _stumbleTimer;
+    public bool IsStumbling => _isStumbling;
 
     // --- BONE NAME MAPS ---
     private static readonly (string limb, string arpGltf, string mixamo, Shape3D shape)[] BoneMap = new (string, string, string, Shape3D)[]
@@ -161,8 +162,7 @@ public partial class NpcController : CharacterBody3D
                     if (skeleton != null)
                     {
                         var animPlayer = capturedModel.FindChild("AnimationPlayer", recursive: true) as AnimationPlayer;
-                        if (animPlayer != null)
-                            animPlayer.Active = false;
+                        if (animPlayer != null) animPlayer.Active = false;
 
                         skeleton.ResetBonePoses();
 
@@ -170,8 +170,22 @@ public partial class NpcController : CharacterBody3D
                             ?? skeleton.GetNodeOrNull<PhysicalBoneSimulator3D>("PhysicalBoneSimulator");
                         if (simulator != null)
                         {
-                            simulator.Active = true;
-                            simulator.PhysicalBonesStartSimulation();
+                            // Ensure physical bones exist
+                            if (simulator.GetChildCount() == 0)
+                            {
+                                GD.PrintErr("NpcController: No PhysicalBone3D nodes found! Ragdoll requires bones in editor or SetupRagdoll().");
+                            }
+                            else
+                            {
+                                simulator.Active = true;
+                                simulator.PhysicalBonesStartSimulation();
+                                
+                                foreach (var child in simulator.GetChildren())
+                                {
+                                    if (child is PhysicalBone3D bone)
+                                        bone.ApplyCentralImpulse(new Vector3(0, 2f, -1f));
+                                }
+                            }
                         }
                     }
                 }
@@ -248,7 +262,6 @@ public partial class NpcController : CharacterBody3D
         }
 
         Velocity = new Vector3(_stumbleVelocity.X, velocity.Y, _stumbleVelocity.Z);
-        MoveAndSlide();
         _stumbleVelocity = _stumbleVelocity.Lerp(Vector3.Zero, dt * 8f);
         _stumbleTimer -= dt;
 
@@ -472,24 +485,7 @@ public partial class NpcController : CharacterBody3D
         return list;
     }
 
-    private void StripBlendShapeTracks(AnimationPlayer animPlayer)
-    {
-        if (animPlayer == null) return;
-        string[] animNames = animPlayer.GetAnimationList();
-        foreach (string animName in animNames)
-        {
-            Animation anim = animPlayer.GetAnimation(animName);
-            if (anim == null) continue;
-
-            for (int i = anim.GetTrackCount() - 1; i >= 0; i--)
-            {
-                if (anim.TrackGetType(i) == Animation.TrackType.BlendShape)
-                {
-                    anim.TrackSetEnabled(i, false); 
-                }
-            }
-        }
-    }
+    private void StripBlendShapeTracks(AnimationPlayer animPlayer) => AnimationFixer.StripBlendShapeTracks(animPlayer);
 
     private void SetupDynamicHitbox(Skeleton3D skeleton)
     {

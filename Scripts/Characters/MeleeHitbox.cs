@@ -18,32 +18,55 @@ public partial class MeleeHitbox : Area3D
         
         BodyEntered += OnBodyEntered;
         AreaEntered += OnAreaEntered; 
-
-        _owner = GetParent()?.GetParent<CharacterBody3D>();
+        // FIX: Walk up the tree to find CharacterBody3D owner
+        _owner = FindOwnerInParents();
         if (_owner == null)
-            _owner = GetParent<CharacterBody3D>();
+            GD.PrintErr($"MeleeHitbox '{Name}': Could not find CharacterBody3D owner!");
 
         _lifetimeTimer = new Timer { OneShot = true, WaitTime = HitboxLifetime };
         _lifetimeTimer.Timeout += EndSwing;
         AddChild(_lifetimeTimer);
-
         // Safety check: warn if the hitbox has no shape
         bool hasShape = false;
         foreach (Node child in GetChildren())
         {
             if (child is CollisionShape3D cs && cs.Shape != null) hasShape = true;
         }
-        if (!hasShape) GD.PrintErr($"MeleeHitbox '{Name}' has no CollisionShape3D! Attacks will not hit anything.");
+        if (!hasShape) GD.PrintErr($"MeleeHitbox '{Name}' has no CollisionShape3D!");
     }
 
+    private CharacterBody3D FindOwnerInParents()
+    {
+        Node current = GetParent();
+        while (current != null)
+        {
+            if (current is CharacterBody3D cb) return cb;
+            current = current.GetParent();
+        }
+        return null;
+    }
     public void StartSwing(ItemData weapon)
     {
         CurrentWeapon = weapon;
         _hitBodies.Clear();
         Monitoring = true;
         _lifetimeTimer.Start(HitboxLifetime);
+        CallDeferred(nameof(CheckInitialOverlaps));
 
         // FIX: Force-check overlaps immediately in case the swing starts while already intersecting
+        foreach (Node node in GetOverlappingBodies())
+        {
+            if (node is Node3D body) OnBodyEntered(body);
+        }
+        foreach (Node node in GetOverlappingAreas())
+        {
+            if (node is Area3D area) OnAreaEntered(area);
+        }
+    }
+
+    private void CheckInitialOverlaps()
+    {
+        if (!Monitoring) return;
         foreach (Node node in GetOverlappingBodies())
         {
             if (node is Node3D body) OnBodyEntered(body);

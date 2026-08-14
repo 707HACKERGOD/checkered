@@ -102,10 +102,20 @@ public partial class NpcEyeTracker : Node
                 GD.PrintErr($"EyeTracker: No material found on surface {EyeMaterialSurfaceIndex}");
                 return;
             }
-
+            
             if (sourceMat is ShaderMaterial shdOriginal)
             {
+                if (shdOriginal.Shader == null)
+                {
+                    GD.PrintErr($"EyeTracker: ShaderMaterial has null shader reference on surface {EyeMaterialSurfaceIndex}");
+                    return;
+                }
                 _eyeMaterial = (ShaderMaterial)shdOriginal.Duplicate();
+                if (_eyeMaterial == null)
+                {
+                    GD.PrintErr("EyeTracker: Failed to duplicate material");
+                    return;
+                }
                 FaceMesh.SetSurfaceOverrideMaterial(EyeMaterialSurfaceIndex, _eyeMaterial);
             }
             else if (sourceMat is StandardMaterial3D stdOriginal)
