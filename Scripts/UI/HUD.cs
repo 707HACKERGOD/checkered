@@ -1760,6 +1760,26 @@ public partial class HUD : Control
                 return ppc != null ? ppc.ScanlineIntensity.ToString("0.00") : "0.00";
             }
         });
+
+        _menuItems.Add(new HeaderItem("TELEPORT"));
+        _menuItems.Add(new ActionItem
+        {
+            Name = "City centre",
+            OnExecute = () => Teleport(new Vector3(1077.2f, 29.7f, 474.87f))
+        });
+    }
+
+    // code for teleporting
+    private void Teleport(Vector3 targetCoordinates)
+    {
+        var player = GetTree().Root.FindChild("Player", true, false) as CharacterBody3D;
+         if (player != null)
+        {
+            // 1. Kill all current physics velocity so you don't retain slide momentum
+            player.Velocity = Vector3.Zero;
+            player.GlobalPosition = targetCoordinates;
+        }
+        
     }
 
     private void AddPreset(string name, WeatherManager.WeatherState state)

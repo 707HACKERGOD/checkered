@@ -6,7 +6,7 @@
 [![Android](https://img.shields.io/badge/Android-v0.1.1--alpha--android-green?logo=android&style=for-the-badge)](https://github.com/707HACKERGOD/checkered/releases/tag/v0.1.1-alpha-android)
 
 System requirements (WIP):
-- 500MB storage
+- 5GB storage
 - Windows 10+, x64
 - Android version 15
 
@@ -47,33 +47,29 @@ Demo:
         🚧 gameplay
 - 🚧 Open world map with 2 key buildings in demo: roadhouse, trade school
         ✅ measuring scale, drawing the 2D map, installing plugin
-        🚧 making textures library for ground painting
-        - painting elevation+textures
-        - painting highways
-        - modeling lamps and foliage
-        - adding lamps and 3d roads
-        - adding trees and foliage
-        - adding water
-        - blocking out buildings
-        - polishing the roadhouse building
-        - polishing the college building
-        - more polishing in general
-        - recreating the pinterest references 1-to-1
+        ✅ making textures library for ground painting
+        ✅ painting elevation+textures
+        ✅ modeling + adding vehicle AI to highways
+        ✅ modeling lamps and foliage
+        ✅ adding lamps and 3d roads
+        ✅ adding trees and foliage
+        ✅ adding water
+        🚧 blocking out buildings
+        🚧 roadhouse
+        🚧 college
 - 🚧 Dialogue UI
         ✅ linear dialogue
         ✅ conditional dialogue
         ✅ branching dialogue
-        🚧 persistent memory
-        🚧 polishing UI to differentiate between MC and NPC; progress ring
         🚧 writing dialogue for the main 2 characters
 - 🚧 Intro story
-        - leaving the woods, newspaper
-        - truant's quest
-        - Kimo's personality test
+        🚧 leaving the woods, newspaper
+        🚧 truant's quest
+        🚧 Kimo's personality test
 - 🚧 Calendar UI
-        - clone from old demo
-        - add key character weeks
-- 🚧 5 NPCs in the first demo: Barkeeper, Rich truant, Phantom, Base_F, Base_M
+        🚧 clone from old demo
+        🚧 add key character weeks
+- ✅ 5 NPCs in the first demo: Barkeeper, Rich truant, Phantom, Base_F, Base_M
 - 🚧 Sounds and music
         - footsteps for everyone
         - UI
@@ -83,7 +79,7 @@ Demo:
         - ambient sounds in different locations (bar music, waves at beach)
 - 🚧 Animation and movement system: idle, walk, sprint, jump, crouch, crawl, turning around, climb, swim
         - basic state machine
-        - IK and smooth merging
+        - IK and merging
         - combat integration
 - 🚧 Crafting system version 1: a list of presets; 3-deep menu for lattice manipulation on every material for the presets + on every material of the 2 buildings
         - UI on a wall
@@ -102,6 +98,10 @@ Demo:
         - slow down time and clone MC into a transparent phantom with special visuals
 
 Future plans:
+
+- Dialogue:
+        - persistent memory
+        - polishing UI to differentiate between MC and NPC; progress ring
 
 - 4 key supported playstyles: Pacifist / Insanity / Criminal / Engineer
 - Thaumaturgy lore and magic system - learn to control the curse, start chemical reactions in real time in the world around you with no equipment but your mind. Transmute walls into gas and then solidify them back while the curse AI is sprinting through to trap it sealed in concrete.
