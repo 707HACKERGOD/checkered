@@ -15,8 +15,8 @@ public partial class Player : CharacterBody3D
     [Export] public string HipsBoneName = "Hips";
     [Export] public bool RootMotionFlipZ = false;   // tick ONLY if walking drives backward after this fix
     [Export] public float WalkSpeed = 2.0f;    // keep these equal to the blend ring radii
-    [Export] public float RunSpeed = 3.5f;
-    [Export] public float SprintSpeed = 6.0f;
+    [Export] public float RunSpeed = 4.9f;
+    [Export] public float SprintSpeed = 5.8f;
     [Export] public float CrouchSpeed = 1.2f;
     [Export] public float JumpVelocity = 3.0f;
     [Export] public float TurnSpeed = 12.0f;
@@ -31,19 +31,33 @@ public partial class Player : CharacterBody3D
     [ExportSubgroup("Sprint Dash")]
     [Export] public float DashSpeed = 3.5f;     // extra m/s on sprint start
     [Export] public float DashDuration = 0.25f;
+    private float _stillTime;   // seconds with horizSpeed < 0.8
+    private float _moveTime;    // seconds with horizSpeed >= 0.8
     private float _pivotTimer;
     private float _pivotTargetYaw;
+    private float _pivotTotal;
+    private float _pivotStartYaw;
 
     [ExportSubgroup("Step Up")]
     [Export] public float StepHeight = 0.4f;
     [Export] public float StepCheckDistance = 0.3f;
     [Export] public int StepCollisionMask = 2;
+    [Export] public CollisionShape3D ColCapsuleFull;
+    [Export] public CollisionShape3D ColCapsuleCrouch;
 
     [ExportSubgroup("Root Motion")]
     [Export] public bool UseRootMotion = true;
     [Export] public float RootMotionScale = 1.0f;    // tune if anim speeds != export speeds
     [Export] public bool MatchDesiredSpeed = false;  // true = exact speeds (may foot-slide)
     [Export] public float BlendSmoothing = 8.0f;     // blend-position smoothing rate
+    [Export] public float StandClearance = 1.9f;   // ceiling height you need standing
+    [Export] public float CrouchClearance = 1.25f; // height you need fully crouched
+    [Export] public CollisionShape3D BodyShape;    // your capsule
+    [Export] public float StandShapeHeight = 1.8f;
+    [Export] public float CrouchShapeHeight = 1.2f;
+    private float _forcedCrouch;   // 0..1
+    private bool _isWallhugging; private Vector3 _wallNormal; private float _wallPressTime;
+    private float _airTime; private float _landImpact; private bool _wasOnFloor = true;
 
     [ExportSubgroup("Foot&Leg IK")]
 
@@ -179,6 +193,8 @@ public partial class Player : CharacterBody3D
     public override void _Ready()
     {
 
+        ColCapsuleFull.Disabled = false;
+        ColCapsuleCrouch.Disabled = true;
         _skeleton = Skeleton
          ?? GetNodeOrNull<Skeleton3D>("Syl/char_grp/rig/Skeleton3D")
          ?? GetNodeOrNull<Skeleton3D>("Syl/char_grp/rig_mc/Skeleton3D");
@@ -327,6 +343,29 @@ public partial class Player : CharacterBody3D
         handle_foot_rotation(dt);}
         RootMotionTrace(dt);
 
+        float fallSpeed = -velocity.Y;
+
+        if (IsOnFloor())
+        {
+            if (!_wasOnFloor) _landImpact = fallSpeed;   // touchdown frame only
+            _airTime = 0f;
+        }
+        else { _airTime += dt; _landImpact = 0f; }
+        _wasOnFloor = IsOnFloor();
+        if (!_wasOnFloor)
+        {
+            _landImpact = fallSpeed;
+            TryPlayLand(_landImpact);
+        }
+
+        float hs = new Vector2(Velocity.X, Velocity.Z).Length();
+        if (hs < 0.8f) { _stillTime += dt; _moveTime = 0f; }
+        else           { _moveTime += dt;  _stillTime = 0f; }
+
+        UpdateForcedCrouch(dt);
+        TraceAnimState();
+        RootMotionDebug(dt);
+
         PushRigidBodies();
         UpdateAnimationParams(dt, anyMenuOpen);    // feed the tree AFTER moving
         UpdateInteraction(anyMenuOpen);
@@ -404,10 +443,12 @@ public partial class Player : CharacterBody3D
         if (_pivotTimer > 0f)   // pivot clip owns the body
         {
             _pivotTimer -= dt;
-            Rotation = new Vector3(0f, Mathf.LerpAngle(Rotation.Y, _pivotTargetYaw,
-                        1f - Mathf.Exp(-10f * dt)), 0f);
+            float k = Mathf.Clamp(1f - _pivotTimer / Mathf.Max(_pivotTotal, 0.01f), 0f, 1f);
+            k = k * k * (3f - 2f * k);   // smoothstep
+            Rotation = new Vector3(0f, _pivotStartYaw + Mathf.AngleDifference(_pivotTargetYaw, _pivotStartYaw) * k, 0f);
             return;
         }
+
         Vector3 faceDir;
         if (_isLockedOn && LockOnTarget != null)
         {
@@ -428,18 +469,27 @@ public partial class Player : CharacterBody3D
         if (Mathf.Abs(yawDiff) > 110f && speed > 1.5f && IsOnFloor() && _stateMachine != null)
         {
             _stateMachine.Travel(Mathf.Abs(yawDiff) > 155f ? "Pivot180" : "Pivot90L");
-            _pivotTimer = _animPlayer.HasAnimation("Run_180") ? 0.7f : 0.5f;
+            _pivotTimer = _animPlayer != null && _animPlayer.HasAnimation("Run_180")
+                ? (float)_animPlayer.GetAnimation("Run_180").Length : 0.6f;
+            _pivotTotal = _pivotTimer;
+            _pivotStartYaw = Rotation.Y;
             _pivotTargetYaw = Rotation.Y + Mathf.DegToRad(yawDiff);
         }
     }
 
+    private static readonly HashSet<string> RootMotionStates = new()
+    { "Locomotion", "Crouch", "run_start", "run_stop", "Pivot180", "Pivot90L",
+      "WallhugStart", "WallhugLoop", "Climb" };   // Jump/Fall/Land stay code-driven on purpose
     private void ApplyMovement(float dt, ref Vector3 velocity)
     {
+        string st = _stateMachine?.GetCurrentNode() ?? "";
+        bool rmAllowed = UseRootMotion && _rootMotionAvailable && _animTree != null
+                        && RootMotionStates.Contains(st);
         bool usedRootMotion = false;
 
         if (IsOnFloor())
         {
-            if (UseRootMotion && _rootMotionAvailable && _animTree != null)
+            if (rmAllowed)
             {
                 Vector3 localDelta = _animTree.GetRootMotionPosition();
                 UpdateRootMotionWatchdog(dt, localDelta);
@@ -451,10 +501,8 @@ public partial class Player : CharacterBody3D
                     Vector3 worldDelta = basis * localDelta;
                     Vector3 rmVel = new Vector3(worldDelta.X, 0f, worldDelta.Z)
                                     * (RootMotionScale / Mathf.Max(dt, 1e-5f));
-
                     if (MatchDesiredSpeed && _targetSpeed > 0.05f && rmVel.LengthSquared() > 1e-8f)
                         rmVel = rmVel.Normalized() * _targetSpeed;
-
                     velocity.X = rmVel.X;
                     velocity.Z = rmVel.Z;
 
@@ -468,7 +516,7 @@ public partial class Player : CharacterBody3D
                 }
             }
 
-            if (!usedRootMotion)
+            if (!usedRootMotion)   // ALWAYS runs in Jump/Fall/Land/Attack — friction + control live here
             {
                 Vector3 target = _moveDirWorld * _targetSpeed;
                 float accel = _moveDirWorld != Vector3.Zero ? GroundAccel : GroundDecel;
@@ -534,6 +582,11 @@ public partial class Player : CharacterBody3D
 
         if (downResult.Count > 0)
         {
+            Vector3 floorNormal = downResult["normal"].AsVector3();
+            // Only treat it as a step if the surface is nearly flat (normal.y > 0.95)
+            if (floorNormal.Y < 0.95f)
+                return;
+
             float floorY = downResult["position"].AsVector3().Y;
             float stepUp = floorY - GlobalPosition.Y;
             if (stepUp > 0.05f && stepUp <= StepHeight)
@@ -543,31 +596,51 @@ public partial class Player : CharacterBody3D
 
     private void ToggleCrouch()
     {
+        if (_isCrouching && _forcedCrouch > 0.15f) return;  // no headroom — refuse to stand
         _isCrouching = !_isCrouching;
-        // TODO: shrink CollisionShape3D + CameraOffset here when you have ceiling checks
+        ApplyCrouchShape();
+    }
+
+    private void ApplyCrouchShape()
+    {
+        bool crouched = _isCrouching || _forcedCrouch > 0.5f;   // forced crouch auto-swaps too
+        if (ColCapsuleFull != null) ColCapsuleFull.Disabled = crouched;
+        if (ColCapsuleCrouch != null) ColCapsuleCrouch.Disabled = !crouched;
     }
 
     // FOOT&LEG IK
     private bool can_player_move = true;
     public void handle_leg_ik(double delta)
     {
-        float floatDelta = (float)delta;
-        bool should_ik_be_active = IsOnFloor() && (ik_is_enabled || !can_player_move);
+        float d = (float)delta;
+        float horizSpeed = new Vector2(Velocity.X, Velocity.Z).Length();
+        // speedGate: 1.0 at idle, 0.0 when speed >= 2.5 m/s (tune the threshold)
+        float speedGate = Mathf.Clamp(1f - horizSpeed / 2.5f, 0f, 1f);
 
-        ik_leg_left.Active = should_ik_be_active;
-        ik_leg_right.Active = should_ik_be_active;
+        bool grounded = IsOnFloor() && ik_is_enabled;
+        ik_leg_left.Active = grounded;
+        ik_leg_right.Active = grounded;
 
-        if (should_ik_be_active)
+        if (grounded)
         {
-            last_offset_l = _process_leg_ik(ray_leg_left_front, ray_leg_left_back, target_leg_left, ik_leg_left, floatDelta);
-            last_offset_r = _process_leg_ik(ray_leg_right_front, ray_leg_right_back, target_leg_right, ik_leg_right, floatDelta);
+            last_offset_l = _process_leg_ik(ray_leg_left_front, ray_leg_left_back, target_leg_left, ik_leg_left, d, speedGate);
+            last_offset_r = _process_leg_ik(ray_leg_right_front, ray_leg_right_back, target_leg_right, ik_leg_right, d, speedGate);
 
-            choose_lowest_gap(floatDelta);
+            // Only sink the visual root when nearly stationary (avoids clamping during motion)
+            if (speedGate > 0.2f)
+                choose_lowest_gap(d);
+            else
+            {
+                Vector3 p = visual_for_IK.Position;
+                p.Y = Mathf.Lerp(p.Y, 0f, 10f * d);
+                visual_for_IK.Position = p;
+            }
         }
         else
         {
+            // airborne branch (keep your existing code)
             Vector3 visualPos = visual_for_IK.Position;
-            visualPos.Y = Mathf.Lerp(visualPos.Y, 0.0f, 15.0f * floatDelta);
+            visualPos.Y = Mathf.Lerp(visualPos.Y, 0.0f, 15.0f * d);
             visual_for_IK.Position = visualPos;
 
             ik_leg_left.Influence = 0.0f;
@@ -591,7 +664,7 @@ public partial class Player : CharacterBody3D
         visual_for_IK.Position = visualPos;
     }
 
-    private float _process_leg_ik(RayCast3D ray_f, RayCast3D ray_b, Marker3D target_marker, TwoBoneIK3D ik, float delta)
+    private float _process_leg_ik(RayCast3D ray_f, RayCast3D ray_b, Marker3D target_marker, TwoBoneIK3D ik, float delta, float speedGate)
     {
         bool is_f_colliding = ray_f.IsColliding();
         bool is_b_colliding = ray_b.IsColliding();
@@ -625,17 +698,14 @@ public partial class Player : CharacterBody3D
 
         if (height_diff > slope_threshold)
         {
-            // 1. Climbing up
             current_pos_y = pos_y_height_up;
         }
         else if (height_diff < -slope_threshold)
         {
-            // 2. Climbing down
             current_pos_y = pos_y_height_down;
         }
         else
         {
-            // 3. Walk on flat surface
             current_pos_y = pos_y_height_flat;
         }
 
@@ -643,7 +713,8 @@ public partial class Player : CharacterBody3D
         targetPos.Y = avg_hit_y + current_pos_y;
         target_marker.GlobalPosition = targetPos;
 
-        ik.Influence = Mathf.Lerp(ik.Influence, active_ik_influence, ik_lerp_speed * delta);
+        // The speedGate reduces IK influence when moving faster
+        ik.Influence = Mathf.Lerp(ik.Influence, active_ik_influence * speedGate, ik_lerp_speed * delta);
 
         return height_diff;
     }
@@ -750,36 +821,86 @@ public partial class Player : CharacterBody3D
     {
         if (_animTree == null) return;
 
-        // Intent-driven blend position: local-space direction * target speed (m/s).
-        // Driven by INPUT, never by Velocity -> no feedback loop.
+        bool justLanded = IsOnFloor() && _landImpact > 0f;
+
         Vector2 blendTarget = Vector2.Zero;
         if (_moveDirWorld != Vector3.Zero)
         {
             Vector3 local = GlobalTransform.Basis.Inverse() * _moveDirWorld;
-            blendTarget = new Vector2(local.X, -local.Z) * _targetSpeed; // forward = +Y
+            blendTarget = new Vector2(local.X, -local.Z) * _targetSpeed;
         }
-
-        float t = 1f - Mathf.Exp(-BlendSmoothing * dt);
-        _blendPos = _blendPos.Lerp(blendTarget, t);
+        _blendPos = _blendPos.Lerp(blendTarget, 1f - Mathf.Exp(-BlendSmoothing * dt));
 
         if (DebugManualBlend)
         {
             _blendPos = Input.GetVector("ui_left", "ui_right", "ui_up", "ui_down") * 5.0f;
             _animTree.Set(PLocomotionBlend, _blendPos);
-            return;   // stand still while doing this; don't press movement keys
+            return;
         }
 
         _animTree.Set(PLocomotionBlend, _blendPos);
         _animTree.Set(PCrouchBlend, _blendPos);
+        _animTree.Set("parameters/Start/blend_position", Mathf.Clamp(_targetSpeed, 0.5f, 5.8f));
 
-        _animTree.Set(PIsCrouching, _isCrouching);
-        _animTree.Set(PIsStanding, !_isCrouching);
+        float horizSpeed = new Vector2(Velocity.X, Velocity.Z).Length();
+        bool wantsMove = _targetSpeed > 0.1f;
+
+        // --- REMOVED: is_moving and is_stopping conditions ---
+        // They are now driven by Travel() calls.
+
+        bool crouched = _isCrouching || _forcedCrouch > 0.5f;
+        _animTree.Set(PIsCrouching, crouched);
+        _animTree.Set(PIsStanding, !crouched);
         _animTree.Set(PIsOnFloor, IsOnFloor());
         _animTree.Set(PIsJumping, !IsOnFloor() && Velocity.Y > 0.1f);
-        _animTree.Set(PIsFalling, !IsOnFloor() && Velocity.Y < -0.1f);
-        float horizSpeed = new Vector2(Velocity.X, Velocity.Z).Length();
-        _animTree.Set("parameters/conditions/is_moving",   _targetSpeed > 0.1f && horizSpeed < 4.0f);
-        _animTree.Set("parameters/conditions/is_stopping", _targetSpeed < 0.1f && horizSpeed > 1.0f);
+        _animTree.Set(PIsFalling, !IsOnFloor() && (_airTime > 0.25f || Velocity.Y < -3.0f));
+
+        // ----- NEW: Travel to run_start / run_stop from Locomotion -----
+        string st = _stateMachine?.GetCurrentNode() ?? "";
+        if (st == "Locomotion")
+        {
+            if (wantsMove && _stillTime > 0.35f && _blendPos.Length() < 0.8f)
+                _stateMachine.Travel("run_start");
+            else if (!wantsMove && _moveTime > 0.25f && horizSpeed > 0.8f)
+                _stateMachine.Travel("run_stop");
+        }
+
+        if (justLanded) _landImpact = 0f;
+    }
+
+    private void TryPlayLand(float impact)
+    {
+        if (_stateMachine == null || !IsOnFloor() || impact < 1.5f) return;
+        string target = impact >= 12f ? "LandStumble"      // <- use YOUR exact state names
+                    : impact >= 7f  ? "LandHeavy"
+                    :                 "LandSoft";
+        _stateMachine.Travel(target);
+        GD.Print($"LAND impact={impact:F1} -> {target}");   // keep until verified
+    }
+
+    private string _lastState = "";
+    private void TraceAnimState()
+    {
+        if (_stateMachine == null) return;
+        string st = _stateMachine.GetCurrentNode();
+        if (st == _lastState) return;
+        GD.Print($"ANIM '{_lastState}' -> '{st}'" +
+            (!RootMotionStates.Contains(st) ? "   [NOT in RootMotionStates -> CODE-DRIVEN, this is your slide]" : ""));
+        _lastState = st;
+    }
+
+    private float _rmDbgTimer;
+    private void RootMotionDebug(float dt)
+    {
+        // Stop logging when the export flag is off
+        if (!DebugRootMotionTrace || _animTree == null) return;
+
+        _rmDbgTimer -= dt;
+        if (_rmDbgTimer > 0) return;
+        _rmDbgTimer = 0.5f;
+        GD.Print($"RMDBG state='{_lastState}' blend={_blendPos:F2} " +
+                $"rmDelta={_animTree.GetRootMotionPosition():F3} " +
+                $"vel={new Vector2(Velocity.X, Velocity.Z).Length():F2} missing={_rootMotionMissing}");
     }
 
     // ==================================================================
@@ -1602,5 +1723,105 @@ public partial class Player : CharacterBody3D
                 $"delta={_animTree.GetRootMotionPosition():F4} | " +
                  $"oldGetType={_animTree.Get("root_motion_position").VariantType} | " +
                 $"track='{_animTree.RootMotionTrack}' | cb={_animTree.CallbackModeProcess}");
+    }
+    private void UpdateForcedCrouch(float dt)
+    {
+        var q = PhysicsRayQueryParameters3D.Create(
+            GlobalPosition + Vector3.Up * 0.3f, GlobalPosition + Vector3.Up * (StandClearance + 0.3f));
+        q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+        q.CollisionMask = (uint)StepCollisionMask;
+        var hit = GetWorld3D().DirectSpaceState.IntersectRay(q);
+
+        float target = 0f;
+        if (hit.Count > 0)
+        {
+            float clearance = GlobalPosition.Y + StandClearance - hit["position"].AsVector3().Y - 0.3f;
+            target = 1f - Mathf.Clamp((clearance - CrouchClearance) / (StandClearance - CrouchClearance), 0f, 1f);
+        }
+        _forcedCrouch = Mathf.Lerp(_forcedCrouch, target, 1f - Mathf.Exp(-10f * dt));
+
+        // drives: tree crouch state, capsule, camera
+        bool crouched = Mathf.Max(_forcedCrouch, _isCrouching ? 1f : 0f) > 0.5f;
+        _animTree?.Set(PIsCrouching, crouched);
+        _animTree?.Set(PIsStanding, !crouched);
+
+        if (BodyShape?.Shape is CapsuleShape3D cap)
+            cap.Height = Mathf.Lerp(StandShapeHeight, CrouchShapeHeight, _forcedCrouch); // shared resource — duplicate per player if you ever instance
+    }
+
+    private void UpdateWallhug(float dt, ref Vector3 velocity)
+    {
+        if (_isWallhugging) { WallhugMove(dt, ref velocity); return; }
+        if (!IsOnFloor() || _forcedCrouch > 0.3f) { _wallPressTime = 0; return; }
+
+        bool pressing = false;
+        for (int i = 0; i < GetSlideCollisionCount(); i++)
+        {
+            Vector3 n = GetSlideCollision(i).GetNormal();
+            if (Mathf.Abs(n.Y) > 0.3f) continue;                      // not a vertical wall
+            if (_moveDirWorld.Dot(-n) > 0.6f)                          // input pushes INTO it
+            { _wallNormal = n; pressing = true; break; }
+        }
+
+        _wallPressTime = pressing ? _wallPressTime + dt : 0f;
+        if (_wallPressTime > 0.15f && _animTree != null)
+        {
+            _isWallhugging = true;
+            _stateMachine.Travel("WallhugStart");
+        }
+    }
+
+    private void WallhugMove(float dt, ref Vector3 velocity)
+    {
+        Vector3 tangent = _wallNormal.Cross(Vector3.Up).Normalized();
+        if (tangent.Dot(GlobalTransform.Basis.Z) < 0) tangent = -tangent; // keep current facing side
+
+        // Face along the wall
+        float yaw = Mathf.Atan2(-tangent.X, -tangent.Z);
+        Rotation = new Vector3(0, Mathf.LerpAngle(Rotation.Y, yaw, 8f * dt), 0);
+
+        // W/A/D = shuffle along wall (root motion from wallhug_LF drives it);
+        // S or input pulling away = peel off
+        bool pullingAway = _moveDirWorld.Dot(-_wallNormal) < -0.4f || Input.IsActionPressed("move_back");
+        Vector2 input = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
+        float along = input.Y;   // W forward along wall, S back — swap if your clips face the other way
+        velocity.X = tangent.X * along * 0.6f;
+        velocity.Z = tangent.Z * along * 0.6f;
+
+        if (pullingAway && _animTree != null)
+        {
+            _isWallhugging = false; _wallPressTime = 0;
+            _stateMachine.Travel(_targetSpeed > 0.1f ? "WallhugEndF" : "WallhugEnd");
+        }
+    }
+    private bool ProbeLedge(Vector3 wallNormal, out Vector3 anchor, out float height)
+    {
+        anchor = Vector3.Zero; height = 0f;
+        Vector3 dir = -wallNormal;
+        float lastHit = -1f;
+        for (float h = 0.5f; h <= 2.6f; h += 0.2f)
+        {
+            var q = PhysicsRayQueryParameters3D.Create(
+                GlobalPosition + Vector3.Up * h + dir * 0.75f,
+                GlobalPosition + Vector3.Up * h + dir * 0.05f);
+            q.CollisionMask = (uint)StepCollisionMask;
+            if (GetWorld3D().DirectSpaceState.IntersectRay(q).Count > 0) lastHit = h;
+            else if (lastHit > 0f)
+            {
+                var dq = PhysicsRayQueryParameters3D.Create(
+                    GlobalPosition + Vector3.Up * h + dir * 0.75f,
+                    GlobalPosition + Vector3.Up * lastHit + dir * 0.75f);
+                dq.CollisionMask = (uint)StepCollisionMask;
+                var d = GetWorld3D().DirectSpaceState.IntersectRay(dq);
+                if (d.Count > 0)
+                {
+                    height = d["position"].AsVector3().Y - GlobalPosition.Y;
+                    anchor = d["position"].AsVector3() + wallNormal * 0.3f;
+                    return true;
+                }
+                lastHit = -1f;
+            }
+        }
+        return false;
     }
 }

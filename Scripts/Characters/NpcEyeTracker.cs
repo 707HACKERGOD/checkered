@@ -9,6 +9,7 @@ public partial class NpcEyeTracker : Node
     [Export] public Vector3 TargetOffset = new Vector3(0, 1.6f, 0);
     [Export] public Skeleton3D CharacterSkeleton;
     [Export] public MeshInstance3D FaceMesh;
+    [Export] public Shader EyeShader;
 
     [ExportGroup("Toggles")]
     [Export] public bool EnableHeadTracking = true;
@@ -60,7 +61,7 @@ public partial class NpcEyeTracker : Node
 
     public override void _Ready()
     {
-        ProcessPriority = 1;
+        ProcessPriority = 50;
         _initialized = false;
         InitializeTracker();
         ResetBlinkTimer();
@@ -87,14 +88,8 @@ public partial class NpcEyeTracker : Node
                 return;
             }
 
-            // CRITICAL FIX: Always get the ACTIVE material (respects overrides)
-            // and clear any existing override first to get back to the original
             Material activeMat = FaceMesh.GetActiveMaterial(EyeMaterialSurfaceIndex);
-            
-            // If there's an override, it might be from a previous editor session - use the mesh's base material
             Material original = FaceMesh.Mesh.SurfaceGetMaterial(EyeMaterialSurfaceIndex);
-            
-            // If original is null, fallback to active (mesh might not have material assigned at mesh level)
             Material sourceMat = original ?? activeMat;
 
             if (sourceMat == null)
@@ -110,7 +105,8 @@ public partial class NpcEyeTracker : Node
                     GD.PrintErr($"EyeTracker: ShaderMaterial has null shader reference on surface {EyeMaterialSurfaceIndex}");
                     return;
                 }
-                _eyeMaterial = (ShaderMaterial)shdOriginal.Duplicate();
+                //_eyeMaterial = (ShaderMaterial)shdOriginal.Duplicate();
+                _eyeMaterial = shdOriginal;
                 if (_eyeMaterial == null)
                 {
                     GD.PrintErr("EyeTracker: Failed to duplicate material");
@@ -131,7 +127,6 @@ public partial class NpcEyeTracker : Node
                 return;
             }
 
-            // CRITICAL FIX: Reset UV offset to base immediately on init
             ApplyEyeUvOffset(EyeUvBase);
             _currentUvOffset = EyeUvBase;
 
@@ -304,15 +299,16 @@ public partial class NpcEyeTracker : Node
             
             if (angleToTarget <= MaxLookAngle)
             {
-                // KEY FIX: Use head's REST pose basis so head rotation doesn't eat the eye offset
-                Transform3D headRest = CharacterSkeleton.GetBoneRest(_headIdx);
-                Vector3 localDir = headRest.Basis.Inverse() * lookDir;
+                // Use head's REST pose basis
+                //Transform3D headRest = CharacterSkeleton.GetBoneRest(_headIdx);
+                //Vector3 localDir = headRest.Basis.Inverse() * lookDir;
+                Vector3 localDir = headGlobalPose.Basis.Inverse() * lookDir;
                 
-                // In your setup +Z is forward
+                // +Z is forward
                 if (localDir.Z > 0.01f)
                 {
                     float rawU = localDir.X * UvSensitivity.X;
-                    // PRESERVED: negative Y fix for up/down inversion
+                    // negative Y fix for up/down inversion
                     float rawV = -localDir.Y * UvSensitivity.Y;
 
                     Vector2 trackingDelta = new Vector2(rawU, rawV);
@@ -342,7 +338,6 @@ public partial class NpcEyeTracker : Node
         ApplyEyeUvOffset(_currentUvOffset);
     }
 
-    // CRITICAL FIX: Centralized UV application to ensure consistency
     private void ApplyEyeUvOffset(Vector2 offset)
     {
         if (_eyeMaterial == null) return;
