@@ -37,6 +37,12 @@ public partial class Player : CharacterBody3D
     private float _pivotTargetYaw;
     private float _pivotTotal;
     private float _pivotStartYaw;
+    private float _stopSpeed;
+
+    [Export] public float ClimbSpeed = 1.5f;
+    [Export] public float WallhugSpeed = 0.8f;
+    private bool _isClimbing;
+    private Vector3 _climbNormal;
 
     [ExportSubgroup("Step Up")]
     [Export] public float StepHeight = 0.4f;
@@ -228,6 +234,8 @@ public partial class Player : CharacterBody3D
             StripBlendShapeTracks(_animPlayer);
             SetupRootMotion();
             ForceLoopModes();
+            if (_animPlayer != null && _animPlayer.HasAnimation("climb_up_stand"))
+                _animPlayer.GetAnimation("climb_up_stand").LoopMode = Animation.LoopModeEnum.None;
             _stateMachine = (AnimationNodeStateMachinePlayback)_animTree.Get("parameters/playback");
             _animTree.Active = true;
         }
@@ -328,8 +336,12 @@ public partial class Player : CharacterBody3D
         UpdateFacing(dt);                          // rotate-to-move / lock-on strafe
 
         Vector3 velocity = Velocity;
-
-        if (!IsOnFloor())
+        float hs = new Vector2(Velocity.X, Velocity.Z).Length();
+        if (hs < 0.8f) { _stillTime += dt; _moveTime = 0f; }
+        else           { _moveTime += dt;  _stillTime = 0f; }
+        FloorSnapLength = hs > 2.0f ? 0.03f : 0.1f;   // at speed: falls off; at idle: stable on slopes
+        // gravity: skip when climbing
+        if (!_isClimbing && !IsOnFloor())
             velocity.Y -= Gravity * dt;
         if (!anyMenuOpen && Input.IsActionJustPressed("jump") && IsOnFloor())
             velocity.Y = JumpVelocity;
@@ -338,6 +350,7 @@ public partial class Player : CharacterBody3D
 
         Velocity = velocity;
         MoveAndSlide();
+        DetectWallhugAndClimb(dt);
         if (ik_is_enabled)
         {handle_leg_ik(dt);
         handle_foot_rotation(dt);}
@@ -347,20 +360,18 @@ public partial class Player : CharacterBody3D
 
         if (IsOnFloor())
         {
-            if (!_wasOnFloor) _landImpact = fallSpeed;   // touchdown frame only
+            if (!_wasOnFloor)          // just landed this frame
+            {
+                _landImpact = fallSpeed;   // store the impact speed
+                TryPlayLand(_landImpact);
+            }
             _airTime = 0f;
         }
-        else { _airTime += dt; _landImpact = 0f; }
-        _wasOnFloor = IsOnFloor();
-        if (!_wasOnFloor)
+        else
         {
-            _landImpact = fallSpeed;
-            TryPlayLand(_landImpact);
+            _airTime += dt;
         }
-
-        float hs = new Vector2(Velocity.X, Velocity.Z).Length();
-        if (hs < 0.8f) { _stillTime += dt; _moveTime = 0f; }
-        else           { _moveTime += dt;  _stillTime = 0f; }
+        _wasOnFloor = IsOnFloor();
 
         UpdateForcedCrouch(dt);
         TraceAnimState();
@@ -478,14 +489,16 @@ public partial class Player : CharacterBody3D
     }
 
     private static readonly HashSet<string> RootMotionStates = new()
-    { "Locomotion", "Crouch", "run_start", "run_stop", "Pivot180", "Pivot90L",
-      "WallhugStart", "WallhugLoop", "Climb" };   // Jump/Fall/Land stay code-driven on purpose
+    { "run_start", "run_stop", "Pivot180", "Pivot90L", "ClimbUpStand" };
     private void ApplyMovement(float dt, ref Vector3 velocity)
     {
         string st = _stateMachine?.GetCurrentNode() ?? "";
         bool rmAllowed = UseRootMotion && _rootMotionAvailable && _animTree != null
                         && RootMotionStates.Contains(st);
         bool usedRootMotion = false;
+
+        if (_isClimbing) { ClimbMove(dt, ref velocity); return; }
+        if (_isWallhugging) { WallhugMove(dt, ref velocity); return; }
 
         if (IsOnFloor())
         {
@@ -616,6 +629,15 @@ public partial class Player : CharacterBody3D
         float horizSpeed = new Vector2(Velocity.X, Velocity.Z).Length();
         // speedGate: 1.0 at idle, 0.0 when speed >= 2.5 m/s (tune the threshold)
         float speedGate = Mathf.Clamp(1f - horizSpeed / 2.5f, 0f, 1f);
+        if (_isClimbing || _isWallhugging)
+        {
+            ik_leg_left.Active = false;  ik_leg_right.Active = false;
+            ik_leg_left.Influence = 0f;  ik_leg_right.Influence = 0f;
+            Vector3 p = visual_for_IK.Position;
+            p.Y = Mathf.Lerp(p.Y, 0f, 15f * d);
+            visual_for_IK.Position = p;
+            return;
+        }
 
         bool grounded = IsOnFloor() && ik_is_enabled;
         ik_leg_left.Active = grounded;
@@ -840,13 +862,11 @@ public partial class Player : CharacterBody3D
 
         _animTree.Set(PLocomotionBlend, _blendPos);
         _animTree.Set(PCrouchBlend, _blendPos);
-        _animTree.Set("parameters/Start/blend_position", Mathf.Clamp(_targetSpeed, 0.5f, 5.8f));
 
         float horizSpeed = new Vector2(Velocity.X, Velocity.Z).Length();
         bool wantsMove = _targetSpeed > 0.1f;
 
-        // --- REMOVED: is_moving and is_stopping conditions ---
-        // They are now driven by Travel() calls.
+        // REMOVED: is_moving and is_stopping conditions They are now driven by Travel() calls.
 
         bool crouched = _isCrouching || _forcedCrouch > 0.5f;
         _animTree.Set(PIsCrouching, crouched);
@@ -855,15 +875,27 @@ public partial class Player : CharacterBody3D
         _animTree.Set(PIsJumping, !IsOnFloor() && Velocity.Y > 0.1f);
         _animTree.Set(PIsFalling, !IsOnFloor() && (_airTime > 0.25f || Velocity.Y < -3.0f));
 
-        // ----- NEW: Travel to run_start / run_stop from Locomotion -----
+        // Travel to run_start / run_stop from Locomotion
         string st = _stateMachine?.GetCurrentNode() ?? "";
-        if (st == "Locomotion")
+        if (st == "Locomotion" || st == "run_start")
         {
+            // ---- START ----
             if (wantsMove && _stillTime > 0.35f && _blendPos.Length() < 0.8f)
+            {
+                // Travel to the Start blend space
                 _stateMachine.Travel("run_start");
-            else if (!wantsMove && _moveTime > 0.25f && horizSpeed > 0.8f)
+            }
+            // ---- STOP ----
+            else if (!wantsMove && _moveTime > 0.25f && horizSpeed > 1.0f)
+            {
+                _stopSpeed = horizSpeed;
                 _stateMachine.Travel("run_stop");
+            }
         }
+
+        // parameters/Start/blend_position
+        _animTree.Set("parameters/Start/blend_position", Mathf.Clamp(_targetSpeed, 0.5f, 5.8f));
+        _animTree.Set("parameters/run_stop/blend_position", _stopSpeed);
 
         if (justLanded) _landImpact = 0f;
     }
@@ -1774,25 +1806,24 @@ public partial class Player : CharacterBody3D
     private void WallhugMove(float dt, ref Vector3 velocity)
     {
         Vector3 tangent = _wallNormal.Cross(Vector3.Up).Normalized();
-        if (tangent.Dot(GlobalTransform.Basis.Z) < 0) tangent = -tangent; // keep current facing side
+        if (tangent.Dot(GlobalTransform.Basis.Z) < 0) tangent = -tangent;
 
-        // Face along the wall
-        float yaw = Mathf.Atan2(-tangent.X, -tangent.Z);
-        Rotation = new Vector3(0, Mathf.LerpAngle(Rotation.Y, yaw, 8f * dt), 0);
+        Rotation = new Vector3(0, Mathf.LerpAngle(Rotation.Y, Mathf.Atan2(-tangent.X, -tangent.Z), 8f * dt), 0);
 
-        // W/A/D = shuffle along wall (root motion from wallhug_LF drives it);
-        // S or input pulling away = peel off
-        bool pullingAway = _moveDirWorld.Dot(-_wallNormal) < -0.4f || Input.IsActionPressed("move_back");
-        Vector2 input = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
-        float along = input.Y;   // W forward along wall, S back — swap if your clips face the other way
-        velocity.X = tangent.X * along * 0.6f;
-        velocity.Z = tangent.Z * along * 0.6f;
+        bool w = Input.IsActionPressed("move_forward");
+        bool a = Input.IsActionPressed("move_left");
+        bool d = Input.IsActionPressed("move_right");
 
-        if (pullingAway && _animTree != null)
+        if (!w || (!a && !d))   // must hold W AND (A or D) — release either → end
         {
             _isWallhugging = false; _wallPressTime = 0;
-            _stateMachine.Travel(_targetSpeed > 0.1f ? "WallhugEndF" : "WallhugEnd");
+            _stateMachine?.Travel("WallhugEnd");
+            return;
         }
+
+        float dir = (d ? 1f : 0f) - (a ? 1f : 0f);
+        velocity.X = tangent.X * dir * WallhugSpeed;
+        velocity.Z = tangent.Z * dir * WallhugSpeed;
     }
     private bool ProbeLedge(Vector3 wallNormal, out Vector3 anchor, out float height)
     {
@@ -1823,5 +1854,109 @@ public partial class Player : CharacterBody3D
             }
         }
         return false;
+    }
+
+    private void DetectWallhugAndClimb(float dt)
+    {
+        if (_isClimbing)
+        {
+            string st = _stateMachine?.GetCurrentNode() ?? "";
+            if (st == "Locomotion" || st == "Fall") _isClimbing = false;  // exited climb
+            return;
+        }
+
+        // --- Climb: airborne + into wall ---
+        if (!IsOnFloor() && _airTime > 0.1f)
+        {
+            for (int i = 0; i < GetSlideCollisionCount(); i++)
+            {
+                Vector3 n = GetSlideCollision(i).GetNormal();
+                if (Mathf.Abs(n.Y) > 0.3f) continue;
+                if (Velocity.Dot(-n) > 0.5f || _moveDirWorld.Dot(-n) > 0.5f)
+                {
+                    _climbNormal = n;
+                    _isClimbing = true;
+                    _isWallhugging = false;
+                    Rotation = new Vector3(0, Mathf.Atan2(-n.X, -n.Z), 0);  // face wall
+                    _stateMachine?.Travel("ClimbIdle");
+                    return;
+                }
+            }
+        }
+
+        // --- Jump during wallhug → climb ---
+        if (_isWallhugging && Input.IsActionJustPressed("jump"))
+        {
+            _climbNormal = _wallNormal;
+            _isClimbing = true;
+            _isWallhugging = false;
+            _stateMachine?.Travel("ClimbIdle");
+            return;
+        }
+
+        // --- Wallhug entry: grounded + pressing into wall ---
+        if (_isWallhugging) return;
+        if (!IsOnFloor() || _forcedCrouch > 0.3f) { _wallPressTime = 0; return; }
+
+        for (int i = 0; i < GetSlideCollisionCount(); i++)
+        {
+            Vector3 n = GetSlideCollision(i).GetNormal();
+            if (Mathf.Abs(n.Y) > 0.3f) continue;
+            if (_moveDirWorld.Dot(-n) > 0.6f)
+            {
+                _wallNormal = n;
+                _wallPressTime += dt;
+                if (_wallPressTime > 0.15f) { _isWallhugging = true; _stateMachine?.Travel("WallhugStart"); }
+                return;
+            }
+        }
+        _wallPressTime = 0;
+    }
+
+    private void ClimbMove(float dt, ref Vector3 velocity)
+    {
+        Vector2 input = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
+
+        // Shift, S, or jump = drop off the wall
+        if (Input.IsActionJustPressed("sprint") || input.Y < -0.1f || Input.IsActionJustPressed("jump"))
+        {
+            _isClimbing = false;
+            velocity = -_climbNormal * 2.0f;   // push away from wall so gravity catches you
+            _stateMachine?.Travel("Fall");
+            return;
+        }
+
+        velocity = Vector3.Zero;
+        velocity += -_climbNormal * 0.5f;      // lean in to maintain contact
+
+        string st = _stateMachine?.GetCurrentNode() ?? "";
+
+        if (st == "ClimbIdle")
+        {
+            if (input.Y > 0.1f) _stateMachine?.Travel("ClimbUp");
+        }
+        else if (st == "ClimbUp")
+        {
+            if (input.Y > 0.1f)
+            {
+                velocity.Y = ClimbSpeed;
+                Vector3 probe = GlobalPosition + (-_climbNormal * 0.3f) + Vector3.Up * 1.6f;
+                var q = PhysicsRayQueryParameters3D.Create(probe, probe + _climbNormal * 0.4f);
+                q.CollisionMask = (uint)StepCollisionMask;
+                q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+                if (GetWorld3D().DirectSpaceState.IntersectRay(q).Count == 0)
+                    _stateMachine?.Travel("ClimbUpStand");
+            }
+            else _stateMachine?.Travel("ClimbIdle");
+        }
+        else if (st == "ClimbUpStand")
+        {
+            if (_animTree != null && UseRootMotion)
+            {
+                Vector3 localDelta = _animTree.GetRootMotionPosition();
+                Basis basis = _skeleton != null ? _skeleton.GlobalTransform.Basis : GlobalTransform.Basis;
+                velocity = (basis * localDelta) / Mathf.Max(dt, 1e-5f) * RootMotionScale;
+            }
+        }
     }
 }

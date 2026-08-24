@@ -39,7 +39,7 @@ Demo:
         ✅ can kill NPCs
         🚧 NPCs fight back
 - ✅ Debug menu
-- ✅ NPC aggressive and desensive behavior
+- ✅ NPC aggressive and defensive behavior
 - ✅ Possession system
 - 🚧 Sanity system (control over districts)
         ✅ detection of districts
@@ -57,35 +57,35 @@ Demo:
         🚧 blocking out buildings
         🚧 roadhouse
         🚧 college
-- 🚧 Dialogue UI
+- ✅ Dialogue UI
         ✅ linear dialogue
         ✅ conditional dialogue
         ✅ branching dialogue
-        🚧 writing dialogue for the main 2 characters
-- 🚧 Intro story
-        🚧 leaving the woods, newspaper
-        🚧 truant's quest
-        🚧 Kimo's personality test
+        ✅ writing dialogue for the main 2 characters
+- ✅ Intro story
+        ✅ leaving the woods, newspaper
+        ✅ truant's quest
+        ✅ Kimo's personality test
 - 🚧 Calendar UI
         🚧 clone from old demo
         🚧 add key character weeks
 - ✅ 5 NPCs in the first demo: Barkeeper, Rich truant, Phantom, Base_F, Base_M
 - 🚧 Sounds and music
-        - footsteps for everyone
-        - UI
-        - ambient rain, snow, strorm, seasonal
-        - a jingle at game start
-        - ambient horror sounds when sanity changes/possession cycles
-        - ambient sounds in different locations (bar music, waves at beach)
+        🚧 footsteps for everyone
+        🚧 UI
+        🚧 ambient rain, snow, strorm, seasonal
+        🚧 a jingle at game start
+        🚧 ambient horror sounds when sanity changes/possession cycles
+        🚧 ambient sounds in different locations (bar music, waves at beach)
 - 🚧 Animation and movement system: idle, walk, sprint, jump, crouch, crawl, turning around, climb, swim
-        - basic state machine
-        - IK and merging
-        - combat integration
+        ✅ basic state machine
+        🚧 IK and merging
+        🚧 combat integration
 - 🚧 Crafting system version 1: a list of presets; 3-deep menu for lattice manipulation on every material for the presets + on every material of the 2 buildings
-        - UI on a wall
-        - apply to all 3d materials
-        - apply to items
-        - allow combining items
+        🚧 UI on a wall
+        🚧 apply to all 3d materials
+        🚧 apply to items
+        🚧 allow combining items
 - 🚧 Saving and loading
         - remember time
         - remember sanity, health, etc
@@ -93,9 +93,9 @@ Demo:
         - remember inventory
         - remember items
         - remember 3d objects
-- Mind's Eye mode: predict monster's behavior and plan ahead
-        - the UI and visuals
-        - slow down time and clone MC into a transparent phantom with special visuals
+- 🚧 Mind's Eye mode: predict monster's behavior and plan ahead
+        🚧 the UI and visuals
+        🚧 slow down time and clone MC into a transparent phantom with special visuals
 
 Future plans:
 
