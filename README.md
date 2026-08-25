@@ -66,9 +66,9 @@ Demo:
         ✅ leaving the woods, newspaper
         ✅ truant's quest
         ✅ Kimo's personality test
-- 🚧 Calendar UI
-        🚧 clone from old demo
-        🚧 add key character weeks
+- ✅ Calendar UI
+        ✅ clone from old demo
+        ✅ add key character weeks
 - ✅ 5 NPCs in the first demo: Barkeeper, Rich truant, Phantom, Base_F, Base_M
 - 🚧 Sounds and music
         🚧 footsteps for everyone

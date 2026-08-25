@@ -147,20 +147,30 @@ public static class DialogueScriptLoader
 
     private static string CleanTarget(string t) => t == "end" ? null : t;
 
-    private static TimePeriod ParsePeriod(string s, string path, int lineNo) => s.ToLowerInvariant() switch
+    private static TimePeriod ParsePeriod(string s, string path, int lineNo)
     {
-        "morning"   => TimePeriod.MORNING,
-        "afternoon" => TimePeriod.AFTERNOON,
-        "evening"   => TimePeriod.EVENING,
-        "night"     => TimePeriod.NIGHT,
-        _ => (GD.PushWarning($"{path}:{lineNo}: bad period '{s}', defaulting to MORNING"), TimePeriod.MORNING).Item2
-    };
+        switch (s.ToLowerInvariant())
+        {
+            case "morning":   return TimePeriod.MORNING;
+            case "afternoon": return TimePeriod.AFTERNOON;
+            case "evening":   return TimePeriod.EVENING;
+            case "night":     return TimePeriod.NIGHT;
+            default:
+                GD.PushWarning($"{path}:{lineNo}: bad period '{s}', defaulting to MORNING");
+                return TimePeriod.MORNING;
+        }
+    }
 
-    private static GazeMode ParseGaze(string s, string path, int lineNo) => s.ToLowerInvariant() switch
+    private static GazeMode ParseGaze(string s, string path, int lineNo)
     {
-        "player" or "on" or "at" => GazeMode.Player,
-        "away"                   => GazeMode.Away,
-        "off" or "none"          => GazeMode.Off,
-        _ => (GD.PushWarning($"{path}:{lineNo}: bad gaze '{s}', defaulting to Player"), GazeMode.Player).Item2
-    };
+        switch (s.ToLowerInvariant())
+        {
+            case "player": case "on": case "at": return GazeMode.Player;
+            case "away":                         return GazeMode.Away;
+            case "off":   case "none":           return GazeMode.Off;
+            default:
+                GD.PushWarning($"{path}:{lineNo}: bad gaze '{s}', defaulting to Player");
+                return GazeMode.Player;
+        }
+    }
 }

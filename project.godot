@@ -15,9 +15,11 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="Checkered v0.16"
-run/main_scene="uid://c3bouadlvlqxl"
+run/main_scene="uid://tx0a6vi8oa1n"
 config/features=PackedStringArray("4.7", "C#", "GL Compatibility")
 run/max_fps=120
+boot_splash/bg_color=Color(0.039215688, 0.039215688, 0.039215688, 1)
+boot_splash/image="uid://b2vpd5a1macxp"
 config/icon="res://icon.svg"
 
 [audio]
@@ -32,7 +34,6 @@ WeatherManager="*uid://de7y7qmr4if0n"
 SanityCycle="*res://Scripts/Systems/SanityCycle.cs"
 WorldMapManager="*uid://bubai10gqlqt6"
 DialogueManager="*uid://dw5ui73ebnv6j"
-VoiceManager="*uid://yu0nk5kv8pto"
 
 [dialogue_manager]
 

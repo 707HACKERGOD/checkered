@@ -198,7 +198,6 @@ public partial class Player : CharacterBody3D
 
     public override void _Ready()
     {
-
         ColCapsuleFull.Disabled = false;
         ColCapsuleCrouch.Disabled = true;
         _skeleton = Skeleton
@@ -285,6 +284,10 @@ public partial class Player : CharacterBody3D
             if (touch.Pressed) _touchStartPositions[touch.Index] = touch.Position;
             else _touchStartPositions.Remove(touch.Index);
         }
+        
+        if (PlayerInputOverride.Active)
+            return;   // calendar / scripted walks / cutscenes own input:
+                      // no camera look, no zoom, no toggle, no attack
 
         if (HandlePinchZoom(@event)) { GetViewport().SetInputAsHandled(); return; }
         if (HandleCameraLook(@event)) { GetViewport().SetInputAsHandled(); return; }
@@ -324,6 +327,7 @@ public partial class Player : CharacterBody3D
 
         bool anyMenuOpen = (HUD.Instance != null && HUD.Instance.IsInventoryOpen) ||
                            (HUD.Instance != null && HUD.Instance.IsHealthPanelOpen);
+        bool inputLocked = anyMenuOpen || PlayerInputOverride.Active;
 
         // Camera & support systems always run (menus, possession, cutscenes...)
         UpdateCamera(dt);
@@ -343,7 +347,7 @@ public partial class Player : CharacterBody3D
         // gravity: skip when climbing
         if (!_isClimbing && !IsOnFloor())
             velocity.Y -= Gravity * dt;
-        if (!anyMenuOpen && Input.IsActionJustPressed("jump") && IsOnFloor())
+        if (!inputLocked && Input.IsActionJustPressed("jump") && IsOnFloor())
             velocity.Y = JumpVelocity;
 
         ApplyMovement(dt, ref velocity);           // root motion or code-driven
@@ -351,9 +355,6 @@ public partial class Player : CharacterBody3D
         Velocity = velocity;
         MoveAndSlide();
         DetectWallhugAndClimb(dt);
-        if (ik_is_enabled)
-        {handle_leg_ik(dt);
-        handle_foot_rotation(dt);}
         RootMotionTrace(dt);
 
         float fallSpeed = -velocity.Y;
@@ -380,6 +381,10 @@ public partial class Player : CharacterBody3D
         PushRigidBodies();
         UpdateAnimationParams(dt, anyMenuOpen);    // feed the tree AFTER moving
         UpdateInteraction(anyMenuOpen);
+                if (ik_is_enabled)
+        {handle_leg_ik(dt);
+        handle_foot_rotation(dt);}
+        UpdateInteraction(inputLocked);
     }
 
     // ==================================================================
@@ -387,6 +392,16 @@ public partial class Player : CharacterBody3D
     // ==================================================================
     private void UpdateLocomotionIntent(float dt, bool anyMenuOpen)
     {
+        // --- scripted steering (intro walk, calendar, future cutscenes) ---
+        if (PlayerInputOverride.Active)
+        {
+            Vector3 steer = PlayerInputOverride.WorldDirection;
+            _moveDirWorld = steer.LengthSquared() > 1e-6f ? steer.Normalized() : Vector3.Zero;
+            _targetSpeed = _moveDirWorld == Vector3.Zero ? 0f : PlayerInputOverride.SpeedMps;
+            return;   // skip toggles/dash/input — facing, anim, root motion, IK
+                      // all run through the normal paths below as with real input
+        }
+        
         Vector2 inputDir = Vector2.Zero;
         float analog = 0f;
 

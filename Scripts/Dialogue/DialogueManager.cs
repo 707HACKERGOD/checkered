@@ -214,8 +214,8 @@ public partial class DialogueManager : Node
     }
 
     // ---------------- gaze ----------------
-    // "Away" uses an invisible ghost Node3D as the tracker target, so your
-    // NpcEyeTracker needs zero changes. If BOTH eyes+head are Away, the ghost
+    // "Away" uses an invisible ghost Node3D as the tracker target
+    // If BOTH eyes+head are Away, the ghost
     // sits off in the distance; if only one is Away, the ghost sits beside the
     // player's head → head stays roughly on the player while eyes glance aside.
 
