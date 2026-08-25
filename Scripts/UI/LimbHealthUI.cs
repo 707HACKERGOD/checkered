@@ -277,6 +277,7 @@ public partial class LimbHealthUI : Control
 
     public void HandleInput(InputEvent @event)
     {
+        if (CalendarMenu.Instance != null && CalendarMenu.Instance.IsOpen) return;
         if (!_isActive) return;
 
         // Allow H to close the panel at any time

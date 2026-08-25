@@ -1146,6 +1146,7 @@ public partial class HUD : Control
     // ========== Input handling ==========
     public override void _Input(InputEvent @event)
     {
+        if (CalendarMenu.Instance != null && CalendarMenu.Instance.IsOpen) return;
         // Touch events are handled by MobileButton – ignore them here
         if (@event is InputEventScreenTouch)
             return;
@@ -1332,6 +1333,7 @@ public partial class HUD : Control
 
     public void TogglePause()
     {
+        if (CalendarMenu.Instance != null && CalendarMenu.Instance.IsOpen) return;
         _isPaused = !_isPaused;
         GetTree().Paused = _isPaused || _isDebugOpen;   // keep paused if debug is also open
 
@@ -1355,6 +1357,7 @@ public partial class HUD : Control
 
     public void ToggleHealth()
     {
+        if (CalendarMenu.Instance != null && CalendarMenu.Instance.IsOpen) return;
         if (_healthPanel == null) { GD.PrintErr("HUD: _healthPanel is null"); return; }
 
         // Prevent opening health if inventory is already open
@@ -1377,6 +1380,7 @@ public partial class HUD : Control
     private float _savedTimeScale = 1f;
     public void ToggleDebug()
     {
+        if (CalendarMenu.Instance != null && CalendarMenu.Instance.IsOpen) return;
         _isDebugOpen = !_isDebugOpen;
         if (_debugControl != null)
         {
@@ -1411,6 +1415,7 @@ public partial class HUD : Control
             GD.PrintErr("HUD: inventory not built yet"); 
             return; 
         }
+        if (CalendarMenu.Instance != null && CalendarMenu.Instance.IsOpen) return;
         bool opening = !_inventoryPanel.Visible;
         if (opening && IsHealthPanelOpen)
             return;

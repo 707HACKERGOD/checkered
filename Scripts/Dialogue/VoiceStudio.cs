@@ -111,4 +111,30 @@ public static class VoiceStudio
         foreach (char c in s) { h ^= c; h *= 16777619; }
         return h;
     }
+
+        public static readonly Dictionary<string, VoiceProfile> RuntimeOverride = new();
+
+    // in Get(): after the Named check, before the generated-cache check:
+    //     if (RuntimeOverride.TryGetValue(npcId, out var ov)) return ov;
+
+    public static VoiceProfile Reroll(string npcId)
+    {
+        var p = Generate(npcId + "#" + GD.Randi(),
+            (MbtiType)GD.RandRange(0, 15), (Predisposition)GD.RandRange(0, 2), (VoiceGender)GD.RandRange(0, 1));
+        p.Id = npcId;
+        RuntimeOverride[npcId] = p;
+        return p;
+    }
+
+    public static string Dump(VoiceProfile p)
+    {
+        if (p == null) return "// no profile";
+        return $"[\"{p.Id}\"] = new VoiceProfile\n{{\n" +
+            $"    Id = \"{p.Id}\",\n" +
+            $"    Waveform = VoiceWaveform.{p.Waveform}, Duty = {p.Duty}f, Roughness = {p.Roughness}f,\n" +
+            $"    Pitch = {p.Pitch}f, Jitter = {p.Jitter}f, JitterChance = {p.JitterChance}f, Drift = {p.Drift}f,\n" +
+            $"    VibratoDepth = {p.VibratoDepth}f, VibratoSpeed = {p.VibratoSpeed}f,\n" +
+            $"    Speed = {p.Speed}f, BlipEveryN = {p.BlipEveryN}, BlipLength = {p.BlipLength}f, SkipBlipChance = {p.SkipBlipChance}f,\n" +
+            $"    VolumeDb = {p.VolumeDb}f\n}},";
+    }
 }

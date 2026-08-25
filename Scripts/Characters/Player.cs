@@ -322,6 +322,7 @@ public partial class Player : CharacterBody3D
     public override void _PhysicsProcess(double delta)
     {
         float dt = (float)delta;
+        Vector3 velocity = Velocity;
         if (_attackCooldownTimer > 0f)
             _attackCooldownTimer -= dt;
 
@@ -337,9 +338,11 @@ public partial class Player : CharacterBody3D
         if (IsPossessed) { MoveAndSlide(); return; }
 
         UpdateLocomotionIntent(dt, anyMenuOpen);   // input, toggles, dash trigger
-        UpdateFacing(dt);                          // rotate-to-move / lock-on strafe
+        UpdateFacing(dt);    
+        ApplyMovement(dt, ref velocity);
+        UpdateAnimationParams(dt, anyMenuOpen);
+        TraceAnimState();                      // rotate-to-move / lock-on strafe
 
-        Vector3 velocity = Velocity;
         float hs = new Vector2(Velocity.X, Velocity.Z).Length();
         if (hs < 0.8f) { _stillTime += dt; _moveTime = 0f; }
         else           { _moveTime += dt;  _stillTime = 0f; }
@@ -379,7 +382,6 @@ public partial class Player : CharacterBody3D
         RootMotionDebug(dt);
 
         PushRigidBodies();
-        UpdateAnimationParams(dt, anyMenuOpen);    // feed the tree AFTER moving
         UpdateInteraction(anyMenuOpen);
                 if (ik_is_enabled)
         {handle_leg_ik(dt);

@@ -29,6 +29,9 @@ public partial class DialogueManager : Node
     private GazeMode _headMode = GazeMode.Player;
     private float _ghostSide = 1f;
 
+    private string _currentVoiceId;
+    private VoiceProfile _currentProfile;
+
     public bool IsDialogueActive => _currentNpc != null;
 
     public override void _Ready()
@@ -57,7 +60,6 @@ public partial class DialogueManager : Node
         AddChild(_repeatTimer);
     }
 
-    // Same signature as before — NpcInteraction needs no changes.
     public void StartDialogue(string npcId, TimePeriod time, Node3D npc, float maxDistance = 10f, float totalTimeout = 60f)
     {
         if (_currentNpc != null) ResetDialogueSystem();
@@ -67,13 +69,12 @@ public partial class DialogueManager : Node
         _currentTreeId = npcId;
         _maxDistance = maxDistance;
         _repeatInserted = false;
+        _currentVoiceId = npcId;
 
-        // --- voice ---
         var (mbti, predis, gender) = GetVoiceKey(npcId);
-        _voice.SetProfile(VoiceStudio.Get(npcId, mbti, predis, gender));
-        _voice.ResetLine();
+        _currentProfile = VoiceStudio.Get(npcId, mbti, predis, gender);
+        _voice.SetProfile(_currentProfile);
 
-        // --- gaze ---
         _npcTracker = npc.GetNodeOrNull<NpcEyeTracker>("EyeTrackerComponent");
         EnsureGazeGhost();
 
@@ -83,25 +84,35 @@ public partial class DialogueManager : Node
 
         if (!Dialogues.BranchingTrees.TryGetValue(npcId, out var tree))
         {
-            GD.PushError($"No dialogue tree found for NPC '{npcId}' (check res://Dialogue/Scripts/)");
+            GD.PushError($"No dialogue tree for NPC '{npcId}' (check res://Dialogue/Scripts/)");
             EndDialogue();
             return;
         }
 
-        string startNode =
-            Dialogues.StartNodes.TryGetValue(npcId, out var s) ? s :
-            tree.ContainsKey($"{npcId}_intro1") ? $"{npcId}_intro1" :
-            tree.ContainsKey($"{npcId}_start") ? $"{npcId}_start" :
-            tree.Count > 0 ? tree.Keys.First() : null;
-
+        string startNode = ResolveEntry(npcId, tree);
         if (startNode == null) { EndDialogue(); return; }
+
+        DialogueState.BumpTalk(npcId);   // sets met_<npcId> AFTER entry resolution
+
         ShowNode(npcId, startNode);
+    }
+
+    private static string ResolveEntry(string npcId, Dictionary<string, DialogueNode> tree)
+    {
+        if (Dialogues.Entries.TryGetValue(npcId, out var entries))
+            foreach (var (nid, conds) in entries)
+                if (DialogueState.MeetsAll(conds) && tree.ContainsKey(nid))
+                    return nid;
+
+        if (tree.ContainsKey($"{npcId}_intro1")) return $"{npcId}_intro1";
+        if (tree.ContainsKey($"{npcId}_start")) return $"{npcId}_start";
+        return tree.Count > 0 ? tree.Keys.First() : null;
     }
 
     private (MbtiType, Predisposition, VoiceGender) GetVoiceKey(string npcId)
     {
         if (Dialogues.NpcVoiceConfig.TryGetValue(npcId, out var cfg)) return cfg;
-        uint h = VoiceStudio.Fnv1a(npcId); // deterministic per name (string.GetHashCode is randomized per run!)
+        uint h = VoiceStudio.Fnv1a(npcId);
         return ((MbtiType)(h % 16), (Predisposition)((h >> 4) % 3), (VoiceGender)((h >> 6) % 2));
     }
 
@@ -112,10 +123,21 @@ public partial class DialogueManager : Node
         _ui.ResponseChosen -= OnResponseChosen;
 
         if (!Dialogues.BranchingTrees.TryGetValue(treeId, out var tree) || !tree.TryGetValue(nodeId, out var node))
+        { EndDialogue(); return; }
+
+        // conditions unmet -> skip the node
+        if (!DialogueState.MeetsAll(node.Conditions))
         {
-            EndDialogue();
+            string skipTo = node.Responses.Count > 0 ? node.Responses[0].NextNodeId : null;
+            if (!string.IsNullOrEmpty(skipTo)) ShowNode(treeId, skipTo); else EndDialogue();
             return;
         }
+
+        // node-enter effects
+        foreach (var op in node.EnterFlags) DialogueState.Set(op.Flag, op.Value);
+        foreach (var (target, delta) in node.RelDeltas) DialogueState.AddRel("player", target, delta);
+        if (_currentNpc != null)
+            foreach (var cmd in node.EnterCommands) DialogueCommands.Run(cmd, _currentNpc);
 
         _currentNodeId = nodeId;
         _currentNode = node;
@@ -131,13 +153,13 @@ public partial class DialogueManager : Node
                 paragraphs.Add(new DialogueParagraph
                 {
                     Text = lines[node.TimeUseIndex],
-                    Eyes = node.NodeEyes,
-                    Head = node.NodeHead
+                    Eyes = node.NodeEyes, Head = node.NodeHead,
+                    Speaker = node.DefaultSpeaker,
+                    Commands = node.ParagraphCommands
                 });
             }
             else
             {
-                // no line for this period → skip node
                 string skipTo = node.Responses.Count > 0 ? node.Responses[0].NextNodeId : null;
                 if (!string.IsNullOrEmpty(skipTo)) ShowNode(treeId, skipTo); else EndDialogue();
                 return;
@@ -153,29 +175,51 @@ public partial class DialogueManager : Node
             return;
         }
 
-        bool autoNext = node.Responses.Count == 1 && string.IsNullOrEmpty(node.Responses[0].Text);
+        var available = node.Responses.Where(r => DialogueState.MeetsAll(r.Requirements)).ToList();
+        bool autoNext = available.Count == 1 && string.IsNullOrEmpty(available[0].Text);
 
-        _ui.PlayParagraphs(node, paragraphs, ApplyGaze, () =>
+        _ui.PlayParagraphs(node, paragraphs, OnParagraphStart, () =>
         {
             if (autoNext)
             {
-                var next = node.Responses[0].NextNodeId;
+                var next = available[0].NextNodeId;
                 if (string.IsNullOrEmpty(next)) EndDialogue();
                 else ShowNode(treeId, next);
             }
-            else if (node.Responses.Count == 0)
+            else if (available.Count == 0)
             {
                 EndDialogue();
             }
             else
             {
-                _originalResponses = new List<DialogueResponse>(node.Responses);
-                _ui.ShowOptions(node.Responses);
+                _originalResponses = available;
+                _ui.ShowOptions(available);
                 _ui.ResponseChosen += OnResponseChosen;
                 _repeatInserted = false;
                 StartRepeatTimer();
             }
         });
+    }
+
+    /// <summary>Fires at each paragraph start: gaze, speaker label, voice, commands.</summary>
+    private void OnParagraphStart(DialogueNode node, DialogueParagraph p)
+    {
+        ApplyGaze(node, p);
+
+        string speakerId = p.Speaker ?? _currentTreeId;
+        _ui.SetSpeaker(speakerId);
+
+        if (speakerId != _currentVoiceId)
+        {
+            _currentVoiceId = speakerId;   // group chats: each speaker uses their own voice
+            var (mbti, predis, gender) = GetVoiceKey(speakerId);
+            _currentProfile = VoiceStudio.Get(speakerId, mbti, predis, gender);
+            _voice.SetProfile(_currentProfile);
+        }
+
+        if (_currentNpc != null)
+            foreach (var cmd in p.Commands)
+                DialogueCommands.Run(cmd, _currentNpc);
     }
 
     private void OnResponseChosen(int index)
@@ -189,13 +233,29 @@ public partial class DialogueManager : Node
 
         if (chosen.Text == Dialogues.RepeatOptionText)
         {
-            ShowNode(_currentTreeId, _currentNodeId); // replay the node
+            ShowNode(_currentTreeId, _currentNodeId);   // replay the node
             return;
         }
+
+        foreach (var op in chosen.SetFlags) DialogueState.Set(op.Flag, op.Value);
 
         if (string.IsNullOrEmpty(chosen.NextNodeId)) EndDialogue();
         else ShowNode(_currentTreeId, chosen.NextNodeId);
     }
+
+    // ---------------- voice debug (F9 / F10, handled in DialogueUI._Input) ----------------
+
+    public void DebugRerollVoice()
+    {
+        if (_currentVoiceId == null) return;
+        _currentProfile = VoiceStudio.Reroll(_currentVoiceId);
+        _voice.SetProfile(_currentProfile);
+        _voice.ResetLine();
+    }
+
+    public void DebugDumpVoice() => GD.Print(VoiceStudio.Dump(_currentProfile));
+
+    // ---------------- repeat option ----------------
 
     private void StartRepeatTimer()
     {
@@ -214,10 +274,6 @@ public partial class DialogueManager : Node
     }
 
     // ---------------- gaze ----------------
-    // "Away" uses an invisible ghost Node3D as the tracker target
-    // If BOTH eyes+head are Away, the ghost
-    // sits off in the distance; if only one is Away, the ghost sits beside the
-    // player's head → head stays roughly on the player while eyes glance aside.
 
     private void ApplyGaze(DialogueNode node, DialogueParagraph p)
     {
@@ -227,7 +283,7 @@ public partial class DialogueManager : Node
         _eyesMode = eyes;
         _headMode = head;
         if (eyes == GazeMode.Away || head == GazeMode.Away)
-            _ghostSide = -_ghostSide; // alternate the glance side paragraph to paragraph
+            _ghostSide = -_ghostSide;
 
         if (_npcTracker == null) return;
         _npcTracker.EnableEyeTracking = eyes != GazeMode.Off;
@@ -316,6 +372,7 @@ public partial class DialogueManager : Node
         _currentNodeId = null;
         _repeatInserted = false;
         _originalResponses = null;
+        _currentVoiceId = null;
         EmitSignal(SignalName.DialogueEnded);
     }
 
@@ -325,4 +382,6 @@ public partial class DialogueManager : Node
         EndDialogue();
         npc?.GetNodeOrNull<NpcInteraction>("Interaction")?.ForceEndDialogue();
     }
+
+    public DialogueUI GetUI() => _ui;
 }

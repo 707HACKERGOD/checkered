@@ -18,6 +18,7 @@ public partial class UIInventory : CanvasLayer
 
     public override void _Input(InputEvent @event)
     {
+        if (CalendarMenu.Instance != null && CalendarMenu.Instance.IsOpen) return;
         if (@event.IsActionPressed("toggle_inventory"))
         {
             _inventoryPanel.Visible = !_inventoryPanel.Visible;

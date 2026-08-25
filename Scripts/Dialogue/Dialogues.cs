@@ -6,7 +6,8 @@ public static class Dialogues
 
     public static readonly Dictionary<string, Dictionary<string, DialogueNode>> BranchingTrees = new();
     public static readonly Dictionary<string, Dictionary<TimePeriod, List<string>>> TimeBased = new();
-    public static readonly Dictionary<string, string> StartNodes = new();
+    public static readonly Dictionary<string, List<(string Node, List<DialogueCondition> Conds)>> Entries = new();
+    public static readonly Dictionary<string, SpeakerInfo> Speakers = new();
 
     public static readonly Dictionary<string, List<string>> Fallback = new()
     {
@@ -15,7 +16,6 @@ public static class Dialogues
         ["strong"]   = new() { "What do you want?" }
     };
 
-    /// <summary>Voice archetype per NPC. Missing NPCs get a deterministic random one.</summary>
     public static readonly Dictionary<string, (MbtiType mbti, Predisposition predis, VoiceGender gender)> NpcVoiceConfig = new()
     {
         ["kendall"]  = (MbtiType.ENFP, Predisposition.Peaceful,   VoiceGender.Female),
