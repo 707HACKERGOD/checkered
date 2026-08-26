@@ -73,10 +73,10 @@ Demo:
 - 🚧 Sounds and music
         🚧 footsteps for everyone
         🚧 UI
-        🚧 ambient rain, snow, strorm, seasonal
-        🚧 a jingle at game start
-        🚧 ambient horror sounds when sanity changes/possession cycles
-        🚧 ambient sounds in different locations (bar music, waves at beach)
+        ✅ ambient rain, snow, strorm, seasonal
+        ✅ a jingle at game start
+        ✅ ambient horror sounds when sanity changes/possession cycles
+        ✅ ambient sounds in different locations (bar music, waves at beach)
 - 🚧 Animation and movement system: idle, walk, sprint, jump, crouch, crawl, turning around, climb, swim
         ✅ basic state machine
         🚧 IK and merging

@@ -4,7 +4,7 @@ using System.Linq;
 
 public static class DialogueScriptLoader
 {
-    public static void LoadAll(string dir = "res://Dialogue/Scripts")
+    public static void LoadAll(string dir = "res://Assets/Dialogue/Scripts")
     {
         DirAccess da = DirAccess.Open(dir);
         if (da == null) { GD.PushError($"DialogueScriptLoader: can't open '{dir}'"); return; }

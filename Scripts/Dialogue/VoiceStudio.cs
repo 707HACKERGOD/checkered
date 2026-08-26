@@ -36,6 +36,51 @@ public static class VoiceStudio
             Speed = 13f, BlipEveryN = 2, BlipLength = 0.07f,
             Roughness = 0.1f, SkipBlipChance = 0.15f, VolumeDb = -10f
         },
+        ["slow_ghost_girl"] = new VoiceProfile
+        {
+            Id = "slow_ghost_girl",
+            Waveform = VoiceWaveform.Triangle, Duty = 0.5f,
+            Pitch = 1f, Jitter = 0.4f, JitterChance = 0.3f, Drift = 0f,
+            VibratoDepth = 0.5f, VibratoSpeed = 4f,
+            Speed = 13f, BlipEveryN = 2, BlipLength = 0.07f,
+            Roughness = 0.1f, SkipBlipChance = 0.15f, VolumeDb = -10f
+        },
+        ["fart"] = new VoiceProfile
+        {
+            Id = "fart",
+            Waveform = VoiceWaveform.Square, Duty = 0.30612776f, Roughness = 0.3938021f,
+            Pitch = -9f, Jitter = 2.025985f, JitterChance = 0.43777275f, Drift = 0f,
+            VibratoDepth = 0.2f, VibratoSpeed = 5.551882f,
+            Speed = 25f, BlipEveryN = 1, BlipLength = 0.059317533f, SkipBlipChance = 0.14681779f,
+            VolumeDb = -7f
+        },
+        ["mett"] = new VoiceProfile
+        {
+            Id = "mett",
+            Waveform = VoiceWaveform.Saw, Duty = 0.30579644f, Roughness = 0.47405213f,
+            Pitch = 2f, Jitter = 3.2488868f, JitterChance = 0.3559982f, Drift = -1f,
+            VibratoDepth = 0f, VibratoSpeed = 3.3167424f,
+            Speed = 27f, BlipEveryN = 2, BlipLength = 0.08384079f, SkipBlipChance = 0.14216036f,
+            VolumeDb = -3f
+        },
+        ["reed"] = new VoiceProfile
+        {
+            Id = "reed",
+            Waveform = VoiceWaveform.Square, Duty = 0.2721187f, Roughness = 0.1f,
+            Pitch = -7f, Jitter = 0.8119271f, JitterChance = 0.5954826f, Drift = 1f,
+            VibratoDepth = 0.2f, VibratoSpeed = 5.1175423f,
+            Speed = 16f, BlipEveryN = 1, BlipLength = 0.06617202f, SkipBlipChance = 0.08000958f,
+            VolumeDb = -10f
+        },
+        ["loud_investigator"] = new VoiceProfile
+        {
+            Id = "loud_investigator",
+            Waveform = VoiceWaveform.Square, Duty = 0.42379367f, Roughness = 0.3868288f,
+            Pitch = -4f, Jitter = 2.9100308f, JitterChance = 0.5463959f, Drift = 0f,
+            VibratoDepth = 0f, VibratoSpeed = 4.547557f,
+            Speed = 21f, BlipEveryN = 2, BlipLength = 0.048081376f, SkipBlipChance = 0.052241758f,
+            VolumeDb = -3f
+        },
     };
 
     private static readonly Dictionary<string, VoiceProfile> _generated = new();

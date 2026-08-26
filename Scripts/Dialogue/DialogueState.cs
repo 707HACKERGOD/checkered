@@ -1,16 +1,14 @@
 using System;
-using Godot;
 using System.Collections.Generic;
 using System.Linq;
+using Godot;
 
-/// <summary>Persistent dialogue world-state. Call Save()/Load() from your save
-/// system, Reset() on New Game. met_<npcId> is set automatically on first talk.</summary>
 public static class DialogueState
 {
     public static event Action Changed;
 
     private static readonly HashSet<string> _flags = new();
-    private static readonly Dictionary<string, float> _rel = new();   // "a>b"
+    private static readonly Dictionary<string, float> _rel = new();
     private static readonly Dictionary<string, int> _talks = new();
 
     private static string RelKey(string a, string b) => $"{a}>{b}";
@@ -36,7 +34,6 @@ public static class DialogueState
         if (_talks[npcId] == 1) Set($"met_{npcId}", true);
     }
 
-    /// <summary>Relationship between two actors ("player" is the player's id). Stored symmetrically.</summary>
     public static float GetRel(string a, string b) => _rel.TryGetValue(RelKey(a, b), out var v) ? v : 0f;
 
     public static void AddRel(string a, string b, float delta)
@@ -57,19 +54,22 @@ public static class DialogueState
 
     public static void Save(string path = "user://dialogue_state.json")
     {
-        var root = new Godot.Collections.Dictionary
-        {
-            ["flags"] = new Godot.Collections.Array<string>(_flags)
-        };
-        var rel = new Godot.Collections.Dictionary();
-        foreach (var kv in _rel) rel[kv.Key] = kv.Value;
-        root["rel"] = rel;
-        var talks = new Godot.Collections.Dictionary();
-        foreach (var kv in _talks) talks[kv.Key] = kv.Value;
-        root["talks"] = talks;
+        var root = new Godot.Collections.Dictionary();
 
-        using var f = FileAccess.Open(path, FileAccess.ModeFlags.Write);
-        f?.StoreString(Json.Stringify(root));
+        var flagsArr = new Godot.Collections.Array();
+        foreach (var f in _flags) flagsArr.Add(f);
+        root["flags"] = flagsArr;
+
+        var relDict = new Godot.Collections.Dictionary();
+        foreach (var kv in _rel) relDict[kv.Key] = kv.Value;
+        root["rel"] = relDict;
+
+        var talksDict = new Godot.Collections.Dictionary();
+        foreach (var kv in _talks) talksDict[kv.Key] = kv.Value;
+        root["talks"] = talksDict;
+
+        using var file = FileAccess.Open(path, FileAccess.ModeFlags.Write);
+        file?.StoreString(Json.Stringify(root, "  "));
     }
 
     public static void Load(string path = "user://dialogue_state.json")
@@ -77,19 +77,21 @@ public static class DialogueState
         if (!FileAccess.FileExists(path)) return;
         using var f = FileAccess.Open(path, FileAccess.ModeFlags.Read);
         if (f == null) return;
-        var parsed = Json.ParseString(f.GetAsText()) as Godot.Collections.Dictionary;
-        if (parsed == null) return;
+
+        var parsed = Json.ParseString(f.GetAsText());
+        if (parsed.VariantType != Variant.Type.Dictionary) return;
+        var root = parsed.AsGodotDictionary();
 
         _flags.Clear();
-        if (parsed.TryGetValue("flags", out var fl) && fl.VariantType == Variant.Type.Array)
+        if (root.TryGetValue("flags", out var fl) && fl.VariantType == Variant.Type.Array)
             foreach (var v in fl.AsGodotArray()) _flags.Add(v.AsString());
 
         _rel.Clear();
-        if (parsed.TryGetValue("rel", out var r) && r.VariantType == Variant.Type.Dictionary)
+        if (root.TryGetValue("rel", out var r) && r.VariantType == Variant.Type.Dictionary)
             foreach (var kv in r.AsGodotDictionary()) _rel[kv.Key.AsString()] = kv.Value.AsSingle();
 
         _talks.Clear();
-        if (parsed.TryGetValue("talks", out var t) && t.VariantType == Variant.Type.Dictionary)
+        if (root.TryGetValue("talks", out var t) && t.VariantType == Variant.Type.Dictionary)
             foreach (var kv in t.AsGodotDictionary()) _talks[kv.Key.AsString()] = kv.Value.AsInt32();
 
         Changed?.Invoke();

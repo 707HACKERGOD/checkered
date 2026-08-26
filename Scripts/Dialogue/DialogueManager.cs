@@ -118,26 +118,31 @@ public partial class DialogueManager : Node
 
     // ---------------- node flow ----------------
 
-    private void ShowNode(string treeId, string nodeId)
+    private void ShowNode(string treeId, string nodeId, bool replay = false)
     {
         _ui.ResponseChosen -= OnResponseChosen;
+        if (_currentNpc != null) _totalTimeoutTimer.Start();
 
         if (!Dialogues.BranchingTrees.TryGetValue(treeId, out var tree) || !tree.TryGetValue(nodeId, out var node))
         { EndDialogue(); return; }
 
-        // conditions unmet -> skip the node
-        if (!DialogueState.MeetsAll(node.Conditions))
+        // conditions unmet -> skip the node (never skip on a repeat replay)
+        if (!replay && !DialogueState.MeetsAll(node.Conditions))
         {
             string skipTo = node.Responses.Count > 0 ? node.Responses[0].NextNodeId : null;
-            if (!string.IsNullOrEmpty(skipTo)) ShowNode(treeId, skipTo); else EndDialogue();
+            if (!string.IsNullOrEmpty(skipTo)) ShowNode(treeId, skipTo);
+            else EndDialogue();
             return;
         }
 
-        // node-enter effects
-        foreach (var op in node.EnterFlags) DialogueState.Set(op.Flag, op.Value);
-        foreach (var (target, delta) in node.RelDeltas) DialogueState.AddRel("player", target, delta);
-        if (_currentNpc != null)
-            foreach (var cmd in node.EnterCommands) DialogueCommands.Run(cmd, _currentNpc);
+        // node-enter effects (skipped on replay so repeating can't farm rel/flags)
+        if (!replay)
+        {
+            foreach (var op in node.EnterFlags) DialogueState.Set(op.Flag, op.Value);
+            foreach (var (target, delta) in node.RelDeltas) DialogueState.AddRel("player", target, delta);
+            if (_currentNpc != null)
+                foreach (var cmd in node.EnterCommands) DialogueCommands.Run(cmd, _currentNpc);
+        }
 
         _currentNodeId = nodeId;
         _currentNode = node;
@@ -225,6 +230,7 @@ public partial class DialogueManager : Node
     private void OnResponseChosen(int index)
     {
         _ui.ResponseChosen -= OnResponseChosen;
+        if (_currentNode == null) return;   // dialogue was cancelled during the confirm burst
         var shown = _ui.GetCurrentResponses();
         if (shown == null || index < 0 || index >= shown.Count) return;
 
@@ -233,7 +239,7 @@ public partial class DialogueManager : Node
 
         if (chosen.Text == Dialogues.RepeatOptionText)
         {
-            ShowNode(_currentTreeId, _currentNodeId);   // replay the node
+            ShowNode(_currentTreeId, _currentNodeId, replay: true);   // replay the node
             return;
         }
 
@@ -268,8 +274,10 @@ public partial class DialogueManager : Node
     {
         if (_repeatInserted || _originalResponses == null) return;
         _repeatInserted = true;
-        var list = new List<DialogueResponse> { new() { Text = Dialogues.RepeatOptionText, NextNodeId = null } };
-        list.AddRange(_originalResponses);
+        var list = new List<DialogueResponse>(_originalResponses)
+        {
+            new() { Text = Dialogues.RepeatOptionText, NextNodeId = null }
+        };
         _ui.UpdateCurrentResponses(list);
     }
 

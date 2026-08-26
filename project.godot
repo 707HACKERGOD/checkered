@@ -35,6 +35,7 @@ SanityCycle="*res://Scripts/Systems/SanityCycle.cs"
 WorldMapManager="*uid://bubai10gqlqt6"
 DialogueManager="*uid://dw5ui73ebnv6j"
 CalendarMenu="*uid://d13mvugsmw1oh"
+AreaAudioManager="*uid://cs7ru4kgcjn8s"
 
 [dialogue_manager]
 
@@ -227,6 +228,7 @@ locale/translations_pot_files=PackedStringArray("res://Assets/dialogue/dial1.dia
 [rendering]
 
 occlusion_culling/bvh_build_quality=0
+textures/vram_compression/import_etc2_astc=true
 lights_and_shadows/directional_shadow/size=2048
 reflections/sky_reflections/roughness_layers=4
 environment/ssao/quality=0
