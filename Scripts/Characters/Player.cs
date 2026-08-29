@@ -27,6 +27,11 @@ public partial class Player : CharacterBody3D
     [Export] public Skeleton3D Skeleton;
     [Export] public string RootMotionBoneName = "Root";
     private bool _rootMotionAvailable;   // set by SetupRootMotion; gates ApplyMovement
+    private string _rootBoneTrack;
+    private float _climbUpRmSpeed, _climbLeftRmSpeed, _climbRightRmSpeed;
+    [ExportSubgroup("Door Ram")]
+    [Export] public float DoorRamForce = 12.0f;
+    [Export] public float DoorPassThroughDuration = 0.6f;
 
     [ExportSubgroup("Sprint Dash")]
     [Export] public float DashSpeed = 3.5f;     // extra m/s on sprint start
@@ -43,6 +48,10 @@ public partial class Player : CharacterBody3D
     [Export] public float WallhugSpeed = 0.8f;
     private bool _isClimbing;
     private Vector3 _climbNormal;
+    [Export] public float ClimbLateralSpeed = 0.8f;
+    private Vector3 _warpScale = Vector3.One;
+    private bool _hasWarpTarget;
+    private Vector3 _warpTarget;
 
     [ExportSubgroup("Step Up")]
     [Export] public float StepHeight = 0.4f;
@@ -106,6 +115,13 @@ public partial class Player : CharacterBody3D
     [Export] public Vector3 right_foot_rotate_offset { get; set; } = new Vector3(-5, 5, 0);
 
     public float Gravity = ProjectSettings.GetSetting("physics/3d/default_gravity").AsSingle();
+
+    [ExportGroup("Hand IK")]
+    [Export] public TwoBoneIK3D ik_hand_right;
+    [Export] public Marker3D target_hand_right;   // placed at chest height in front
+    [Export] public float HandReachSpeed = 15.0f;
+    [Export] public float HandRestSpeed = 10.0f;
+    [Export] public Vector3 HandRestOffset = new(0.25f, 1.2f, 0.3f); // relative to body
 
     // ==================================================================
     //  CAMERA
@@ -232,6 +248,7 @@ public partial class Player : CharacterBody3D
         {
             StripBlendShapeTracks(_animPlayer);
             SetupRootMotion();
+            CacheClimbRhythm();
             ForceLoopModes();
             if (_animPlayer != null && _animPlayer.HasAnimation("climb_up_stand"))
                 _animPlayer.GetAnimation("climb_up_stand").LoopMode = Animation.LoopModeEnum.None;
@@ -338,8 +355,7 @@ public partial class Player : CharacterBody3D
         if (IsPossessed) { MoveAndSlide(); return; }
 
         UpdateLocomotionIntent(dt, anyMenuOpen);   // input, toggles, dash trigger
-        UpdateFacing(dt);    
-        ApplyMovement(dt, ref velocity);
+        UpdateFacing(dt);
         UpdateAnimationParams(dt, anyMenuOpen);
         TraceAnimState();                      // rotate-to-move / lock-on strafe
 
@@ -357,6 +373,8 @@ public partial class Player : CharacterBody3D
 
         Velocity = velocity;
         MoveAndSlide();
+        HandleDoorRam();
+        HandleHandReach(dt);
         DetectWallhugAndClimb(dt);
         RootMotionTrace(dt);
 
@@ -1464,6 +1482,7 @@ public partial class Player : CharacterBody3D
 
         // ---- 2. Scan every Position3D track once ----
         string boneTrack = $"{skeletonPath}:{RootMotionBoneName}";
+        _rootBoneTrack = boneTrack;
         float bestBoneMps = 0f;
         int nodeTracksWithMotion = 0;
         var travelers = new List<(string anim, string path, float mps)>();
@@ -1894,8 +1913,8 @@ public partial class Player : CharacterBody3D
                     _climbNormal = n;
                     _isClimbing = true;
                     _isWallhugging = false;
-                    Rotation = new Vector3(0, Mathf.Atan2(-n.X, -n.Z), 0);  // face wall
-                    _stateMachine?.Travel("ClimbIdle");
+                    Rotation = new Vector3(0, Mathf.Atan2(-n.X, -n.Z), 0);
+                    _stateMachine?.Travel("ClimbStart");   // <-- changed from "ClimbIdle"
                     return;
                 }
             }
@@ -1934,46 +1953,187 @@ public partial class Player : CharacterBody3D
     {
         Vector2 input = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
 
-        // Shift, S, or jump = drop off the wall
+        // Drop off the wall (Shift, S, or Jump)
         if (Input.IsActionJustPressed("sprint") || input.Y < -0.1f || Input.IsActionJustPressed("jump"))
         {
-            _isClimbing = false;
-            velocity = -_climbNormal * 2.0f;   // push away from wall so gravity catches you
-            _stateMachine?.Travel("Fall");
+            DropFromWall(ref velocity);
             return;
         }
 
-        velocity = Vector3.Zero;
-        velocity += -_climbNormal * 0.5f;      // lean in to maintain contact
-
         string st = _stateMachine?.GetCurrentNode() ?? "";
 
-        if (st == "ClimbIdle")
-        {
-            if (input.Y > 0.1f) _stateMachine?.Travel("ClimbUp");
-        }
-        else if (st == "ClimbUp")
-        {
-            if (input.Y > 0.1f)
-            {
-                velocity.Y = ClimbSpeed;
-                Vector3 probe = GlobalPosition + (-_climbNormal * 0.3f) + Vector3.Up * 1.6f;
-                var q = PhysicsRayQueryParameters3D.Create(probe, probe + _climbNormal * 0.4f);
-                q.CollisionMask = (uint)StepCollisionMask;
-                q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-                if (GetWorld3D().DirectSpaceState.IntersectRay(q).Count == 0)
-                    _stateMachine?.Travel("ClimbUpStand");
-            }
-            else _stateMachine?.Travel("ClimbIdle");
-        }
-        else if (st == "ClimbUpStand")
+        // --- Root‑Motion driven states (one‑shots) ---
+        if (st == "ClimbStart" || st == "ClimbUpStand")
         {
             if (_animTree != null && UseRootMotion)
             {
                 Vector3 localDelta = _animTree.GetRootMotionPosition();
                 Basis basis = _skeleton != null ? _skeleton.GlobalTransform.Basis : GlobalTransform.Basis;
+                // Full 3D delta – no horizontal flattening
                 velocity = (basis * localDelta) / Mathf.Max(dt, 1e-5f) * RootMotionScale;
+                // (Warp scaling can be applied here if you implement it later)
             }
+            // Don't add lean‑in – RM provides the motion
+            return;
         }
+
+        // --- Code‑driven climb states (Idle, Up, Left, Right) ---
+        // Always lean into the wall
+        velocity = -_climbNormal * 0.5f;
+
+        // State transitions (same as before)
+        if (st == "ClimbIdle" || st == "ClimbUp")
+        {
+            if (input.Y > 0.1f && st != "ClimbUp")
+                _stateMachine?.Travel("ClimbUp");
+            else if (Mathf.Abs(input.X) > 0.1f)
+                _stateMachine?.Travel(input.X < 0 ? "ClimbLeft" : "ClimbRight");
+            else if (st == "ClimbUp" && input.Y < 0.05f && Mathf.Abs(input.X) < 0.05f)
+                _stateMachine?.Travel("ClimbIdle");
+        }
+
+        if (st == "ClimbLeft" || st == "ClimbRight")
+        {
+            if (Mathf.Abs(input.X) < 0.05f)
+                _stateMachine?.Travel("ClimbIdle");
+            else if (input.Y > 0.1f)
+                _stateMachine?.Travel("ClimbUp");
+        }
+
+        // Velocity per code‑driven state
+        if (st == "ClimbUp" && input.Y > 0.1f)
+        {
+            velocity.Y = ClimbSpeed * RhythmMod(Vector3.Up, _climbUpRmSpeed, dt);
+            // Ledge probe → ClimbUpStand
+            Vector3 probe = GlobalPosition + (-_climbNormal * 0.3f) + Vector3.Up * 1.6f;
+            var q = PhysicsRayQueryParameters3D.Create(probe, probe + _climbNormal * 0.4f);
+            q.CollisionMask = (uint)StepCollisionMask;
+            q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+            if (GetWorld3D().DirectSpaceState.IntersectRay(q).Count == 0)
+                _stateMachine?.Travel("ClimbUpStand");
+        }
+        else if (st == "ClimbLeft" || st == "ClimbRight")
+        {
+            Vector3 tangent = _climbNormal.Cross(Vector3.Up).Normalized();
+            float dir = st == "ClimbLeft" ? -1f : 1f;
+            Vector3 moveDir = tangent * dir;
+            float expected = st == "ClimbLeft" ? _climbLeftRmSpeed : _climbRightRmSpeed;
+            float mod = RhythmMod(moveDir, expected, dt);
+            velocity += moveDir * ClimbLateralSpeed * mod;
+        }
+    }
+
+    // Helper method to drop off the wall
+    private void DropFromWall(ref Vector3 velocity)
+    {
+        _isClimbing = false;
+        velocity = -_climbNormal * 2.0f;   // push away so we don't re‑trigger
+        _stateMachine?.Travel("Fall");
+    }
+
+    private void HandleDoorRam()
+    {
+        // We need to check collisions from the slide
+        for (int i = 0; i < GetSlideCollisionCount(); i++)
+        {
+            var col = GetSlideCollision(i);
+            if (col.GetCollider() is not RigidBody3D rb) continue;
+            if (!rb.IsInGroup("OpenableDoor")) continue;
+
+            Vector3 n = col.GetNormal();
+            Vector3 v = new Vector3(Velocity.X, 0, Velocity.Z);
+            if (v.Length() < 1.0f || v.Dot(-n) < 0.5f) continue;   // must be moving INTO it
+
+            // Slam the door open
+            rb.ApplyImpulse(-n * DoorRamForce, col.GetPosition() - rb.GlobalPosition);
+            // Optional: also apply a torque around the hinge axis (you'll need a marker)
+
+            // Disable collision for the player to pass through
+            var doorShape = rb.GetNodeOrNull<CollisionShape3D>("CollisionShape3D");
+            if (doorShape != null)
+            {
+                doorShape.SetDeferred("disabled", true);
+                GetTree().CreateTimer(DoorPassThroughDuration).Timeout += () =>
+                    doorShape.SetDeferred("disabled", false);
+            }
+            // Play slam sound / camera shake if desired
+        }
+    }
+
+    private bool PredictDoor(out Vector3 hitPoint, out RigidBody3D door, out Vector3 normal)
+    {
+        hitPoint = Vector3.Zero; door = null; normal = Vector3.Up;
+        Vector3 v = new Vector3(Velocity.X, 0, Velocity.Z);
+        if (v.Length() < 1.0f) return false;
+
+        float lookahead = Mathf.Clamp(v.Length() * 0.22f, 0.3f, 1.2f);
+        var q = PhysicsRayQueryParameters3D.Create(
+            GlobalPosition + Vector3.Up * 1.3f,
+            GlobalPosition + Vector3.Up * 1.3f + v.Normalized() * lookahead);
+        q.CollisionMask = (uint)StepCollisionMask;   // doors on the same layer as floor
+        var hit = GetWorld3D().DirectSpaceState.IntersectRay(q);
+        if (hit.Count == 0) return false;
+        if (hit["collider"].AsGodotObject() is not RigidBody3D rb || !rb.IsInGroup("OpenableDoor")) 
+            return false;
+
+        hitPoint = hit["position"].AsVector3();
+        normal = hit["normal"].AsVector3();
+        door = rb;
+        return true;
+    }
+
+    private void HandleHandReach(float dt)
+    {
+        bool reaching = PredictDoor(out Vector3 hp, out _, out Vector3 n) 
+                        && IsOnFloor() 
+                        && new Vector2(Velocity.X, Velocity.Z).Length() > 1.5f;
+
+        ik_hand_right.Active = true;
+        float targetInfluence = reaching ? 1.0f : 0.0f;
+        ik_hand_right.Influence = Mathf.Lerp(ik_hand_right.Influence, targetInfluence, HandReachSpeed * dt);
+
+        if (reaching)
+        {
+            // Place palm flat on the door surface, slightly inside
+            Vector3 palmTarget = hp + n * 0.06f + Vector3.Up * 0.15f; // adjust lift
+            target_hand_right.GlobalPosition = target_hand_right.GlobalPosition.Lerp(palmTarget, HandReachSpeed * dt);
+        }
+        else
+        {
+            // Relax back to a rest position relative to the player
+            Vector3 restPos = GlobalPosition + GlobalTransform.Basis * HandRestOffset;
+            target_hand_right.GlobalPosition = target_hand_right.GlobalPosition.Lerp(restPos, HandRestSpeed * dt);
+        }
+    }
+
+    private void CacheClimbRhythm()
+    {
+        _climbUpRmSpeed    = GetClipRMSpeed("climb_up");
+        _climbLeftRmSpeed  = GetClipRMSpeed("climb_left");
+        _climbRightRmSpeed = GetClipRMSpeed("climb_right");
+    }
+
+    private float GetClipRMSpeed(string clipName)
+    {
+        if (_animPlayer == null || !_animPlayer.HasAnimation(clipName) || string.IsNullOrEmpty(_rootBoneTrack))
+            return 0f;
+        Animation a = _animPlayer.GetAnimation(clipName);
+        for (int i = 0; i < a.GetTrackCount(); i++)
+        {
+            if (a.TrackGetType(i) != Animation.TrackType.Position3D) continue;
+            if (a.TrackGetPath(i).ToString() != _rootBoneTrack) continue;
+            Vector3 t = a.PositionTrackInterpolate(i, a.Length) - a.PositionTrackInterpolate(i, 0.0);
+            return t.Length() / Mathf.Max((float)a.Length, 0.001f);
+        }
+        return 0f;
+    }
+
+    private float RhythmMod(Vector3 worldDir, float expectedRmSpeed, float dt)
+    {
+        if (expectedRmSpeed < 0.05f || _animTree == null) return 1f;
+        Basis basis = _skeleton != null ? _skeleton.GlobalTransform.Basis : GlobalTransform.Basis;
+        Vector3 wd = basis * _animTree.GetRootMotionPosition();
+        float along = wd.Dot(worldDir) / Mathf.Max(dt, 1e-5f);
+        return Mathf.Clamp(along / expectedRmSpeed, 0f, 2.5f);
     }
 }
