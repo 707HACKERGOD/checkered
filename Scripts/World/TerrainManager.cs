@@ -11,7 +11,7 @@ public partial class TerrainManager : Node3D
 
     public override void _Ready()
     {
-        _terrain = GetNode<Node3D>(TerrainNodePath);
+         _terrain = GetNodeOrNull<Node3D>(TerrainNodePath);
         if (_terrain == null)
         {
             GD.PrintErr("TerrainManager: No Terrain3D node found at path: " + TerrainNodePath);
