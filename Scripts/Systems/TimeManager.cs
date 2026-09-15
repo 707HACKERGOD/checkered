@@ -15,7 +15,7 @@ public partial class TimeManager : Node
 
     [Export] public float DayDuration = 600.0f;
     [Export] public float TimeScale = 1.0f;
-    
+
     // --- HITSTOP (new, doesn't affect existing logic) ---
     [Export] public Node3D CameraShakeTarget;
     private float _shakeAmount = 0f;
@@ -23,28 +23,71 @@ public partial class TimeManager : Node
     private bool _hitstopActive = false;
     // ---
 
-    public int Month { get; private set; } = 9;  
-    public int Day { get; private set; } = 1;    
-    public int Year { get; private set; } = 2004;
-    public int Hour { get; private set; } = 6;   
+    // [SKY3D] Reference to Sky3D's TimeOfDay node. This autoload is the
+    // SOURCE OF TRUTH for game time. Sky3D is a follower: we push our clock
+    // into it every minute so its sun/moon/atmosphere render in sync.
+    // Sky3D's own game_time_enabled must be false so it doesn't fight us.
+    private Node _skyTod;
+
+    public int Month { get; private set; } = 9;
+    public int Day { get; private set; } = 1;
+    public int Year { get; private set; } = 2025;
+    public int Hour { get; private set; } = 6;
     public int Minute { get; private set; } = 0;
 
     public int CurrentDay { get; private set; } = 1;
     public TimePeriod CurrentPeriod { get; private set; } = TimePeriod.MORNING;
     public Season CurrentSeason => GetSeason(Month);
-    
+
     public bool IsWeekend => DayOfWeek == 6 || DayOfWeek == 7;
-    public int DayOfWeek => ((CurrentDay - 1) % 7) + 1; 
+    public int DayOfWeek => ((CurrentDay - 1) % 7) + 1;
     public float TimeOfDay => (Hour + (Minute / 60.0f)) / 24.0f;
 
     private double _timer = 0.0;
-    private double _realSecondsPerGameMinute; 
+    private double _realSecondsPerGameMinute;
 
     public override void _Ready()
     {
         Instance = this;
         _realSecondsPerGameMinute = DayDuration / 1440.0;
         UpdatePeriod();
+
+        // [SKY3D] Autoloads run _Ready() BEFORE the main scene loads, so the
+        // Sky3D TimeOfDay node isn't in the tree yet. Defer + retry until found.
+        CallDeferred(nameof(FindSkyTod));
+    }
+
+    // [SKY3D] Locate Sky3D's TimeOfDay node, retrying every 0.5s if the scene
+    // hasn't finished loading yet. Once found, push our clock into it so the
+    // game starts at OUR time, not whatever the editor left Sky3D at.
+    private void FindSkyTod()
+    {
+        _skyTod = GetTree().Root.FindChild("TimeOfDay", true, false) as Node;
+        if (_skyTod == null)
+        {
+            GetTree().CreateTimer(0.5).Timeout += FindSkyTod;
+            return;
+        }
+
+        // [SKY3D] Belt-and-braces: ensure Sky3D doesn't advance its own clock
+        // in game. It can still advance in the editor for preview.
+        _skyTod.Set("game_time_enabled", false);
+
+        // Sync once immediately so the game's first frame uses OUR time.
+        PushTimeToSky3D();
+        GD.Print($"TimeManager: connected to Sky3D TimeOfDay at {Hour:D2}:{Minute:D2}");
+    }
+
+    // [SKY3D] Push our clock into Sky3D. Sky3D's setters trigger a full
+    // celestial recalculation (sun/moon/star positions), so this is the only
+    // call needed to keep the sky in sync.
+    private void PushTimeToSky3D()
+    {
+        if (_skyTod == null) return;
+        _skyTod.Set("current_time", (float)(Hour + Minute / 60.0));
+        _skyTod.Set("day",   Day);
+        _skyTod.Set("month", Month);
+        _skyTod.Set("year",  Year);
     }
 
     public override void _Process(double delta)
@@ -88,14 +131,14 @@ public partial class TimeManager : Node
     public async void TriggerHitstop(float duration = 0.05f, float shakeIntensity = 0.1f)
     {
         if (_hitstopActive) return; // prevent stacking
-        
+
         _hitstopActive = true;
         _engineTimeScaleBeforeHitstop = Engine.TimeScale;
         Engine.TimeScale = 0.05f;
         _shakeAmount = shakeIntensity;
 
         await ToSignal(
-            GetTree().CreateTimer(duration, processAlways: false, processInPhysics: false, ignoreTimeScale: true), 
+            GetTree().CreateTimer(duration, processAlways: false, processInPhysics: false, ignoreTimeScale: true),
             "timeout"
         );
 
@@ -118,26 +161,26 @@ public partial class TimeManager : Node
     public float GetSeasonalSunProgress()
     {
         float currentSmoothTime = GetSmoothHour(); // 0-24
-        
+
         // 1. Calculate Day of Year (Approx 1-360)
         int dayOfYear = ((Month - 1) * 30) + Day;
-        
+
         // 2. Normalize to 0-1 (0 = Winter, 1 = Summer)
         // -Cos formula creates a wave that is -1 in Jan/Dec and +1 in June/July
         float seasonWave = -(float)Math.Cos(((dayOfYear - 15) / 360.0f) * Mathf.Tau);
 
         // 3. Define Extremes (Based on your request)
         // Winter (Mid-Jan): Rise 7:00, Set 18:00
-        float winterRise = 7.0f; 
+        float winterRise = 7.0f;
         float winterSet  = 18.0f;
-        
+
         // Summer (Mid-July): Rise 5:00, Set 21:00
-        float summerRise = 5.0f; 
+        float summerRise = 5.0f;
         float summerSet  = 21.0f;
 
         // 4. Interpolate based on the Wave (-1 to 1 mapped to 0 to 1)
-        float alpha = (seasonWave + 1.0f) * 0.5f; 
-        
+        float alpha = (seasonWave + 1.0f) * 0.5f;
+
         float sunriseHour = Mathf.Lerp(winterRise, summerRise, alpha);
         float sunsetHour = Mathf.Lerp(winterSet, summerSet, alpha);
 
@@ -186,6 +229,9 @@ public partial class TimeManager : Node
         }
         EmitSignal(SignalName.ClockTick, Hour, Minute);
         EmitSignal(SignalName.TimeUpdated, TimeOfDay);
+
+        // [SKY3D] Push our clock into Sky3D so sun/moon/atmosphere follow.
+        PushTimeToSky3D();
     }
 
     private void AdvanceDay()
@@ -199,6 +245,9 @@ public partial class TimeManager : Node
             if (Month > 12) { Month = 1; Year++; }
         }
         EmitSignal(SignalName.DayChanged, CurrentDay, Month, Day, (int)CurrentSeason);
+
+        // [SKY3D] Date changed — push so Sky3D's calendar and star rotation follow.
+        PushTimeToSky3D();
     }
 
     private void UpdatePeriod()
@@ -221,7 +270,7 @@ public partial class TimeManager : Node
     public int GetTimeID() => Hour * 100 + Minute;
     public string GetDateString() => $"{Month:D2}/{Day:D2}/{Year}";
     public string GetTimeString() => $"{Hour:D2}:{Minute:D2}";
-    
+
     public void SkipToNextMorning()
     {
         AdvanceDay();
@@ -230,5 +279,8 @@ public partial class TimeManager : Node
         UpdatePeriod();
         EmitSignal(SignalName.ClockTick, Hour, Minute);
         EmitSignal(SignalName.TimeUpdated, TimeOfDay);
+
+        // [SKY3D] Push the jump so Sky3D snaps to morning too.
+        PushTimeToSky3D();
     }
 }

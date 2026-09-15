@@ -19,7 +19,6 @@ metadata/_snap_count = 4
 
 [resource]
 script = ExtResource("1_qhltn")
+SunColor = SubResource("Gradient_0vyep")
 TopColor = SubResource("Gradient_50sq1")
 HorizonColor = SubResource("Gradient_qhltn")
-SunColor = SubResource("Gradient_0vyep")
-metadata/_custom_type_script = "uid://beketmea06yvt"

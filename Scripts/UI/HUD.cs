@@ -96,17 +96,6 @@ public partial class HUD : Control
     private WeatherManager _weatherManager;
     private Tween _tooltipTween;
 
-    // ========== Particle & Debug Data ==========
-    private GpuParticles3D _rainNode;
-    private GpuParticles3D _splashNode;
-    private GpuParticles3D _snowNode;
-
-    private Dictionary<string, float> _trackedValues = new Dictionary<string, float>()
-    {
-        { "rain_amount", 0f }, { "snow_amount", 0f }, { "ice_amount", 0f },
-        { "wind_speed", 0f },  { "wind_angle", 0f }
-    };
-
     // ========== Debug Menu ==========
     private List<DebugItem> _menuItems = new List<DebugItem>();
     private List<Control> _itemRows = new();
@@ -152,7 +141,7 @@ public partial class HUD : Control
         GameState.TimeScaleChanged += OnTimeScaleChanged;
         Instance = this;
         _timeManager = TimeManager.Instance;
-        _weatherManager = GetNodeOrNull<WeatherManager>("/root/WeatherManager");
+        _weatherManager = WeatherManager.Instance ?? GetNodeOrNull<WeatherManager>("/root/WeatherManager");
 
         ProcessMode = ProcessModeEnum.Always;
         SetupShowcaseMenu();
@@ -442,11 +431,6 @@ public partial class HUD : Control
             InputMap.AddAction("toggle_debug");
         if (!InputMap.HasAction("interact"))
             InputMap.AddAction("interact");
-
-        // Rain / snow nodes
-        _rainNode = GetTree().Root.FindChild("RainParticles", true, false) as GpuParticles3D;
-        _splashNode = GetTree().Root.FindChild("RainSplashParticles", true, false) as GpuParticles3D;
-        _snowNode = GetTree().Root.FindChild("SnowParticles", true, false) as GpuParticles3D;
 
         //GD.Print($"HUD layers - inventory: 5, debug/health: 25, pause: {_pauseMenu?.Layer}, mobile: 128");
 
@@ -1525,110 +1509,17 @@ public partial class HUD : Control
         _menuItems.Clear();
 
         _menuItems.Add(new HeaderItem("PRESETS (Enter)"));
-        AddPreset("CLEAR", WeatherManager.WeatherState.Clear);
-        AddPreset("RAIN (Gloomy)", WeatherManager.WeatherState.Rain);
-        AddPreset("SUMMER RAIN (Bright)", WeatherManager.WeatherState.SummerRain);
-        AddPreset("STORM (Grey Sky)", WeatherManager.WeatherState.Storm);
-        AddPreset("SNOW (Standard)", WeatherManager.WeatherState.Snow);
-        AddPreset("SUNNY SNOW (Bright)", WeatherManager.WeatherState.SunnySnow);
-        AddPreset("ICE", WeatherManager.WeatherState.Ice);
-        AddPreset("MIXED", WeatherManager.WeatherState.Mixed);
 
-        _menuItems.Add(new HeaderItem("PARTICLES (On/Off)"));
-        AddToggle("Rain Particles", _rainNode);
-        AddToggle("Splash Particles", _splashNode);
-        AddToggle("Snow Particles", _snowNode);
-
-        _menuItems.Add(new HeaderItem("GROUND & WIND (< >)"));
-        // Puddle Coverage
-        _menuItems.Add(new ActionItem
-        {
-            Name = "Puddle Coverage",
-            OnAdjust = (dir) => {
-                float current = _trackedValues.ContainsKey("rain_amount") ? _trackedValues["rain_amount"] : 0f;
-                float next = Mathf.Clamp(current + (dir * 0.05f), 0.0f, 1.0f);
-                _trackedValues["rain_amount"] = next;
-                RenderingServer.GlobalShaderParameterSet("rain_amount", next);
-            },
-            SetValue = (val) => {
-                val = Mathf.Clamp(val, 0.0f, 1.0f);
-                _trackedValues["rain_amount"] = val;
-                RenderingServer.GlobalShaderParameterSet("rain_amount", val);
-            },
-            GetDisplayValue = () => _trackedValues["rain_amount"].ToString("0.00")
-        });
-        // Snow Coverage
-        _menuItems.Add(new ActionItem
-        {
-            Name = "Snow Coverage",
-            OnAdjust = (dir) => {
-                float current = _trackedValues.ContainsKey("snow_amount") ? _trackedValues["snow_amount"] : 0f;
-                float next = Mathf.Clamp(current + (dir * 0.05f), 0.0f, 1.0f);
-                _trackedValues["snow_amount"] = next;
-                RenderingServer.GlobalShaderParameterSet("snow_amount", next);
-            },
-            SetValue = (val) => {
-                val = Mathf.Clamp(val, 0.0f, 1.0f);
-                _trackedValues["snow_amount"] = val;
-                RenderingServer.GlobalShaderParameterSet("snow_amount", val);
-            },
-            GetDisplayValue = () => _trackedValues["snow_amount"].ToString("0.00")
-        });
-        // Ice Coverage
-        _menuItems.Add(new ActionItem
-        {
-            Name = "Ice Coverage",
-            OnAdjust = (dir) => {
-                float current = _trackedValues.ContainsKey("ice_amount") ? _trackedValues["ice_amount"] : 0f;
-                float next = Mathf.Clamp(current + (dir * 0.05f), 0.0f, 1.0f);
-                _trackedValues["ice_amount"] = next;
-                RenderingServer.GlobalShaderParameterSet("ice_amount", next);
-            },
-            SetValue = (val) => {
-                val = Mathf.Clamp(val, 0.0f, 1.0f);
-                _trackedValues["ice_amount"] = val;
-                RenderingServer.GlobalShaderParameterSet("ice_amount", val);
-            },
-            GetDisplayValue = () => _trackedValues["ice_amount"].ToString("0.00")
-        });
-
-        _menuItems.Add(new ActionItem
-        {
-            Name = "Wind Speed",
-            OnAdjust = (dir) => AdjustWind("wind_speed", dir * 1.0f),
-            SetValue = (val) => AdjustWind("wind_speed", val - _trackedValues["wind_speed"]),
-            GetDisplayValue = () => _trackedValues["wind_speed"].ToString("0.0")
-        });
-        _menuItems.Add(new ActionItem
-        {
-            Name = "Wind Angle",
-            OnAdjust = (dir) => AdjustWind("wind_angle", dir * 15.0f),
-            SetValue = (val) => AdjustWind("wind_angle", val - _trackedValues["wind_angle"]),
-            GetDisplayValue = () => _trackedValues["wind_angle"].ToString("0") + "°"
-        });
-        _menuItems.Add(new ActionItem
-        {
-            Name = "Auto Wind",
-            OnExecute = () => {
-                if (_weatherManager != null)
-                {
-                    bool newState = !_weatherManager.IsAutoWindEnabled();
-                    _weatherManager.SetAutoWindEnabled(newState);
-                }
-            },
-            GetDisplayValue = () => _weatherManager != null ? (_weatherManager.IsAutoWindEnabled() ? "ON" : "OFF") : "N/A"
-        });
-        _menuItems.Add(new ActionItem
-        {
-            Name = "Fog Density",
-            OnAdjust = (dir) => AdjustFogDensity(dir * 0.005f),
-            SetValue = (val) => {
-                var env = GetEnvironment();
-                if (env != null && env.VolumetricFogEnabled)
-                    env.VolumetricFogDensity = Mathf.Clamp(val, 0.0f, 0.5f);
-            },
-            GetDisplayValue = () => GetFogDensity().ToString("0.000")
-        });
+        // Each preset button reloads the .tres from disk before applying it.
+        // Workflow: run the game → alt-tab → edit the preset in the inspector →
+        // alt-tab back → click the preset button here. The reload bypasses Godot's
+        // resource cache so the running game sees your edits. The array slot on
+        // WeatherManager is replaced too, so gameplay systems that read
+        // _weatherPresets later also see the new values.
+        AddPreset("CLEAR",       WeatherManager.WeatherState.Clear);
+        AddPreset("RAIN",        WeatherManager.WeatherState.Rain);
+        AddPreset("SNOW",        WeatherManager.WeatherState.Snow);
+        AddPreset("RAINSTORM",   WeatherManager.WeatherState.Rainstorm);
 
         _menuItems.Add(new HeaderItem("TIME CONTROL"));
         _menuItems.Add(new ActionItem
@@ -1792,86 +1683,62 @@ public partial class HUD : Control
         _menuItems.Add(new ActionItem
         {
             Name = name,
-            OnExecute = () => {
-                _weatherManager?.ChangeWeather(state);
-                _trackedValues["rain_amount"] = 0.0f;
-                _trackedValues["snow_amount"] = 0.0f;
-                _trackedValues["ice_amount"] = 0.0f;
-                _trackedValues["wind_speed"] = 0.0f;
-
-                switch (state)
-                {
-                    case WeatherManager.WeatherState.Rain:
-                    case WeatherManager.WeatherState.SummerRain:
-                        _trackedValues["rain_amount"] = 1.0f;
-                        break;
-                    case WeatherManager.WeatherState.Snow:
-                    case WeatherManager.WeatherState.SunnySnow:
-                        _trackedValues["snow_amount"] = 1.0f;
-                        break;
-                    case WeatherManager.WeatherState.Ice:
-                        _trackedValues["ice_amount"] = 1.0f;
-                        break;
-                    case WeatherManager.WeatherState.Storm:
-                        _trackedValues["rain_amount"] = 1.0f;
-                        _trackedValues["wind_speed"] = 20.0f;
-                        break;
-                    case WeatherManager.WeatherState.Mixed:
-                        _trackedValues["rain_amount"] = 0.5f;
-                        _trackedValues["snow_amount"] = 0.5f;
-                        _trackedValues["wind_speed"] = 5.0f;
-                        break;
-                }
-            },
+            OnExecute = () => ReloadPresetFromDiskAndApply(state),
             GetDisplayValue = () => _weatherManager?.CurrentState == state ? "ACTIVE" : ""
         });
     }
 
-    private void AddSlider(string name, string key, float step)
+    /// <summary>
+    /// Re-reads the .tres for the given state from disk (bypassing Godot's resource
+    /// cache), swaps it into the WeatherManager's preset array, and re-fires
+    /// ChangeWeather so any edits made in the editor while the game was running
+    /// take effect immediately. Uses reflection so the HUD doesn't need a public
+    /// accessor on WeatherManager — but if you add one, this can be simplified.
+    /// </summary>
+    private void ReloadPresetFromDiskAndApply(WeatherManager.WeatherState state)
     {
-        _menuItems.Add(new ActionItem
-        {
-            Name = name,
-            OnAdjust = (dir) => {
-                float current = _trackedValues.ContainsKey(key) ? _trackedValues[key] : 0f;
-                float next = Mathf.Clamp(current + (dir * step), 0.0f, 1.0f);
-                _trackedValues[key] = next;
-                RenderingServer.GlobalShaderParameterSet(key, next);
-            },
-            GetDisplayValue = () => _trackedValues[key].ToString("0.00")
-        });
-    }
+        if (_weatherManager == null) return;
 
-    private void AddToggle(string name, GpuParticles3D node)
-    {
-        _menuItems.Add(new ActionItem
+        WeatherPreset[] presets = null;
+        try
         {
-            Name = name,
-            OnExecute = () => { if (node != null) node.Emitting = !node.Emitting; },
-            GetDisplayValue = () => (node != null && node.Emitting) ? "ON" : "OFF"
-        });
+            var field = typeof(WeatherManager).GetField("_weatherPresets",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            presets = field?.GetValue(_weatherManager) as WeatherPreset[];
+        }
+        catch (Exception e)
+        {
+            GD.PushWarning($"HUD: preset reload failed ({e.Message}) — applying cached preset instead");
+        }
+
+        if (presets != null)
+        {
+            int idx = (int)state;
+            if (idx >= 0 && idx < presets.Length && presets[idx] != null)
+            {
+                string path = presets[idx].ResourcePath;
+                if (!string.IsNullOrEmpty(path))
+                {
+                    // CacheMode.Ignore = read the file again, do not hand back the cached instance
+                    var fresh = ResourceLoader.Load<WeatherPreset>(path,
+                        cacheMode: ResourceLoader.CacheMode.Ignore);
+                    if (fresh != null)
+                    {
+                        presets[idx] = fresh;   // replace slot so future reads use the new values
+                        GD.Print($"[HUD] Reloaded preset '{path}' from disk");
+                    }
+                }
+            }
+        }
+
+        // immediate: true → snap to the new values instead of waiting for the tween.
+        // If you'd rather keep the smooth crossfade, drop the second arg.
+        _weatherManager.ChangeWeather(state);
     }
 
     private void AdjustWind(string key, float change)
     {
-        float val = _trackedValues[key] + change;
-        if (key == "wind_angle")
-        {
-            if (val >= 360) val -= 360;
-            if (val < 0) val += 360;
-        }
-        else
-        {
-            val = Mathf.Max(0, val);
-        }
-        _trackedValues[key] = val;
-
-        float angleRad = Mathf.DegToRad(_trackedValues["wind_angle"]);
-        float speed = _trackedValues["wind_speed"];
-        Vector3 windVec = new Vector3(Mathf.Cos(angleRad), 0, Mathf.Sin(angleRad)) * speed;
-
-        if (_weatherManager != null)
-            _weatherManager.SetManualWind(windVec);
+        // (Removed – wind is now controlled exclusively through weather presets.)
     }
 
     private void JumpToNextSeason()
@@ -1897,25 +1764,6 @@ public partial class HUD : Control
         updateMethod?.Invoke(_timeManager, null);
         _timeManager.EmitSignal(TimeManager.SignalName.ClockTick, h, m);
         _timeManager.EmitSignal(TimeManager.SignalName.TimeUpdated, (h + (m / 60.0f)) / 24.0f);
-    }
-
-    private void AdjustFogDensity(float change)
-    {
-        var env = GetEnvironment();
-        if (env != null && env.VolumetricFogEnabled)
-            env.VolumetricFogDensity = Mathf.Clamp(env.VolumetricFogDensity + change, 0.0f, 0.5f);
-    }
-
-    private float GetFogDensity()
-    {
-        var env = GetEnvironment();
-        return env != null ? env.VolumetricFogDensity : 0.0f;
-    }
-
-    private Godot.Environment GetEnvironment()
-    {
-        var node = GetTree().Root.FindChild("WorldEnvironment", true, false) as WorldEnvironment;
-        return node?.Environment;
     }
 
     private void Navigate(int dir)
@@ -2157,10 +2005,7 @@ public partial class HUD : Control
                             System.Globalization.CultureInfo.InvariantCulture, out val);
 
                 float min = 0, max = 1, step = 0.01f;
-                if (action.Name.Contains("Wind Speed")) { max = 50; step = 1; }
-                else if (action.Name.Contains("Wind Angle")) { max = 360; step = 15; }
-                else if (action.Name.Contains("Fog Density")) { max = 0.5f; step = 0.005f; }
-                else if (action.Name.Contains("Time Scale")) { min = 0; max = 10; step = 0.1f; }
+                if (action.Name.Contains("Time Scale")) { min = 0; max = 10; step = 0.1f; }
                 else if (action.Name.Contains("Sanity Level")) { min = 0; max = 100; step = 0.1f; }
                 else if (action.Name.Contains("Pixelation Strength")) { min = 0; max = 1; step = 0.01f; }
                 else if (action.Name.Contains("Color Quantization"))   { min = 0; max = 1; step = 0.01f; }

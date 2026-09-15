@@ -1,0 +1,22 @@
+[gd_resource type="Environment" format=3 uid="uid://bld0qarcklxe6"]
+
+[ext_resource type="Sky" uid="uid://drilpxj1xe7ui" path="res://Scenes/World/sky_main.tres" id="1_k8obr"]
+
+[resource]
+background_mode = 2
+sky = ExtResource("1_k8obr")
+ambient_light_color = Color(0.23515597, 0.27890673, 0.35, 1)
+ambient_light_sky_contribution = 0.7
+tonemap_mode = 4
+ssr_enabled = true
+ssao_enabled = true
+ssao_radius = 4.57
+glow_enabled = true
+glow_normalized = true
+glow_blend_mode = 0
+volumetric_fog_enabled = true
+volumetric_fog_density = 0.005
+volumetric_fog_ambient_inject = 0.1
+volumetric_fog_sky_affect = 0.455
+adjustment_enabled = true
+adjustment_contrast = 1.08

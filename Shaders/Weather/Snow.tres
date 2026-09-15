@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="WeatherPreset" format=3 uid="uid://cwrip5wx8dc0"]
+
+[ext_resource type="Script" uid="uid://2j5etn8ap0yt" path="res://Shaders/WeatherPreset.cs" id="1_qhdq0"]
+
+[resource]
+script = ExtResource("1_qhdq0")
+SnowAmount = 1.0
+RainParticles = false
+SplashParticles = false
+CumulusSize = 0.32000000000000006
+CumulusSkyTintFade = 0.31000000000000005
+FogDensity = 0.020000000000000018
+FogFalloff = 4.79
+FogEnd = 5482.0
+FogTint = Color(1, 1, 1, 1)
+WindSpeed = 5.0
+WindDirectionDeg = 0.6806784082777885
+metadata/_custom_type_script = "uid://2j5etn8ap0yt"

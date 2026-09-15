@@ -407,8 +407,7 @@ public partial class Player : CharacterBody3D
             else _touchStartPositions.Remove(touch.Index);
         }
 
-        if (PlayerInputOverride.Active)
-            return;
+        if (PlayerInputOverride.Active) return;
 
         if (HandlePinchZoom(@event)) { GetViewport().SetInputAsHandled(); return; }
         if (HandleCameraLook(@event)) { GetViewport().SetInputAsHandled(); return; }
@@ -425,6 +424,8 @@ public partial class Player : CharacterBody3D
             _targetZoom = Mathf.Max(_targetZoom - 0.5f, MinZoom);
         if (@event.IsActionPressed("zoom_out"))
             _targetZoom = Mathf.Min(_targetZoom + 0.5f, MaxZoom);
+
+        if (MindEyeMode.ActiveNow) return;
 
         if (@event.IsActionPressed("lock_on") && LockOnTarget != null)
             _isLockedOn = !_isLockedOn;
@@ -450,7 +451,7 @@ public partial class Player : CharacterBody3D
 
         bool anyMenuOpen = (HUD.Instance != null && HUD.Instance.IsInventoryOpen) ||
                            (HUD.Instance != null && HUD.Instance.IsHealthPanelOpen);
-        bool inputLocked = anyMenuOpen || PlayerInputOverride.Active;
+        bool inputLocked = anyMenuOpen || PlayerInputOverride.Active || PlayerInputOverride.MovementLock;
 
         UpdateCamera(dt);
         UpdateLockOn(dt);
@@ -525,6 +526,13 @@ public partial class Player : CharacterBody3D
             Vector3 steer = PlayerInputOverride.WorldDirection;
             _moveDirWorld = steer.LengthSquared() > 1e-6f ? steer.Normalized() : Vector3.Zero;
             _targetSpeed = _moveDirWorld == Vector3.Zero ? 0f : PlayerInputOverride.SpeedMps;
+            return;
+        }
+
+        if (PlayerInputOverride.MovementLock)
+        {
+            _moveDirWorld = Vector3.Zero;
+            _targetSpeed = 0f;
             return;
         }
 

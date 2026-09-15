@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="WeatherPreset" format=3 uid="uid://ur1ivad7wtfx"]
+
+[ext_resource type="Script" uid="uid://2j5etn8ap0yt" path="res://Shaders/WeatherPreset.cs" id="1_21xfu"]
+
+[resource]
+script = ExtResource("1_21xfu")
+MoonBoost = 0.19999999999999996
+CumulusIntensity = 0.53
+CumulusSize = 0.6099999999999999
+FogFalloff = 0.97
+FogEnd = 5569.7
+WindSpeed = 30.0
+metadata/_custom_type_script = "uid://2j5etn8ap0yt"

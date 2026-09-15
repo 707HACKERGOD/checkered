@@ -3,8 +3,10 @@ using Godot;
 public partial class WorldEnvironmentManager : Node
 {
     [Export] private DirectionalLight3D _sun;
+    [Export] private DirectionalLight3D _moon;
     [Export] private WorldEnvironment _worldEnvironment;
     [Export] private Gradient _sunColorGradient;
+    private ShaderMaterial _skyMat;
 
     private TimeManager _timeManager;
 
@@ -13,6 +15,16 @@ public partial class WorldEnvironmentManager : Node
         if (_sun == null)
             _sun = GetNodeOrNull<DirectionalLight3D>("../DirectionalLight3D")
                 ?? GetTree()?.GetFirstNodeInGroup("sun") as DirectionalLight3D;
+
+        if (_moon == null)
+            _moon = GetNodeOrNull<DirectionalLight3D>("../MoonLight")
+                ?? GetTree()?.GetFirstNodeInGroup("moon") as DirectionalLight3D;
+
+        if (_moon == null)
+        {
+            GD.PrintErr("WorldEnvironmentManager: _moon is null. Sky3D moon won't render.");
+            return;
+        }
 
         if (_worldEnvironment == null)
             _worldEnvironment = GetNodeOrNull<WorldEnvironment>("../WorldEnvironment")
@@ -34,6 +46,10 @@ public partial class WorldEnvironmentManager : Node
             _timeManager.TimeUpdated += OnTimeUpdated;
         else
             GD.PrintErr("WorldEnvironmentManager: TimeManager not found.");
+
+        _skyMat = _worldEnvironment?.Environment?.Sky?.SkyMaterial as ShaderMaterial;
+        if (_skyMat == null)
+            GD.PrintErr("WorldEnvironmentManager: Sky material is not a ShaderMaterial.");
     }
 
     private void OnTimeUpdated(float timeOfDay)
@@ -42,6 +58,8 @@ public partial class WorldEnvironmentManager : Node
 
         float hour = timeOfDay * 24f;
         float sunAngle = (hour - 6f) * (Mathf.Pi / 12f);
+        //Vector3 moonDir = -sunDir; // simple opposition; replace with real orbit if you want phases
+        //_moon.Transform = new Transform3D(Basis.LookingAt(-moonDir, Vector3.Up), _moon.Position);
 
         // Match shader: rotated original formula
         Vector3 sunDir = new Vector3(
@@ -51,6 +69,8 @@ public partial class WorldEnvironmentManager : Node
         ).Normalized();
 
         _sun.Transform = new Transform3D(Basis.LookingAt(-sunDir, Vector3.Up), _sun.Position);
-        _sun.LightColor = _sunColorGradient.Sample(timeOfDay);
+        Color sunColor = _sunColorGradient.Sample(timeOfDay);
+        _sun.LightColor = sunColor;
+        _skyMat?.SetShaderParameter("sun_light_color", sunColor);
     }
 }

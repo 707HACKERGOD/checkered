@@ -196,7 +196,7 @@ public static class ItemRegistry
             new MaterialPhysics(LatticeType.FCC, 420f, 35f, 1350f)));
     }
 
-    private static void RegisterItem(ItemData item)
+    public static void RegisterItem(ItemData item)
     {
         Items[item.Id] = item;
         ItemKeys.Add(item.Id);

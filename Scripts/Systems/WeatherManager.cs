@@ -3,11 +3,17 @@ using System;
 
 public partial class WeatherManager : Node
 {
-    public enum WeatherState { Clear, Rain, SummerRain, Snow, SunnySnow, Ice, Storm, Mixed }
+    public enum WeatherState { Clear, Rain, Snow, Rainstorm }
     public WeatherState CurrentState { get; private set; } = WeatherState.Clear;
     public float GetRainAmount() => _currentRainVal;
 
     // --- StringName cache (prevents GC allocations) ---
+    [Export] private WeatherPreset[] _weatherPresets; // ORDER = WeatherState: Clear, Rain, Snow, Rainstorm
+    public static WeatherManager Instance { get; private set; }
+    public override void _ExitTree() { if (Instance == this) Instance = null; }
+    private bool  _worldResolved;
+    private bool  _weatherReapplied;
+    private float _worldResolveTimer;
     private static readonly StringName ParamGlobalTime          = "global_time";
     private static readonly StringName ParamRainAmount          = "rain_amount";
     private static readonly StringName ParamSnowAmount          = "snow_amount";
@@ -44,7 +50,19 @@ public partial class WeatherManager : Node
     private float _resolveRetryTimer = 0f;
     private const float RESOLVE_RETRY_INTERVAL = 2.0f;
 
+    // [SKY3D] Reference to the SkyDome node so we can drive its wind / cloud /
+    // fog properties instead of writing raw shader uniforms. SkyDome owns the
+    // cloud drift loop and the fog mesh, so routing through it keeps the
+    // inspector in sync and avoids fighting the plugin.
+    private Node _skyDome;
+    private const string SKYDOME_NAME = "SkyDome";
+
+    // [SKY3D] Our weather fog density values range 0..0.15; Sky3D's fog_density
+    // property expects values in the ~0.0001..0.01 range. This scales between them.
+    private const float FOG_DENSITY_SCALE = 0.01f;
+
     // --- Other ---
+    [Export] private bool _constantWind = true; // 1 speed per weather state; no gust scheduler
     [Export] private AudioStreamPlayer _thunderPlayer;      // Assign in inspector
     [Export] private AudioStream[] _thunderSounds;          // Array of thunder sounds
     [Export] private float _thunderDelayMin = 0.2f;         // Min delay after lightning
@@ -82,20 +100,32 @@ public partial class WeatherManager : Node
     [Export] private Texture2D _autumnLeafTexture;
 
     private Tween _activeTween;
+    private WeatherPreset _activePreset = new WeatherPreset();
 
     // Weather blend values
     private float _currentRainVal = 0.0f;
     private float _currentSnowVal = 0.0f;
     private float _currentIceVal  = 0.0f;
     private float _currentGreySkyTint = 0.0f;
+    // [SKY3D] _currentFogBaseColor is retained as dead state — the fog color is
+    // now derived from SkyDome's atm_day_tint / atm_horizon_light_tint, which
+    // SkyDome manages. If you later want to tint fog toward a specific color,
+    // we can blend it into those SkyDome properties the same way we route
+    // fog_density below.
     private Color _currentFogBaseColor = new Color(0.8f, 0.8f, 0.8f);
     private float _currentCloudCoverage = 0.3f;
+    // [SKY3D] _currentCloudSoftness / _currentCloudScale retained for compatibility
+    // but no longer written anywhere — Sky3D exposes cumulus_noise_freq / cumulus_size
+    // via SkyDome inspector properties if you need to tune them.
     private float _currentCloudSoftness = 0.5f;
     private float _currentCloudScale    = 0.4f;
 
     // Wind smoothing
     private Vector3 _targetWindVelocity = Vector3.Zero;
     private Vector3 _currentWindVelocity = Vector3.Zero;
+    // [SKY3D] _currentCloudOffset is dead state — SkyDome's own process_tick()
+    // integrates cloud positions from wind_speed / wind_direction. Kept for
+    // compatibility with any external scripts that might read it.
     private Vector2 _currentCloudOffset = Vector2.Zero;
     private float _windSmoothSpeed = 4.0f;
 
@@ -172,6 +202,7 @@ public partial class WeatherManager : Node
 
     public override void _Ready()
     {
+        Instance = this;
         ResolveReferences();
         CacheMaterials(); // <-- NEW: Cache materials once
 
@@ -253,6 +284,8 @@ public partial class WeatherManager : Node
 
         RenderingServer.GlobalShaderParameterSet(ParamWindHistory, _windHistoryTexture);
         RenderingServer.GlobalShaderParameterSet(ParamWindHistoryDuration, _windHistoryDuration);
+
+        ValidatePresetArray();
     }
 
     // -------------------------------------------------------------------------
@@ -300,12 +333,7 @@ public partial class WeatherManager : Node
 
         UpdateSeasonalLeafTexture();
         _subscribed = true;
-        //GD.Print("WeatherManager subscribed to TimeManager");
     }
-
-    // -------------------------------------------------------------------------
-    // OPTIMIZED: ResolveReferences only retries every few seconds if SkyMaterial missing
-    // -------------------------------------------------------------------------
     public override void _Process(double delta)
     {
         float dt = (float)delta;
@@ -313,18 +341,28 @@ public partial class WeatherManager : Node
         {
             SubscribeToTimeManager();
         }
+        TryResolveWorldReferences(dt);
 
-        // FIXED: Only attempt resolve periodically, not every frame
-        if (SkyMaterial == null)
+        if (SkyMaterial == null && SkyWeaver.Instance == null)
         {
             _resolveRetryTimer -= dt;
             if (_resolveRetryTimer <= 0f)
             {
                 ResolveReferences();
-                CacheMaterials(); // Re-cache materials after resolve
+                CacheMaterials();
                 _resolveRetryTimer = RESOLVE_RETRY_INTERVAL;
             }
             return;
+        }
+
+        if (_skyDome == null)
+        {
+            _resolveRetryTimer -= dt;
+            if (_resolveRetryTimer <= 0f)
+            {
+                ResolveReferences();
+                _resolveRetryTimer = RESOLVE_RETRY_INTERVAL;
+            }
         }
 
         _internalTime += dt;
@@ -341,7 +379,7 @@ public partial class WeatherManager : Node
             dayFactor = Mathf.Sin(t * Mathf.Pi);
         }
 
-        if (!_manualWindOverride && !_isWindFrozenForTransition)
+        if (!_constantWind && !_manualWindOverride && !_isWindFrozenForTransition)
             UpdateWindSchedule(dt);
 
         if (!_isWindFrozenForTransition)
@@ -364,7 +402,7 @@ public partial class WeatherManager : Node
             RenderingServer.GlobalShaderParameterSet(ParamWindStrength, _currentWindVelocity.Length());
         }
 
-        if (!_manualWindOverride && !_isWindFrozenForTransition)
+        if (!_constantWind && !_manualWindOverride && !_isWindFrozenForTransition)
         {
             _nextAngleChangeTimer -= dt;
             while (_nextAngleChangeTimer <= 0)
@@ -383,11 +421,11 @@ public partial class WeatherManager : Node
 
         UpdateCanopyLeavesState();
 
-        float targetGust = (CurrentState == WeatherState.Storm || _currentWindVelocity.Length() > 10.0f) ? 1.0f : 0.0f;
+        float targetGust = (CurrentState == WeatherState.Rainstorm || _currentWindVelocity.Length() > 10.0f) ? 1.0f : 0.0f;
         _currentGustMode = Mathf.Lerp(_currentGustMode, targetGust, dt * 2.0f);
         RenderingServer.GlobalShaderParameterSet(ParamGustMode, _currentGustMode);
 
-        if (CurrentState == WeatherState.Storm)
+        if (_activePreset.LightningRate > 0f)
         {
             _lightningTimer -= dt;
             if (_lightningTimer <= 0.0f)
@@ -397,12 +435,16 @@ public partial class WeatherManager : Node
             }
         }
 
+        // [SKY3D] Lightning writes to the shader's lightning_strength uniform.
+        // Sky3D does NOT touch this uniform, so there is no conflict.
+        // (If you're using the stock Sky3D shader, this uniform doesn't exist
+        // and the write is a harmless no-op. It only works on the merged shader.)
         if (_skyFlashIntensity > 0.0f)
         {
             _skyFlashIntensity -= dt * 5.0f;
             if (_skyFlashIntensity < 0.0f) _skyFlashIntensity = 0.0f;
-            if (IsInstanceValid(SkyMaterial))
-                SkyMaterial.SetShaderParameter("lightning_strength", _skyFlashIntensity);
+            if (SkyWeaver.Instance != null)
+                SkyWeaver.Instance.SetLightning(_skyFlashIntensity);
         }
 
         float brightness = Mathf.Lerp(0.1f, 1.0f, dayFactor);
@@ -465,67 +507,35 @@ public partial class WeatherManager : Node
             }
         }
 
-        if (IsInstanceValid(SkyMaterial) && TimeManager.Instance != null)
+        // --- Feed SkyWeaver — single call pulls every value from the active
+        // preset. SkyWeaver applies each field per its own sentinel rules:
+        // fields the preset left at -1 / alpha<0 inherit the SkyWeaver
+        // inspector values, so a fresh preset == the editor look.
+        // Rain/snow particle emission and ground shader globals are handled
+        // separately (above) — the sky only cares about sky and fog fields.
+        if (SkyWeaver.Instance != null && TimeManager.Instance != null)
         {
-            SeasonPalette activePalette = _springSky;
-            switch (_currentSeason)
-            {
-                case Season.SPRING: activePalette = _springSky ?? _summerSky; break;
-                case Season.SUMMER: activePalette = _summerSky ?? _springSky; break;
-                case Season.AUTUMN: activePalette = _autumnSky ?? _springSky; break;
-                case Season.WINTER: activePalette = _winterSky ?? _springSky; break;
-            }
+            SkyWeaver.Instance.TimeOfDay   = TimeManager.Instance.Hour + TimeManager.Instance.Minute / 60f;
+            SkyWeaver.Instance.SeasonIndex = (int)_currentSeason;
+            SkyWeaver.Instance.SetPaletteTime(sunProgress);
+            SkyWeaver.Instance.SetWind(_currentWindVelocity);
 
-            if (activePalette != null && activePalette.TopColor != null)
-            {
-                Color topCol = activePalette.TopColor.Sample(sunProgress);
-                Color horCol = activePalette.HorizonColor.Sample(sunProgress);
-                Color sunCol = activePalette.SunColor != null
-                    ? activePalette.SunColor.Sample(sunProgress)
-                    : new Color(1, 0.9f, 0.7f);
-
-                Color stormGrey = new Color(0.3f, 0.35f, 0.4f);
-                topCol = topCol.Lerp(stormGrey, _currentGreySkyTint);
-                horCol = horCol.Lerp(stormGrey, _currentGreySkyTint);
-                sunCol = sunCol.Lerp(new Color(0.1f, 0.1f, 0.1f), _currentGreySkyTint * 0.9f);
-
-                SkyMaterial.SetShaderParameter("sky_top_color", topCol);
-                SkyMaterial.SetShaderParameter("sky_horizon_color", horCol);
-                SkyMaterial.SetShaderParameter("sun_color", sunCol);
-                SkyMaterial.SetShaderParameter("time_of_day", sunProgress * 24.0f);
-            }
+            SkyWeaver.Instance.FeedWeather(_activePreset);
         }
 
-        if (IsInstanceValid(_worldEnv) && _worldEnv.Environment != null)
+        if (IsInstanceValid(_skyDome))
         {
-            float minNightBrightness = 0.02f;
-            if (CurrentState == WeatherState.Snow || CurrentState == WeatherState.SunnySnow)
-                minNightBrightness = 0.15f;
-            float finalBrightness = Mathf.Lerp(minNightBrightness, 1.0f, dayFactor);
-            _worldEnv.Environment.VolumetricFogAlbedo = _currentFogBaseColor * finalBrightness;
-        }
+            float speed = _currentWindVelocity.Length();
+            // Sky3D's wind_direction is where the wind COMES FROM (0 = north).
+            // Our _currentWindVelocity points where the wind BLOWS TOWARD.
+            float towardAngle = Mathf.Atan2(_currentWindVelocity.Z, _currentWindVelocity.X);
+            float sky3dWindDir = towardAngle - Mathf.Pi * 0.5f;
 
-        if (IsInstanceValid(SkyMaterial))
-        {
-            Vector3 windForClouds = _currentWindVelocity;
-            Vector2 baseWind = new Vector2(windForClouds.X, windForClouds.Z) * 0.5f;
-            Vector2 driftWind = new Vector2(2.0f, 0.0f);
-            Vector2 finalCloudVelocity = baseWind + driftWind;
-            Vector2 windDelta = finalCloudVelocity * dt * 0.0125f;
-
-            _currentCloudOffset += windDelta;
-            if (_currentCloudOffset.X > 100.0f) _currentCloudOffset.X -= 100.0f;
-            if (_currentCloudOffset.Y > 100.0f) _currentCloudOffset.Y -= 100.0f;
-            if (_currentCloudOffset.X < -100.0f) _currentCloudOffset.X += 100.0f;
-            if (_currentCloudOffset.Y < -100.0f) _currentCloudOffset.Y += 100.0f;
-
-            SkyMaterial.SetShaderParameter("wind_offset", _currentCloudOffset);
+            _skyDome.Set("wind_speed", speed);
+            _skyDome.Set("wind_direction", sky3dWindDir);
         }
     }
 
-    // -------------------------------------------------------------------------
-    // OPTIMIZED HELPERS (use cached materials)
-    // -------------------------------------------------------------------------
     private void SetShaderParameter(GpuParticles3D particles, ShaderMaterial cachedMat, StringName param, Variant val)
     {
         if (cachedMat != null)
@@ -536,6 +546,14 @@ public partial class WeatherManager : Node
     {
         if (cachedMat != null)
             cachedMat.AlbedoColor = color;
+    }
+
+    private void SetSkyDomeProperty(string name, Variant value)
+    {
+        if (IsInstanceValid(_skyDome))
+            _skyDome.Set(name, value);
+        else if (IsInstanceValid(SkyMaterial))
+            SkyMaterial.SetShaderParameter(name, value);
     }
 
     // --- Determine target wind angle based on season, time of day, randomness ---
@@ -590,7 +608,7 @@ public partial class WeatherManager : Node
 
         while (_windPhaseTimer <= 0f)
         {
-            bool isStorm = CurrentState == WeatherState.Storm;
+            bool isStorm = CurrentState == WeatherState.Rainstorm;
             bool isAutumn = _currentSeason == Season.AUTUMN && !isStorm;
 
             // Default durations and strengths (for non‑autumn, non‑storm)
@@ -710,12 +728,12 @@ public partial class WeatherManager : Node
     private void SetTargetWindStrength(float strength)
     {
         // Use the current smoothed angle (or target angle) to set direction.
-        // We'll use _targetWindAngle for consistency; the smoothing will handle it.
+        // use _targetWindAngle for consistency; the smoothing will handle it.
         Vector3 windVec = new Vector3(Mathf.Cos(_targetWindAngle), 0, Mathf.Sin(_targetWindAngle)) * strength;
         _targetWindVelocity = windVec;
     }
 
-    // --- NEW: Write a sample to the wind history texture ---
+    // Write a sample to the wind history texture ---
     private void WriteWindSample()
     {
         // Use the *target* wind values (not heavily smoothed) so the history reflects actual changes.
@@ -749,7 +767,7 @@ public partial class WeatherManager : Node
         }
 
         float windStrength = _currentWindVelocity.Length();
-        bool shouldShow = CurrentState == WeatherState.Storm || _isInLeafyArea || windStrength > 0.5f;
+        bool shouldShow = CurrentState == WeatherState.Rainstorm || _isInLeafyArea || windStrength > 0.5f;
 
         if (shouldShow != _canopyLeavesVisible)
         {
@@ -878,15 +896,21 @@ public partial class WeatherManager : Node
         if (seasonVal == (int)Season.WINTER)
         {
             if (roll > 0.7f) next = WeatherState.Snow;
-            else if (roll > 0.4f) next = WeatherState.Ice;
         }
         else if (seasonVal == (int)Season.AUTUMN)
         {
             if (roll > 0.5f) next = WeatherState.Rain;
+            else if (roll > 0.4f) next = WeatherState.Rainstorm;
         }
         else if (seasonVal == (int)Season.SPRING)
         {
             if (roll > 0.7f) next = WeatherState.Rain;
+            else if (roll > 0.4f) next = WeatherState.Rainstorm;
+        }
+        else if (seasonVal == (int)Season.SUMMER)
+        {
+            if (roll > 0.7f) next = WeatherState.Rain;
+            else if (roll > 0.4f) next = WeatherState.Rainstorm;
         }
         ChangeWeather(next);
     }
@@ -989,165 +1013,67 @@ public partial class WeatherManager : Node
     public void ChangeWeather(WeatherState newState, bool immediate = false)
     {
         CurrentState = newState;
-        float targetRain = 0f, targetSnow = 0f, targetIce = 0f, windSpeed = 0f;
-        float targetFogDensity = 0f;
-        Color targetFogColor = new Color(0.8f, 0.8f, 0.8f);
-        float targetCloudCoverage = 0.3f, targetCloudSoftness = 0.5f, targetCloudScale = 0.4f;
-        Color targetCloudColor = new Color(1.0f, 1.0f, 1.0f);
-        float targetGreyTint = 0.0f;
+        var p = (_weatherPresets != null && (int)newState < _weatherPresets.Length && _weatherPresets[(int)newState] != null)
+            ? _weatherPresets[(int)newState] : new WeatherPreset();
+        _activePreset = p;
 
-        switch (newState)
-        {
-            case WeatherState.Clear:
-                windSpeed = 0.0f; targetFogDensity = 0.0f;
-                targetFogColor = new Color(0.8f, 0.8f, 0.8f);
-                targetCloudCoverage = 0.3f; targetCloudSoftness = 0.5f;
-                targetCloudColor = new Color(1.0f, 1.0f, 1.0f);
-                break;
-            case WeatherState.Rain:
-                targetRain = 1.0f; targetGreyTint = 0.6f;
-                windSpeed = 2.0f; targetFogDensity = 0.02f;
-                targetFogColor = new Color(0.6f, 0.65f, 0.7f);
-                targetCloudCoverage = 0.7f; targetCloudSoftness = 0.7f;
-                targetCloudColor = new Color(0.9f, 0.92f, 0.95f);
-                break;
-            case WeatherState.SummerRain:
-                targetRain = 1.0f; targetGreyTint = 0.0f;
-                windSpeed = 1.0f; targetFogDensity = 0.01f;
-                targetFogColor = new Color(0.8f, 0.85f, 0.9f);
-                targetCloudCoverage = 0.5f; targetCloudSoftness = 0.5f;
-                targetCloudColor = new Color(0.9f, 0.92f, 0.95f);
-                break;
-            case WeatherState.Snow:
-                targetSnow = 1.0f; targetGreyTint = 0.4f;
-                windSpeed = 1.5f; targetFogDensity = 0.04f;
-                targetFogColor = new Color(0.75f, 0.8f, 0.85f);
-                targetCloudCoverage = 0.85f; targetCloudSoftness = 0.6f;
-                targetCloudColor = new Color(1.0f, 1.0f, 1.0f);
-                break;
-            case WeatherState.SunnySnow:
-                targetSnow = 1.0f; targetGreyTint = 0.0f;
-                windSpeed = 0.5f; targetFogDensity = 0.02f;
-                targetFogColor = new Color(0.85f, 0.9f, 0.95f);
-                targetCloudCoverage = 0.4f; targetCloudSoftness = 0.5f;
-                targetCloudColor = new Color(1.0f, 1.0f, 1.0f);
-                break;
-            case WeatherState.Storm:
-                targetRain = 1.0f; targetGreyTint = 1.0f;
-                windSpeed = 20.0f; targetFogDensity = 0.15f;
-                targetFogColor = new Color(0.5f, 0.5f, 0.55f);
-                targetCloudCoverage = 0.9f; targetCloudSoftness = 0.9f;
-                targetCloudColor = new Color(0.5f, 0.52f, 0.55f);
-                break;
-            case WeatherState.Ice:
-                targetIce = 1.0f; windSpeed = 0.0f; targetFogDensity = 0.01f;
-                targetFogColor = new Color(0.8f, 0.85f, 0.9f);
-                targetCloudCoverage = 0.45f; targetCloudSoftness = 0.05f;
-                targetCloudColor = new Color(0.9f, 0.95f, 1.0f);
-                break;
-            case WeatherState.Mixed:
-                targetRain = 0.5f; targetSnow = 0.5f; targetIce = 0.3f; targetGreyTint = 0.5f;
-                windSpeed = 5.0f; targetFogDensity = 0.03f;
-                targetFogColor = new Color(0.6f, 0.65f, 0.7f);
-                targetCloudCoverage = 0.6f; targetCloudSoftness = 0.3f;
-                targetCloudColor = new Color(0.8f, 0.8f, 0.8f);
-                break;
-        }
+        GD.Print($"[Weather] {newState} | rain={p.RainAmount} snow={p.SnowAmount} ice={p.IceAmount} " +
+                $"cov={p.CloudCoverage} dark={p.StormDarkness} fogD={p.FogDensity} fogF={p.FogFalloff} " +
+                $"wind={p.WindSpeed} auto={p.AutoWind}");
 
-        // If wind is frozen for a transition, do not change the target wind velocity
-        if (!_isWindFrozenForTransition)
-        {
-            // Preserve current target angle, only adjust strength
-            // We'll use _targetWindAngle to compute new vector.
-            Vector3 windVec = new Vector3(Mathf.Cos(_targetWindAngle), 0, Mathf.Sin(_targetWindAngle)) * windSpeed;
-            _targetWindVelocity = windVec;
-        }
-
-        UpdateCanopyLeavesState();
-
-        bool isRaining = targetRain > 0.1f;
-        bool isSnowing = targetSnow > 0.1f;
-
+        // --- particles: independent booleans, no > 0.1 threshold ---
         if (IsInstanceValid(_rainParticles))
         {
-            SetParticlesActive(_rainParticles, isRaining);
-            SetShaderParameter(_rainParticles, _rainProcessMaterial, ParamDoRecycle, isRaining ? 1.0f : 0.0f);
+            SetParticlesActive(_rainParticles, p.RainParticles && p.RainAmount > 0f);
+            SetShaderParameter(_rainParticles, _rainProcessMaterial, ParamDoRecycle, p.RainParticles ? 1f : 0f);
         }
         if (IsInstanceValid(_rainSplashParticles))
-            SetParticlesActive(_rainSplashParticles, isRaining);
+            SetParticlesActive(_rainSplashParticles, p.SplashParticles && p.RainAmount > 0f);
         if (IsInstanceValid(_snowParticles))
         {
-            SetParticlesActive(_snowParticles, isSnowing);
-            SetShaderParameter(_snowParticles, _snowProcessMaterial, ParamIsSnow, 1.0f);
-            SetShaderParameter(_snowParticles, _snowProcessMaterial, ParamDoRecycle, isSnowing ? 1.0f : 0.0f);
+            SetParticlesActive(_snowParticles, p.SnowParticles && p.SnowAmount > 0f);
+            SetShaderParameter(_snowParticles, _snowProcessMaterial, ParamIsSnow, 1f);
+            SetShaderParameter(_snowParticles, _snowProcessMaterial, ParamDoRecycle, p.SnowParticles ? 1f : 0f);
         }
 
+        // --- wind: only touch the scheduler if the preset wants it off ---
+        if (!p.AutoWind)
+        {
+            _manualWindOverride = true;
+            float rad = Mathf.DegToRad(p.WindDirectionDeg);
+            _targetWindVelocity = new Vector3(Mathf.Cos(rad), 0, Mathf.Sin(rad)) * p.WindSpeed;
+        }
+        else
+        {
+            _manualWindOverride = false;
+            _targetWindVelocity = new Vector3(Mathf.Cos(_targetWindAngle), 0, Mathf.Sin(_targetWindAngle)) * p.WindSpeed;
+        }
+
+        // --- shader globals + SkyWeaver: tween or snap ---
         if (_activeTween != null && _activeTween.IsValid()) _activeTween.Kill();
 
         if (immediate)
         {
-            _currentRainVal = targetRain;
-            RenderingServer.GlobalShaderParameterSet(ParamRainAmount, targetRain);
-            _currentSnowVal = targetSnow;
-            RenderingServer.GlobalShaderParameterSet(ParamSnowAmount, targetSnow);
-            _currentIceVal = targetIce;
-            RenderingServer.GlobalShaderParameterSet(ParamIceAmount, targetIce);
-            _currentGreySkyTint = targetGreyTint;
-            _currentFogBaseColor = targetFogColor;
-
-            if (IsInstanceValid(_worldEnv) && _worldEnv.Environment != null)
-                _worldEnv.Environment.VolumetricFogDensity = targetFogDensity;
-
-            if (IsInstanceValid(SkyMaterial))
-            {
-                _currentCloudCoverage = targetCloudCoverage;
-                _currentCloudSoftness = targetCloudSoftness;
-                _currentCloudScale = targetCloudScale;
-                SkyMaterial.SetShaderParameter("cloud_coverage", targetCloudCoverage);
-                SkyMaterial.SetShaderParameter("cloud_softness", targetCloudSoftness);
-                SkyMaterial.SetShaderParameter("cloud_scale", targetCloudScale);
-                SkyMaterial.SetShaderParameter("cloud_tint", targetCloudColor);
-            }
+            ApplyPrecipitationInstant(p);
         }
         else
         {
             _activeTween = CreateTween();
             _activeTween.SetParallel(true);
-            _activeTween.TweenMethod(
-                Callable.From<float>(v => { _currentRainVal = v; RenderingServer.GlobalShaderParameterSet(ParamRainAmount, v); }),
-                _currentRainVal, targetRain, 8.0f);
-            _activeTween.TweenMethod(
-                Callable.From<float>(v => { _currentSnowVal = v; RenderingServer.GlobalShaderParameterSet(ParamSnowAmount, v); }),
-                _currentSnowVal, targetSnow, 8.0f);
-            _activeTween.TweenMethod(
-                Callable.From<float>(v => { _currentIceVal = v; RenderingServer.GlobalShaderParameterSet(ParamIceAmount, v); }),
-                _currentIceVal, targetIce, 8.0f);
-            _activeTween.TweenMethod(
-                Callable.From<float>(v => _currentGreySkyTint = v),
-                _currentGreySkyTint, targetGreyTint, 8.0f);
-            _activeTween.TweenMethod(
-                Callable.From<Color>(c => _currentFogBaseColor = c),
-                _currentFogBaseColor, targetFogColor, 8.0f);
-
-            if (IsInstanceValid(_worldEnv) && _worldEnv.Environment != null)
-                _activeTween.TweenProperty(_worldEnv.Environment, "volumetric_fog_density", targetFogDensity, 8.0f);
-
-            if (IsInstanceValid(SkyMaterial))
-            {
-                _activeTween.TweenMethod(
-                    Callable.From<float>(v => { _currentCloudCoverage = v; SkyMaterial.SetShaderParameter("cloud_coverage", v); }),
-                    _currentCloudCoverage, targetCloudCoverage, 8.0f);
-                _activeTween.TweenMethod(
-                    Callable.From<float>(v => { _currentCloudSoftness = v; SkyMaterial.SetShaderParameter("cloud_softness", v); }),
-                    _currentCloudSoftness, targetCloudSoftness, 8.0f);
-                _activeTween.TweenMethod(
-                    Callable.From<float>(v => { _currentCloudScale = v; SkyMaterial.SetShaderParameter("cloud_scale", v); }),
-                    _currentCloudScale, targetCloudScale, 8.0f);
-                _activeTween.TweenMethod(
-                    Callable.From<Color>(c => SkyMaterial.SetShaderParameter("cloud_tint", c)),
-                    (Color)SkyMaterial.GetShaderParameter("cloud_tint"), targetCloudColor, 8.0f);
-            }
+            _activeTween.TweenMethod(Callable.From<float>(v => { _currentRainVal = v; RenderingServer.GlobalShaderParameterSet(ParamRainAmount, v); }), _currentRainVal, p.RainAmount, 3.0f);
+            _activeTween.TweenMethod(Callable.From<float>(v => { _currentSnowVal = v; RenderingServer.GlobalShaderParameterSet(ParamSnowAmount, v); }), _currentSnowVal, p.SnowAmount, 3.0f);
+            _activeTween.TweenMethod(Callable.From<float>(v => { _currentIceVal  = v; RenderingServer.GlobalShaderParameterSet(ParamIceAmount,  v); }), _currentIceVal,  p.IceAmount,  3.0f);
         }
+
+        // Everything else is pushed every frame from _Process via the feed.
+        UpdateCanopyLeavesState();
+    }
+
+    private void ApplyPrecipitationInstant(WeatherPreset p)
+    {
+        _currentRainVal = p.RainAmount;  RenderingServer.GlobalShaderParameterSet(ParamRainAmount, _currentRainVal);
+        _currentSnowVal = p.SnowAmount;  RenderingServer.GlobalShaderParameterSet(ParamSnowAmount, _currentSnowVal);
+        _currentIceVal  = p.IceAmount;   RenderingServer.GlobalShaderParameterSet(ParamIceAmount,  _currentIceVal);
     }
 
     // -------------------------------------------------------------------------
@@ -1213,6 +1139,11 @@ public partial class WeatherManager : Node
             SkyMaterial = _worldEnv.Environment.Sky.SkyMaterial as ShaderMaterial;
         if (_lightningBoltScene == null)
             _lightningBoltScene = GD.Load<PackedScene>("res://Scenes/Effects/LightningBolt.tscn");
+
+        // [SKY3D] Locate the SkyDome node created by Sky3D. It's a direct child
+        // of the Sky3D node. Adjust SKYDOME_NAME if you renamed it.
+        if (_skyDome == null)
+            _skyDome = GetTree().Root.FindChild(SKYDOME_NAME, true, false);
     }
 
     private void TriggerLightning()
@@ -1258,6 +1189,49 @@ public partial class WeatherManager : Node
             };
             AddChild(timer);
             timer.Start();
+        }
+    }
+
+    private void TryResolveWorldReferences(float dt)
+    {
+        if (_worldResolved) return;
+        _worldResolveTimer -= dt;
+        if (_worldResolveTimer > 0f) return;
+        _worldResolveTimer = 1.0f;   // retry once per second until it works
+
+        ResolveReferences();
+        CacheMaterials();
+
+        _worldResolved = _rainParticles != null
+                    && _rainSplashParticles != null
+                    && _snowParticles != null
+                    && _player != null;
+
+        if (_worldResolved && !_weatherReapplied)
+        {
+            _weatherReapplied = true;
+            GD.Print($"[Weather] World resolved — re-applying {CurrentState}");
+            ChangeWeather(CurrentState, immediate: true);
+        }
+    }
+
+    private void ValidatePresetArray()
+    {
+        string[] expected = { "Clear", "Rain", "Snow", "Rainstorm" };
+        if (_weatherPresets == null)
+        {
+            GD.PushError("WeatherManager: _weatherPresets is NULL — assign it in the inspector!");
+            return;
+        }
+        if (_weatherPresets.Length != expected.Length)
+            GD.PushWarning($"WeatherManager: {_weatherPresets.Length} presets set, expected {expected.Length}");
+
+        for (int i = 0; i < _weatherPresets.Length; i++)
+        {
+            string label = i < expected.Length ? expected[i] : $"Slot{i}";
+            var p = _weatherPresets[i];
+            GD.Print($"  preset[{i}] {label,-11} = " +
+                    (p == null ? "NULL !!!" : System.IO.Path.GetFileName(p.ResourcePath)));
         }
     }
 }

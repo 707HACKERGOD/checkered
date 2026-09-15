@@ -20,6 +20,12 @@ public static class PlayerInputOverride
 
     public static event Action BecameActive;
     public static event Action BecameInactive;
+    public static bool MovementLock;   // Mind's Eye: blocks movement, keeps camera look
+
+    public static void Set(bool active)
+    {
+        Active = active;
+    }
 
     public static void Begin()
     {

@@ -34,7 +34,7 @@ group_uniforms;
 group_uniforms Look;
 uniform float horizon_power : hint_range(0.5, 4.0) = 1.6;
 uniform float sunset_band_strength = 1.1;
-uniform float sun_disc_size : hint_range(0.0005, 0.02) = 0.0035;
+uniform float sun_disc_size : hint_range(0.0002, 0.02) = 0.001; // 0.001 == your old smoothstep(0.998,0.999) exactly
 uniform float sun_disc_intensity = 5.0;
 uniform float sun_halo_strength = 0.4;
 uniform vec3  ground_color : source_color = vec3(0.28, 0.27, 0.26);
@@ -44,6 +44,12 @@ group_uniforms Moon;
 uniform sampler2D moon_texture : source_color, filter_linear, repeat_disable;
 uniform float moon_size : hint_range(0.01, 0.3) = 0.07;
 uniform float moon_brightness = 1.2;
+uniform float moon_fullness : hint_range(0.0, 1.0) = 1.0;
+
+uniform float cirrus_day_intensity    = 2.4;  // noon
+uniform float cirrus_night_intensity  = 1.0;  // sunrise/sunset/night
+uniform float cumulus_day_intensity   = 4.0;  // noon: white clouds
+uniform float cumulus_night_intensity = 0.6;  // sunrise/sunset: the dark look
 group_uniforms;
 
 group_uniforms Stars;
@@ -63,9 +69,10 @@ group_uniforms;
 group_uniforms Clouds;
 uniform vec2 cloud_offset = vec2(0.0); // accumulated wind drift, pushed by SkyWeaver
 uniform vec3 clouds_night_color : source_color = vec3(0.09, 0.094, 0.129);
+uniform float cumulus_moon_intensity = 2.2;  // full-moon: white moonlit clouds
+uniform float cirrus_moon_intensity = 1.6;
 
 uniform bool  cirrus_visible = true;
-uniform float cirrus_intensity = 1.8;
 uniform float cirrus_thickness = 2.0;
 uniform float cirrus_absorption = 2.0;
 uniform float cirrus_coverage_scale : hint_range(0.0, 1.5) = 0.85;
@@ -75,7 +82,6 @@ uniform float cirrus_sky_tint_fade : hint_range(0.0, 1.0) = 0.5;
 uniform sampler2D cirrus_texture : filter_linear, repeat_enable;
 
 uniform bool  cumulus_visible = true;
-uniform float cumulus_intensity = 0.6;
 uniform float cumulus_thickness = 0.0243;
 uniform float cumulus_absorption = 2.0;
 uniform float cumulus_noise_freq = 2.7;
@@ -209,9 +215,9 @@ float cumulus_density(vec3 p, vec3 wind, float t) {
 vec4 render_cirrus(vec3 rd) {
     vec2 p = (rd.xz / max(rd.y, 0.05)) * cirrus_size;
     vec2 off = cloud_offset * 0.25; // cirrus drifts slower (parallax)
-    float a = textureLod(cirrus_texture, p * cirrus_uv + off, 0.0).r;
-    float b = textureLod(cirrus_texture, p * cirrus_uv + off * 1.6 + vec2(0.37, 0.11), 0.0).r;
-    float d = (a + b) * 0.5;
+    float a = textureLod(cirrus_texture, p * cirrus_uv - off, 0.0).r;
+	float b = textureLod(cirrus_texture, p * cirrus_uv - off * 1.6 + vec2(0.37, 0.11), 0.0).r;
+	float d = (a + b) * 0.5;
     float cov = 1.0 - sat(cloud_coverage * cirrus_coverage_scale);
     float density = sat(d - cov);
     float sh = sat(exp(-cirrus_absorption * density));
@@ -219,7 +225,7 @@ vec4 render_cirrus(vec3 rd) {
 }
 
 vec4 render_cumulus(vec3 rd, float night_f, float wet) {
-    vec3 wind = -vec3(cloud_offset.x, 0.0, cloud_offset.y);
+    vec3 wind = vec3(cloud_offset.x, 0.0, cloud_offset.y); // drifts downwind; negate if backwards
     if (rd.y <= 0.02) return vec4(0.0);
     float tt; vec3 n;
     if (!ray_sphere_intersect(500.0, vec3(0.0), rd, tt, n)) return vec4(0.0);
@@ -251,7 +257,7 @@ vec4 render_cumulus(vec3 rd, float night_f, float wet) {
         pos += dir_step;
         if (trans < 0.03) break; // early-out, big perf win
     }
-    return vec4(ret.rgb * cumulus_intensity, alpha);
+    return vec4(ret.rgb, alpha);
 }
 
 // ============================================================
@@ -316,20 +322,28 @@ vec3 render(vec3 dir, float wet) {
     }
 
     // ---- clouds (tinted by the SAME gradient colors) ----
+    // Brightness follows the sun: white at noon, dark near sunrise/sunset,
+    // moonlit-white on full-moon nights.
     float horizon_blend = sat((dir.y - 0.02) * 8.0);
     vec3 cloud_light = mix(clouds_night_color, sun_color, day_f);
+    cloud_light = mix(cloud_light, moon_color * 1.6, moon_fullness * night_f); // full-moon nights
+    float noon_f = smoothstep(0.12, 0.5, sun_h); // 0 near the horizon, 1 at midday
+    float cir_int = mix(cirrus_night_intensity, cirrus_day_intensity, noon_f);
+    float cum_int = mix(cumulus_night_intensity, cumulus_day_intensity, noon_f);
+    cum_int = mix(cum_int, cumulus_moon_intensity, moon_fullness * night_f);
+    cir_int = mix(cir_int, cirrus_moon_intensity, moon_fullness * night_f);
 
     if (cirrus_visible && dir.y > 0.015) {
         vec4 cir = render_cirrus(dir);
         cir.a = sat(cir.a) * horizon_blend;
-        cir.rgb *= cloud_light * cloud_tint * cirrus_intensity;
+        cir.rgb *= cloud_light * cloud_tint * cir_int;
         cir.rgb *= mix(1.0, 0.45, storm_darkness);
         col = mix(col, cir.rgb + col * cirrus_sky_tint_fade, cir.a);
     }
     if (cumulus_visible) {
         vec4 cum = render_cumulus(dir, night_f, wet);
         cum.a = sat(cum.a) * horizon_blend;
-        cum.rgb *= cloud_light * cloud_tint * cumulus_intensity;
+        cum.rgb *= cloud_light * cloud_tint * cum_int;
         cum.rgb *= mix(1.0, 0.35, storm_darkness);
         col = mix(col, cum.rgb + col * cumulus_sky_tint_fade, cum.a);
     }
