@@ -22,3 +22,6 @@ script = ExtResource("1_ncqsx")
 SunColor = SubResource("Gradient_tc1oa")
 TopColor = SubResource("Gradient_no5m2")
 HorizonColor = SubResource("Gradient_ncqsx")
+NightSkyColor = Color(0.07205845, 0.08434778, 0.103757285, 1)
+MoonColor = Color(0.6152326, 0.7779078, 0.6901479, 1)
+CloudCoverage = 0.4

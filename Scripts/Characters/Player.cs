@@ -1903,6 +1903,17 @@ public partial class Player : CharacterBody3D
     private CarController _currentVehicleInteract;
     private void UpdateInteraction(bool anyMenuOpen)
     {
+        // Crafting takes E while it is doing something (carrying, floor-snap,
+        // socket-attach). Otherwise Player owns E normally.
+        if (Crafting.CarrySystem.Instance != null && Crafting.CarrySystem.Instance.IsBusy)
+        {
+            _hud?.HideTooltip();
+            _currentInteractable = null;
+            _currentNpc = null;
+            _currentVehicleInteract = null;
+            return;
+        }
+
         if (!anyMenuOpen && PlayerCamera != null)
         {
             var spaceState = GetWorld3D().DirectSpaceState;

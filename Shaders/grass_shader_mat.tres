@@ -1,0 +1,22 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://dn430kswyqym"]
+
+[ext_resource type="Shader" uid="uid://br0jkojhjid45" path="res://Shaders/grass_blade.gdshader" id="1_ot82o"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_ot82o")
+shader_parameter/blade_height_taper = 2.0
+shader_parameter/blade_width = 1.0
+shader_parameter/blade_bend = 0.5
+shader_parameter/color_top = Color(0.667, 0.922, 0.431, 1)
+shader_parameter/color_bottom = Color(0.651, 0.282, 0, 1)
+shader_parameter/color_variation = Color(0.9, 0.9, 0.2, 1)
+shader_parameter/patch_scale = 5.0
+shader_parameter/wind_texture_scale = 20.0
+shader_parameter/wind_speed = 0.1
+shader_parameter/still_sway_speed = 4.5
+shader_parameter/still_sway_strength = 0.1
+shader_parameter/gust_strength = 0.35
+shader_parameter/gust_frequency = 0.08
+shader_parameter/interaction_radius = 1.4
+shader_parameter/interaction_push = 0.5

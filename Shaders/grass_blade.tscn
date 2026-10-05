@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://ckfdjr3ijkjj0"]
+
+[ext_resource type="QuadMesh" uid="uid://biqrh7ejo3n7p" path="res://Shaders/grass_blade.tres" id="1_3wj63"]
+
+[node name="GrassBlade" type="MeshInstance3D" unique_id=1741770676]
+mesh = ExtResource("1_3wj63")

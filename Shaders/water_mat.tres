@@ -1,0 +1,45 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://bjf8lx86gexh2"]
+
+[ext_resource type="Shader" uid="uid://c868u6n08g3c5" path="res://Shaders/terrain3d_water.gdshader" id="1_w6pbw"]
+[ext_resource type="Texture2D" uid="uid://b10c4t0an3x76" path="res://Assets/caust00.png" id="2_21e2a"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_w6pbw")
+shader_parameter/water_level = 0.0
+shader_parameter/underwater_fog_color = Color(0, 0.55, 0.85, 1)
+shader_parameter/fade_start_depth = 0.5
+shader_parameter/max_depth = 10.0
+shader_parameter/sea_height = 1.3
+shader_parameter/sea_choppy = 2.458000116755
+shader_parameter/sea_speed = 1.5
+shader_parameter/sea_freq = 0.17200000817
+shader_parameter/ITER_GEOMETRY = 1
+shader_parameter/ITER_FRAGMENT = 3
+shader_parameter/refraction_strength = 0.03
+shader_parameter/refraction_distance_fade = 5.0
+shader_parameter/normal_epsilon = 0.01
+shader_parameter/normal_smoothness_dist = 50.0
+shader_parameter/base_tint_color = Color(0.439, 0.973, 1, 1)
+shader_parameter/deep_color = Color(0, 0.341, 0.29, 1)
+shader_parameter/water_absorption = Color(0.3, 0.06, 0.02, 1)
+shader_parameter/roughness = 0.05
+shader_parameter/metallic = 0.0
+shader_parameter/specular = 0.5
+shader_parameter/caustics_texture = ExtResource("2_21e2a")
+shader_parameter/caustics_scale = 0.30000000447036
+shader_parameter/caustics_speed = 0.1
+shader_parameter/caustics_intensity = 0.8
+shader_parameter/caustics_depth_fade = 0.7
+shader_parameter/foam_color = Color(1, 1, 1, 1)
+shader_parameter/foam_depth_start = 0.8
+shader_parameter/foam_depth_end = 0.0
+shader_parameter/foam_noise_scale = 2.0
+shader_parameter/foam_noise_speed = 1.0
+shader_parameter/foam_cutoff = 0.93999997898912
+shader_parameter/foam_crest_threshold = 0.7
+shader_parameter/foam_crest_amount = 2.0
+shader_parameter/foam_edge_color = Color(0.70764697, 0.8862823, 0.8938053, 1)
+shader_parameter/foam_edge_offset = Vector2(0.44, 0.02)
+shader_parameter/voronoi_scale = 0.50000002375
+shader_parameter/voronoi_strength = 0.58000002755

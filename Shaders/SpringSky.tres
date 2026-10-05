@@ -1,25 +1,25 @@
-[gd_resource type="Resource" script_class="SeasonPalette" format=3 uid="uid://dqo124ll8hvq8"]
+[gd_resource type="Resource" script_class="SeasonPalette" format=3 uid="uid://bbnsxlybjjfqr"]
 
-[ext_resource type="Script" uid="uid://4oqq2ilvj7ad" path="res://Scripts/Systems/SeasonPalette.cs" id="1_x2qd6"]
+[ext_resource type="Script" uid="uid://4oqq2ilvj7ad" path="res://Scripts/Systems/SeasonPalette.cs" id="1_kjue1"]
 
-[sub_resource type="Gradient" id="Gradient_x2qd6"]
-offsets = PackedFloat32Array(0, 0.12707183, 0.24033149, 0.3646409, 0.6077348, 0.7292818, 0.88121545, 1)
-colors = PackedColorArray(0, 0, 0, 1, 0.8666667, 0.93333334, 0.5647059, 1, 0.49955562, 0.83152944, 0.64491504, 1, 0.44838017, 0.7619021, 0.9045184, 1, 0.44705883, 0.7607843, 0.90588236, 1, 0.4, 0.8039216, 0.6666667, 1, 1, 0.76479816, 0.5469879, 1, 0, 0, 0, 1)
-metadata/_snap_count = 4
+[sub_resource type="Gradient" id="Gradient_horizon"]
+offsets = PackedFloat32Array(0, 0.127, 0.24, 0.35, 0.5, 0.65, 0.73, 0.88, 1)
+colors = PackedColorArray(0.01, 0.02, 0.05, 1, 0.867, 0.933, 0.565, 1, 0.5, 0.83, 0.645, 1, 0.5607226, 0.75664103, 0.7754475, 1, 0.675, 0.886, 0.846, 1, 0.5, 0.82, 0.85, 1, 0.4, 0.804, 0.667, 1, 1, 0.765, 0.547, 1, 0.01, 0.02, 0.05, 1)
 
-[sub_resource type="Gradient" id="Gradient_7http"]
-offsets = PackedFloat32Array(0.5, 0.75)
-colors = PackedColorArray(1, 0.98039216, 0.8039216, 1, 1, 0.6901961, 0.4862745, 1)
-metadata/_snap_enabled = true
-metadata/_snap_count = 4
+[sub_resource type="Gradient" id="Gradient_sun"]
+offsets = PackedFloat32Array(0.25, 0.4, 0.5, 0.6, 0.75)
+colors = PackedColorArray(1, 0.75, 0.5, 1, 1, 0.9, 0.75, 1, 1, 1, 1, 1, 1, 0.9, 0.75, 1, 1, 0.69, 0.49, 1)
 
-[sub_resource type="Gradient" id="Gradient_cif5y"]
-offsets = PackedFloat32Array(0, 0.22099447, 0.5331492, 0.88121545, 1)
-colors = PackedColorArray(0, 0.14431372, 0.14431372, 1, 0, 0.23921569, 0.23921569, 1, 0, 0.47843137, 0.6392157, 1, 0, 0.2509804, 0.3137255, 1, 0, 0.14382122, 0.1700866, 1)
-metadata/_snap_count = 4
+[sub_resource type="Gradient" id="Gradient_top"]
+offsets = PackedFloat32Array(0, 0.15, 0.35, 0.5, 0.65, 0.85, 1)
+colors = PackedColorArray(0, 0.144, 0.144, 1, 0.03, 0.26, 0.32, 1, 0.11, 0.37, 0.48, 1, 0.2, 0.47, 0.6, 1, 0.11, 0.37, 0.48, 1, 0.02, 0.21, 0.28, 1, 0, 0.144, 0.17, 1)
 
 [resource]
-script = ExtResource("1_x2qd6")
-SunColor = SubResource("Gradient_7http")
-TopColor = SubResource("Gradient_cif5y")
-HorizonColor = SubResource("Gradient_x2qd6")
+script = ExtResource("1_kjue1")
+SunColor = SubResource("Gradient_sun")
+TopColor = SubResource("Gradient_top")
+HorizonColor = SubResource("Gradient_horizon")
+NightSkyColor = Color(0.011764706, 0.03137255, 0.0627451, 1)
+CloudTint = Color(0.9098039, 0.9607843, 0.8784314, 1)
+MoonColor = Color(0.8352941, 0.9411765, 0.84705883, 1)
+CloudCoverage = 0.5

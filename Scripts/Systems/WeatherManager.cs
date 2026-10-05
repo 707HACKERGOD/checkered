@@ -8,7 +8,6 @@ public partial class WeatherManager : Node
     public float GetRainAmount() => _currentRainVal;
 
     // --- StringName cache (prevents GC allocations) ---
-    [Export] private WeatherPreset[] _weatherPresets; // ORDER = WeatherState: Clear, Rain, Snow, Rainstorm
     public static WeatherManager Instance { get; private set; }
     public override void _ExitTree() { if (Instance == this) Instance = null; }
     private bool  _worldResolved;
@@ -50,17 +49,6 @@ public partial class WeatherManager : Node
     private float _resolveRetryTimer = 0f;
     private const float RESOLVE_RETRY_INTERVAL = 2.0f;
 
-    // [SKY3D] Reference to the SkyDome node so we can drive its wind / cloud /
-    // fog properties instead of writing raw shader uniforms. SkyDome owns the
-    // cloud drift loop and the fog mesh, so routing through it keeps the
-    // inspector in sync and avoids fighting the plugin.
-    private Node _skyDome;
-    private const string SKYDOME_NAME = "SkyDome";
-
-    // [SKY3D] Our weather fog density values range 0..0.15; Sky3D's fog_density
-    // property expects values in the ~0.0001..0.01 range. This scales between them.
-    private const float FOG_DENSITY_SCALE = 0.01f;
-
     // --- Other ---
     [Export] private bool _constantWind = true; // 1 speed per weather state; no gust scheduler
     [Export] private AudioStreamPlayer _thunderPlayer;      // Assign in inspector
@@ -85,13 +73,6 @@ public partial class WeatherManager : Node
     [Export] private float _lightningIntervalMax = 15.0f;
     private float _lightningTimer = 0.0f;
     private float _skyFlashIntensity = 0.0f;
-
-    // --- SEASONAL PALETTES ---
-    [ExportCategory("Seasonal Skies")]
-    [Export] private SeasonPalette _springSky;
-    [Export] private SeasonPalette _summerSky;
-    [Export] private SeasonPalette _autumnSky;
-    [Export] private SeasonPalette _winterSky;
 
     // --- SEASONAL LEAF TEXTURES ---
     [ExportCategory("Seasonal Leaves")]
@@ -355,16 +336,6 @@ public partial class WeatherManager : Node
             return;
         }
 
-        if (_skyDome == null)
-        {
-            _resolveRetryTimer -= dt;
-            if (_resolveRetryTimer <= 0f)
-            {
-                ResolveReferences();
-                _resolveRetryTimer = RESOLVE_RETRY_INTERVAL;
-            }
-        }
-
         _internalTime += dt;
         RenderingServer.GlobalShaderParameterSet(ParamGlobalTime, _internalTime);
 
@@ -522,18 +493,6 @@ public partial class WeatherManager : Node
 
             SkyWeaver.Instance.FeedWeather(_activePreset);
         }
-
-        if (IsInstanceValid(_skyDome))
-        {
-            float speed = _currentWindVelocity.Length();
-            // Sky3D's wind_direction is where the wind COMES FROM (0 = north).
-            // Our _currentWindVelocity points where the wind BLOWS TOWARD.
-            float towardAngle = Mathf.Atan2(_currentWindVelocity.Z, _currentWindVelocity.X);
-            float sky3dWindDir = towardAngle - Mathf.Pi * 0.5f;
-
-            _skyDome.Set("wind_speed", speed);
-            _skyDome.Set("wind_direction", sky3dWindDir);
-        }
     }
 
     private void SetShaderParameter(GpuParticles3D particles, ShaderMaterial cachedMat, StringName param, Variant val)
@@ -546,14 +505,6 @@ public partial class WeatherManager : Node
     {
         if (cachedMat != null)
             cachedMat.AlbedoColor = color;
-    }
-
-    private void SetSkyDomeProperty(string name, Variant value)
-    {
-        if (IsInstanceValid(_skyDome))
-            _skyDome.Set(name, value);
-        else if (IsInstanceValid(SkyMaterial))
-            SkyMaterial.SetShaderParameter(name, value);
     }
 
     // --- Determine target wind angle based on season, time of day, randomness ---
@@ -1013,8 +964,9 @@ public partial class WeatherManager : Node
     public void ChangeWeather(WeatherState newState, bool immediate = false)
     {
         CurrentState = newState;
-        var p = (_weatherPresets != null && (int)newState < _weatherPresets.Length && _weatherPresets[(int)newState] != null)
-            ? _weatherPresets[(int)newState] : new WeatherPreset();
+        var presets = SkyWeaver.Instance?.Presets;
+        var p = (presets != null && (int)newState < presets.Length && presets[(int)newState] != null)
+            ? presets[(int)newState] : new WeatherPreset();
         _activePreset = p;
 
         GD.Print($"[Weather] {newState} | rain={p.RainAmount} snow={p.SnowAmount} ice={p.IceAmount} " +
@@ -1139,11 +1091,6 @@ public partial class WeatherManager : Node
             SkyMaterial = _worldEnv.Environment.Sky.SkyMaterial as ShaderMaterial;
         if (_lightningBoltScene == null)
             _lightningBoltScene = GD.Load<PackedScene>("res://Scenes/Effects/LightningBolt.tscn");
-
-        // [SKY3D] Locate the SkyDome node created by Sky3D. It's a direct child
-        // of the Sky3D node. Adjust SKYDOME_NAME if you renamed it.
-        if (_skyDome == null)
-            _skyDome = GetTree().Root.FindChild(SKYDOME_NAME, true, false);
     }
 
     private void TriggerLightning()
@@ -1217,19 +1164,19 @@ public partial class WeatherManager : Node
 
     private void ValidatePresetArray()
     {
-        string[] expected = { "Clear", "Rain", "Snow", "Rainstorm" };
-        if (_weatherPresets == null)
+        var presets = SkyWeaver.Instance?.Presets;
+        if (presets == null)
         {
-            GD.PushError("WeatherManager: _weatherPresets is NULL — assign it in the inspector!");
+            GD.PushWarning("WeatherManager: SkyWeaver.Instance.Preset is not available yet.");
             return;
         }
-        if (_weatherPresets.Length != expected.Length)
-            GD.PushWarning($"WeatherManager: {_weatherPresets.Length} presets set, expected {expected.Length}");
-
-        for (int i = 0; i < _weatherPresets.Length; i++)
+        string[] expected = { "Clear", "Rain", "Snow", "Rainstorm" };
+        if (presets.Length != expected.Length)
+            GD.PushWarning($"WeatherManager: SkyWeaver.Preset has {presets.Length} entries, expected {expected.Length}");
+        for (int i = 0; i < presets.Length; i++)
         {
             string label = i < expected.Length ? expected[i] : $"Slot{i}";
-            var p = _weatherPresets[i];
+            var p = presets[i];
             GD.Print($"  preset[{i}] {label,-11} = " +
                     (p == null ? "NULL !!!" : System.IO.Path.GetFileName(p.ResourcePath)));
         }

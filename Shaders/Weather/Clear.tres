@@ -4,9 +4,17 @@
 
 [resource]
 script = ExtResource("1_21xfu")
-MoonBoost = 0.19999999999999996
+RainParticles = false
+SplashParticles = false
+SnowParticles = false
+MoonBoost = 0.2
 CumulusIntensity = 0.53
-CumulusSize = 0.6099999999999999
+CumulusSize = 0.61
+StarBrightness = 1.0
+TwinkleSpeed = 5.0
+StarmapTint = Color(1, 1, 1, 0)
+StarmapBrightness = 0.5
+FogDensity = 0.02
 FogFalloff = 0.97
 FogEnd = 5569.7
 WindSpeed = 30.0

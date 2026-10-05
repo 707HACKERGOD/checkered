@@ -11,6 +11,7 @@ using Godot;
 /// when you want that specific preset to differ from the editor setup.
 /// </summary>
 [GlobalClass]
+[Tool]
 public partial class WeatherPreset : Resource
 {
     // ------------------------------------------------------------------

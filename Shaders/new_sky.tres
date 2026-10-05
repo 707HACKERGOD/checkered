@@ -1,9 +1,7 @@
 [gd_resource type="Sky" format=3 uid="uid://b4v8lwnmp6dow"]
 
 [ext_resource type="Shader" uid="uid://b04qwiljkk51s" path="res://Shaders/Sky.gdshader" id="1_5n1r3"]
-[ext_resource type="Texture2D" uid="uid://kfjltn0d3icg" path="res://Assets/6da3c4228b17b9357ce6c3bd42a4c665.jpg" id="2_mmasv"]
-[ext_resource type="Texture2D" uid="uid://n7hd4ockb1bs" path="res://Assets/moon.png" id="3_1a8g7"]
-[ext_resource type="Texture2D" uid="uid://dk0srpy2jevj4" path="res://Assets/Skybox_night_clear_bw.jpg" id="4_2y1f8"]
+[ext_resource type="Texture2D" uid="uid://n7hd4ockb1bs" path="res://Shaders/moon.png" id="3_1a8g7"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_hd3un"]
 shader = ExtResource("1_5n1r3")
@@ -12,18 +10,49 @@ shader_parameter/sky_horizon_color = Color(0.4, 0.6, 0.9, 1)
 shader_parameter/sky_night_color = Color(0.02, 0.02, 0.05, 1)
 shader_parameter/sun_color = Color(1, 0.9, 0.7, 1)
 shader_parameter/moon_color = Color(0.9, 0.95, 1, 1)
-shader_parameter/lightning_strength = 0.0
-shader_parameter/lightning_color = Color(0.8, 0.9, 1, 1)
-shader_parameter/wind_offset = Vector2(0, 0)
-shader_parameter/cloud_texture = ExtResource("2_mmasv")
-shader_parameter/star_texture = ExtResource("4_2y1f8")
-shader_parameter/moon_texture = ExtResource("3_1a8g7")
-shader_parameter/time_of_day = 12.0
-shader_parameter/cloud_scale = 0.4
-shader_parameter/cloud_coverage = 0.5
-shader_parameter/cloud_softness = 0.5
 shader_parameter/cloud_tint = Color(1, 1, 1, 1)
+shader_parameter/sun_dir = Vector3(0, 1, 0)
+shader_parameter/moon_dir = Vector3(0, -1, 0)
+shader_parameter/cloud_coverage = 0.5
+shader_parameter/storm_darkness = 0.0
+shader_parameter/horizon_power = 1.6
+shader_parameter/sunset_band_strength = 1.1
+shader_parameter/sun_disc_size = 0.0035
+shader_parameter/sun_disc_intensity = 5.0
+shader_parameter/sun_halo_strength = 0.4
+shader_parameter/ground_color = Color(0.28, 0.27, 0.26, 1)
+shader_parameter/moon_texture = ExtResource("3_1a8g7")
 shader_parameter/moon_size = 0.05
+shader_parameter/moon_brightness = 1.2
+shader_parameter/starmap_tint = Color(0.75, 0.75, 0.8, 1)
+shader_parameter/starmap_brightness = 1.0
+shader_parameter/star_alignment = Vector3(2.68288, -0.25891, 0.40101)
+shader_parameter/star_rotation = 0.0
+shader_parameter/star_tilt = 0.0
+shader_parameter/starmap_flip_u = false
+shader_parameter/starmap_flip_v = false
+shader_parameter/star_brightness = 2.3
+shader_parameter/twinkle_speed = 0.8
+shader_parameter/star_movement = 0.0002
+shader_parameter/cloud_offset = Vector2(0, 0)
+shader_parameter/clouds_night_color = Color(0.09, 0.094, 0.129, 1)
+shader_parameter/cirrus_visible = true
+shader_parameter/cirrus_intensity = 1.8
+shader_parameter/cirrus_thickness = 2.0
+shader_parameter/cirrus_absorption = 2.0
+shader_parameter/cirrus_coverage_scale = 0.85
+shader_parameter/cirrus_size = 1.0
+shader_parameter/cirrus_uv = Vector2(0.16, 0.11)
+shader_parameter/cirrus_sky_tint_fade = 0.5
+shader_parameter/cumulus_visible = true
+shader_parameter/cumulus_intensity = 0.6
+shader_parameter/cumulus_thickness = 0.0243
+shader_parameter/cumulus_absorption = 2.0
+shader_parameter/cumulus_noise_freq = 2.7
+shader_parameter/cumulus_size = 0.5
+shader_parameter/cumulus_mie_intensity = 1.0
+shader_parameter/cumulus_sky_tint_fade = 0.0
+shader_parameter/lightning_color = Color(0.8, 0.9, 1, 1)
 
 [resource]
 sky_material = SubResource("ShaderMaterial_hd3un")

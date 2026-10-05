@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SeasonPalette" format=3 uid="uid://bbnsxlybjjfqr"]
+
+[ext_resource type="Script" uid="uid://4oqq2ilvj7ad" path="res://Scripts/Systems/SeasonPalette.cs" id="1_kjue1"]
+
+[sub_resource type="Gradient" id="Gradient_lkuj1"]
+offsets = PackedFloat32Array(0, 0.24, 0.42, 0.5, 0.79, 0.9, 1)
+colors = PackedColorArray(0.019607844, 0.02745098, 0.05882353, 1, 0.49411765, 0.8509804, 0.5411765, 1, 0.64705884, 0.8862745, 0.7411765, 1, 0.7490196, 0.9019608, 0.8117647, 1, 0.7882353, 0.9019608, 0.65882355, 1, 0.2, 0.28235295, 0.17254902, 1, 0.019607844, 0.02745098, 0.05882353, 1)
+
+[sub_resource type="Gradient" id="Gradient_lklsk"]
+offsets = PackedFloat32Array(0, 0.24, 0.34, 0.5, 0.78, 0.88, 1)
+colors = PackedColorArray(0.101960786, 0.1254902, 0.2, 1, 0.68235296, 0.9490196, 0.6039216, 1, 0.9490196, 1, 0.8784314, 1, 1, 1, 1, 1, 1, 0.9137255, 0.6901961, 1, 0.43529412, 0.5176471, 0.33333334, 1, 0.101960786, 0.1254902, 0.2, 1)
+
+[sub_resource type="Gradient" id="Gradient_34hf4"]
+offsets = PackedFloat32Array(0, 0.3, 0.5, 0.82, 1)
+colors = PackedColorArray(0.015686275, 0.023529412, 0.050980393, 1, 0.078431375, 0.22352941, 0.17254902, 1, 0.11764706, 0.43529412, 0.54901963, 1, 0.13333334, 0.1882353, 0.2901961, 1, 0.015686275, 0.023529412, 0.050980393, 1)
+
+[resource]
+script = ExtResource("1_kjue1")
+SunColor = SubResource("Gradient_lklsk")
+TopColor = SubResource("Gradient_34hf4")
+HorizonColor = SubResource("Gradient_lkuj1")
+NightSkyColor = Color(0.011764706, 0.03137255, 0.0627451, 1)
+CloudTint = Color(0.9098039, 0.9607843, 0.8784314, 1)
+MoonColor = Color(0.8352941, 0.9411765, 0.84705883, 1)
+CloudCoverage = 0.38

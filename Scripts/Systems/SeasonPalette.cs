@@ -6,6 +6,7 @@ using Godot;
 /// HorizonColor / SunColor) match your WeatherManager's existing API.
 /// </summary>
 [GlobalClass]
+[Tool]
 public partial class SeasonPalette : Resource
 {
     [Export] public Gradient SunColor;      // sun disc, halo, sunset band, sun light

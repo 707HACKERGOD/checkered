@@ -14,11 +14,11 @@ public partial class SkyWeaver : WorldEnvironment
     public static SkyWeaver Instance { get; private set; }
 
     private const string ShaderPath   = "res://Shaders/new_sky.gdshader";
-    private const string FogShaderPath = "res://addons/sky_3d/shaders/AtmFog.gdshader";
-    private const string StarMapPath  = "res://addons/sky_3d/assets/thirdparty/textures/milkyway/Milkyway.jpg";
-    private const string MoonPath     = "res://Assets/moon.png";
-    private const string CirrusPath   = "res://addons/sky_3d/assets/resources/SNoise.tres";
-    private const string CumulusPath  = "res://addons/sky_3d/assets/textures/noiseClouds.png";
+    private const string FogShaderPath = "res://Shaders/AtmFog.gdshader";
+    private const string StarMapPath  = "res://Shaders/Milkyway.jpg";
+    private const string MoonPath     = "res://Shaders/moon.png";
+    private const string CirrusPath   = "res://Shaders/SNoise.tres";
+    private const string CumulusPath  = "res://Shaders/noiseClouds.png";
 
     // ------------------------------------------------------------------
     // WEATHER FEED
@@ -240,7 +240,7 @@ public partial class SkyWeaver : WorldEnvironment
     [ExportGroup("Seasons")]
     [Export] public SeasonPalette[] Seasons { get; set; } = new SeasonPalette[0];
     [Export(PropertyHint.Enum, "Spring,Summer,Autumn,Winter")] public int SeasonIndex { get; set; }
-    [Export(PropertyHint.Range, "0,600,0.1")] public float SeasonTransitionSeconds { get; set; } // 0 = instant switch
+    [Export(PropertyHint.Range, "0,600,0.1")] public float SeasonTransitionSeconds { get; set; }
     [Export] public Color StormGreyColor { get; set; } = new Color(0.3f, 0.35f, 0.4f);
 
     [ExportGroup("Wind")]
@@ -276,27 +276,6 @@ public partial class SkyWeaver : WorldEnvironment
     [ExportGroup("Weather Presets")]
     [Export] public WeatherPreset[] Presets { get; set; } = new WeatherPreset[0];
 
-    /// Editor-only live preview: pick an index in the inspector, the sky previews it instantly.
-    /// In game this is ignored — WeatherManager owns the real values via FeedWeather().
-    [Export] public int PreviewPreset
-    {
-        get => _previewPreset;
-        set
-        {
-            _previewPreset = value;
-            if (!Engine.IsEditorHint()) return;
-            if (Presets != null && value >= 0 && value < Presets.Length && Presets[value] != null)
-            {
-                FeedWeather(Presets[value]);
-            }
-            else
-            {
-                ClearWeatherFeed();
-            }
-        }
-    }
-    private int _previewPreset = -1;
-
     // ------------------------------------------------------------------
     // STATE
     // ------------------------------------------------------------------
@@ -327,32 +306,6 @@ public partial class SkyWeaver : WorldEnvironment
 
         if (Seasons == null || Seasons.Length == 0 || Seasons.All(s => s == null))
             Seasons = SeasonPalette.CreateDefaults();
-
-        // Editor auto-populate: load every WeatherPreset .tres in the folder
-        // so PreviewPreset has something to point at without manual assignment.
-        if (Engine.IsEditorHint() && Presets != null && Presets.Length == 0)
-        {
-            const string weatherFolder = "res://Shaders/Weather";
-            var list = new System.Collections.Generic.List<WeatherPreset>();
-            var dir = DirAccess.Open(weatherFolder);
-            if (dir != null)
-            {
-                dir.ListDirBegin();
-                string f = dir.GetNext();
-                while (!string.IsNullOrEmpty(f))
-                {
-                    if (f.EndsWith(".tres"))
-                    {
-                        var loaded = ResourceLoader.Load<WeatherPreset>($"{weatherFolder}/{f}");
-                        if (loaded != null) list.Add(loaded);
-                    }
-                    f = dir.GetNext();
-                }
-                dir.ListDirEnd();
-                list.Sort((x, y) => x.ResourcePath.CompareTo(y.ResourcePath));
-                Presets = list.ToArray();
-            }
-        }
 
         _seasonTarget = SeasonIndex;
         _seasonFrom = SeasonIndex;
