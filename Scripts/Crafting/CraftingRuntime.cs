@@ -53,7 +53,6 @@ namespace Crafting
             CraftingHud.SetHint += SetHint;
             CraftingHud.StormChanged += OnStorm;
             CraftingHud.ZapFx += OnZap;
-            if (_grid != null) CraftingHud.ToggleGrid += ToggleGrid;
 
             var player = (PlayerPath != null && !PlayerPath.IsEmpty)
                 ? GetNodeOrNull<Node3D>(PlayerPath)
@@ -75,7 +74,11 @@ namespace Crafting
             CraftingHud.SetHint -= SetHint;
             CraftingHud.StormChanged -= OnStorm;
             CraftingHud.ZapFx -= OnZap;
-            if (_grid != null) CraftingHud.ToggleGrid -= ToggleGrid;
+        }
+        public void ToggleGrid()
+        {
+            if (_grid == null) { Toast("Build grid is disabled (AddOwnGrid is off)"); return; }
+            _grid.Toggle();
         }
 
         public void RebindPlayer(Node3D player)
@@ -124,12 +127,6 @@ namespace Crafting
 
         public void Toast(string msg) { if (_toast == null) return; _toast.Text = msg; _toast.Modulate = Colors.White; _toastCd = 2.6f; }
         public void SetHint(string text) { if (_hint != null) _hint.Text = text; }
-        public void ToggleGrid()
-        {
-            if (_grid == null) { Toast("Build grid is disabled (AddOwnGrid is off)"); return; }
-            _grid.Visible = !_grid.Visible;
-            Toast(_grid.Visible ? "Build grid ON" : "Build grid OFF");
-        }
         void OnStorm(bool on) => Toast(on ? "Thunderstorm ON" : "Thunderstorm off");
         void OnZap() => Toast("ZAPPED — conductive material overhead in a storm.");
 
@@ -151,6 +148,7 @@ namespace Crafting
             if (key == InventoryKey)
             {
                 if (!EnableCraftingInventory || UiStack.Blocking) return;
+                if (ResizeEditor.Instance != null && ResizeEditor.Instance.Active) return;
                 GetViewport().SetInputAsHandled();
                 OpenCraftingInventory();
                 return;

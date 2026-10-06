@@ -182,15 +182,23 @@ namespace Crafting
         {
             var space = Instance?.WorldRoot?.GetWorld3D().DirectSpaceState;
             if (space == null) return pos;
-            float half = 0.25f;
+            float half = 0.1f;
             foreach (var p in d.Parts) half = Mathf.Max(half, p.Shape.Size.Y * 0.5f);
-            // Origin well above (slope/cliff safety: a ray starting inside the
-            // terrain never hits it going down), mask excludes the player.
-            var hit = space.IntersectRay(PhysicsRayQueryParameters3D.Create(
-                pos + Vector3.Up * (half + 10f), pos + Vector3.Down * (half + 2f), 126));
-            if (hit.Count == 0) return pos;
-            float minY = hit["position"].AsVector3().Y + half + 0.02f;
-            return pos.Y < minY ? new Vector3(pos.X, minY, pos.Z) : pos;
+
+            // 1) Surface below (terrain, floors, other items). Never looks above,
+            //    so roofs/ceilings can't capture the spawn.
+            var down = space.IntersectRay(PhysicsRayQueryParameters3D.Create(pos, pos + Vector3.Down * 3f, 126));
+            if (down.Count > 0)
+            {
+                float minY = down["position"].AsVector3().Y + half + 0.02f;
+                return pos.Y < minY ? new Vector3(pos.X, minY, pos.Z) : pos;
+            }
+            // 2) Buried (aimed into a slope, spawn point underground): surface
+            //    above with an UPWARD normal = terrain, not a ceiling — pop out on it.
+            var up = space.IntersectRay(PhysicsRayQueryParameters3D.Create(pos, pos + Vector3.Up * (half + 3f), 126));
+            if (up.Count > 0 && up["normal"].AsVector3().Y > 0.5f)
+                return new Vector3(pos.X, up["position"].AsVector3().Y + half + 0.02f, pos.Z);
+            return pos;
         }
 
         public static WorldObject SpawnObjectAtXf(CraftedObjectData d, Transform3D xf, bool frozen = false) =>

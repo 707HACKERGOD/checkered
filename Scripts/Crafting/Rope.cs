@@ -1,23 +1,23 @@
 using Godot;
-using System;
 using System.Collections.Generic;
 
 namespace Crafting
 {
-    // Verlet rope: cheap, looks good, "infinite" (auto-extends up to 250
-    // segments). Ends can be held, tied to part sockets, and tightened.
-    // When both ends are tied to rigid objects it also acts as a leash:
-    // stretched beyond rest length it pulls the two bodies together.
+    // Verlet rope: fixed default length (scroll adjusts 0.5–6 m in 15 cm
+    // steps while holding an end). Ends can be held and tied to part
+    // sockets; tied at both ends it acts as a leash between the bodies.
     public partial class Rope : Node3D
     {
         public float Segment = 0.15f;
         public float Radius = 0.02f;
+        public float DefaultLengthM = 2.5f;
+        public float MinLengthM = 0.5f;
+        public float MaxLengthM = 6f;
         public uint CollisionMask = 2 | 4 | 8 | 64;   // floor, buildings, doors, items
-        public int MaxSegments = 250;
 
         public class EndAnchor
         {
-            public WorldObject Obj; public Guid PartId; public Vector3 LocalPos;
+            public WorldObject Obj; public System.Guid PartId; public Vector3 LocalPos;
             public bool Held; public Vector3 HoldPoint;
             public bool Attached => Obj != null && !Held;
 
@@ -40,11 +40,11 @@ namespace Crafting
         public readonly EndAnchor[] Ends = { new EndAnchor(), new EndAnchor() };
 
         readonly List<Vector3> _pos = new();
-        bool _inited;
         readonly List<Vector3> _prev = new();
         readonly List<MeshInstance3D> _segs = new();
         CylinderMesh _unit;
         StandardMaterial3D _mat;
+        bool _inited;
 
         public float Length => (_pos.Count - 1) * Segment;
 
@@ -52,8 +52,8 @@ namespace Crafting
         {
             var r = new Rope();
             CraftingSim.Instance.WorldRoot.AddChild(r);   // _Ready fires here
-            r.GlobalPosition = pos;                        // position becomes real
-            r.ResetPoints(pos + Vector3.Up * 0.6f, pos);   // build chain AFTER
+            r.GlobalPosition = pos;
+            r.ResetPoints(pos + Vector3.Up * r.DefaultLengthM, pos);   // build AFTER position is real
             r._inited = true;
             CraftingSim.Instance.Ropes.Add(r);
             return r;
@@ -65,8 +65,6 @@ namespace Crafting
         {
             _mat = new StandardMaterial3D { AlbedoColor = MaterialLibrary.Get("rope").Color, Roughness = 1f };
             _unit = new CylinderMesh { TopRadius = Radius, BottomRadius = Radius, Height = 1f, RadialSegments = 6 };
-            // NOTE: no ResetPoints here — _Ready runs inside AddChild, before
-            // Spawn has assigned GlobalPosition. InitPoints is called after.
         }
 
         public void ResetPoints(Vector3 a, Vector3 b)
@@ -109,7 +107,8 @@ namespace Crafting
 
         public void AdjustLength(float meters)
         {
-            int target = Mathf.Clamp(_pos.Count + (int)(meters / Segment), 3, MaxSegments);
+            int target = Mathf.Clamp(_pos.Count + (int)Mathf.Round(meters / Segment),
+                (int)(MinLengthM / Segment), (int)(MaxLengthM / Segment));
             while (_pos.Count < target) { _pos.Add(_pos[^1]); _prev.Add(_pos[^1]); }
             while (_pos.Count > target) { _pos.RemoveAt(_pos.Count - 1); _prev.RemoveAt(_prev.Count - 1); }
             RebuildSegs();
@@ -120,26 +119,18 @@ namespace Crafting
             if (!_inited) return;
             float dt = (float)delta;
 
-            // auto-extend while anchors stretch it
-            var a = Ends[0].World(_pos[0]);
-            var b = Ends[1].World(_pos[^1]);
-            float need = a.DistanceTo(b) * 1.1f + Segment;
-            if (need > Length && _pos.Count < MaxSegments) AdjustLength(need - Length);
-
             bool pinA = Ends[0].Held || Ends[0].Attached;
             bool pinB = Ends[1].Held || Ends[1].Attached;
 
-            // verlet integration
             for (int i = 0; i < _pos.Count; i++)
             {
                 if ((i == 0 && pinA) || (i == _pos.Count - 1 && pinB)) continue;
                 var cur = _pos[i];
-                var vel = (cur - _prev[i]) * 0.985f;
+                var vel = (cur - _prev[i]) * 0.97f;
                 _prev[i] = cur;
                 _pos[i] = cur + vel + Vector3.Down * 9.8f * dt * dt;
             }
 
-            // distance constraints
             for (int it = 0; it < 3; it++)
                 for (int i = 0; i < _pos.Count - 1; i++)
                 {
@@ -154,16 +145,22 @@ namespace Crafting
                     _pos[i + 1] -= dir * err * w1;
                 }
 
-            // collision: push points out of statics + items
+            // Collision for every non-pinned point (ends included, so free
+            // ends rest ON the ground instead of sinking out of sight).
+            // Velocity is damped on contact — this is the anti-jitter.
             var space = GetWorld3D().DirectSpaceState;
-            for (int i = 1; i < _pos.Count - 1; i++)
+            for (int i = 0; i < _pos.Count; i++)
             {
+                if ((i == 0 && pinA) || (i == _pos.Count - 1 && pinB)) continue;
                 var hit = space.IntersectRay(PhysicsRayQueryParameters3D.Create(_prev[i], _pos[i], CollisionMask));
                 if (hit.Count > 0)
-                    _pos[i] = hit["position"].AsVector3() + hit["normal"].AsVector3() * Radius;
+                {
+                    var v = _pos[i] - _prev[i];
+                    _pos[i] = hit["position"].AsVector3() + hit["normal"].AsVector3() * (Radius * 1.5f);
+                    _prev[i] = _pos[i] - v * 0.3f;
+                }
             }
 
-            // pin ends
             _pos[0] = Ends[0].World(_pos[0]);
             _pos[^1] = Ends[1].World(_pos[^1]);
 

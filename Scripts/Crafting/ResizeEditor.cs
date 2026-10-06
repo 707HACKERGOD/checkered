@@ -105,6 +105,7 @@ void fragment() { ALBEDO = vec3(0.95); }
             BuildHandles();
             BuildOutline();
             UpdateHint();
+            CraftingHud.InputLocked = true;
         }
 
         public void End(bool apply)
@@ -119,6 +120,8 @@ void fragment() { ALBEDO = vec3(0.95); }
             obj.RebuildBody();
             obj.Freeze = obj.Data.Anchored || _wasFrozen;
             if (obj.Freeze) obj.FreezeMode = RigidBody3D.FreezeModeEnum.Static;
+            CraftingHud.InputLocked = false;
+            CraftingHud.LookLocked = false;
             CraftingHud.SetHint?.Invoke("");
         }
 
@@ -236,12 +239,14 @@ void fragment() { ALBEDO = vec3(0.95); }
             DragActive = true;
             RefreshHotVisuals();
             UpdateHint();
+            CraftingHud.LookLocked = true;
         }
 
         void EndGrab()
         {
             _grab = null;
             DragActive = false;
+            CraftingHud.LookLocked = false;
             UpdateHint();
         }
 
@@ -363,7 +368,7 @@ void fragment() { ALBEDO = vec3(0.95); }
                 CraftingHud.SetHint?.Invoke("RESIZE — aim an arrow, hold LMB and drag · E/Q done · Esc revert");
         }
 
-        public override void _UnhandledInput(InputEvent e)
+        public override void _Input(InputEvent e)
         {
             if (!Active) return;
             if (e is InputEventMouseMotion mm)

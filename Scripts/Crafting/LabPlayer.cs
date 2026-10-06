@@ -64,9 +64,8 @@ namespace Crafting
         public override void _PhysicsProcess(double delta)
         {
             float d = (float)delta;
-            if (Input.IsMouseButtonPressed(MouseButton.Left) && !Crafting.ResizeEditor.DragActive) RayHeat(70f * d);
-            if (Input.IsMouseButtonPressed(MouseButton.Right) && !Crafting.ResizeEditor.DragActive) RayHeat(70f * d);
-
+            if (Input.IsMouseButtonPressed(MouseButton.Left)  && !CraftingHud.InputLocked) RayHeat(70f * d);
+            if (Input.IsMouseButtonPressed(MouseButton.Right) && !CraftingHud.InputLocked) RayHeat(-70f * d);
             if (_shakeT > 0f)
             {
                 _shakeT -= d;
@@ -102,10 +101,10 @@ namespace Crafting
 
         public override void _UnhandledInput(InputEvent e)
         {
-            if (Crafting.ResizeEditor.DragActive) return;
+            if (CraftingHud.InputLocked || CraftingHud.LookLocked) return;
             if (UiStack.Blocking) return;
 
-            if (e is InputEventMouseMotion mm && Input.MouseMode == Input.MouseModeEnum.Captured)
+            if (e is InputEventMouseMotion mm && Input.MouseMode == Input.MouseModeEnum.Captured && !CraftingHud.LookLocked)
             {
                 RotateY(-mm.Relative.X * 0.0025f);
                 _pitch = Mathf.Clamp(_pitch - mm.Relative.Y * 0.0025f, -1.35f, 1.35f);

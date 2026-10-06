@@ -28,7 +28,6 @@ namespace Crafting
             CraftingHud.SetHint += SetHint;
             CraftingHud.StormChanged += SetStorm;
             CraftingHud.ZapFx += Zap;
-            CraftingHud.ToggleGrid += ToggleGrid;
 
             _sim = new CraftingSim { Name = "CraftingSim" };
             AddChild(_sim);
@@ -50,7 +49,6 @@ namespace Crafting
             CraftingHud.SetHint -= SetHint;
             CraftingHud.StormChanged -= SetStorm;
             CraftingHud.ZapFx -= Zap;
-            CraftingHud.ToggleGrid -= ToggleGrid;
         }
 
         void RegisterCustomMeshes()
@@ -253,7 +251,7 @@ namespace Crafting
 
         public void Toast(string msg) { _toast.Text = msg; _toast.Modulate = Colors.White; _toastCd = 2.6f; }
         public void SetHint(string text) => _hint.Text = text;
-        public void ToggleGrid() => _grid.Visible = !_grid.Visible;
+        public void ToggleGrid() => _grid?.Toggle();
         public void Zap() { _flashCd = 0.35f; Toast("ZAPPED — conductive material overhead in a storm."); }
 
         public void SetStorm(bool on)

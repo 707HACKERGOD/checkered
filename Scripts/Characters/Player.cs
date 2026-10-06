@@ -408,6 +408,8 @@ public partial class Player : CharacterBody3D
         }
 
         if (PlayerInputOverride.Active) return;
+        if (PlayerInputOverride.Active) return;
+        if (Crafting.CraftingHud.InputLocked) return;
 
         if (HandlePinchZoom(@event)) { GetViewport().SetInputAsHandled(); return; }
         if (HandleCameraLook(@event)) { GetViewport().SetInputAsHandled(); return; }
@@ -1634,6 +1636,7 @@ public partial class Player : CharacterBody3D
     private bool HandleCameraLook(InputEvent @event)
     {
         if (_isLockedOn || IsAnyMenuOpen()) return false;
+        if (Crafting.CraftingHud.LookLocked) return false;
         if (_pinch0 != -1 && _pinch1 != -1) return false;
 
         if (@event is InputEventMouseMotion mouse && !DisplayServer.IsTouchscreenAvailable())

@@ -2,13 +2,15 @@ using Godot;
 
 namespace Crafting
 {
-    // World-anchored build grid that drapes over terrain. The mesh snaps in
-    // 1 m cells under the player and its vertices are raycast onto the floor
-    // layer; visible lines are computed from world position in the shader, so
-    // the grid never shifts as you move.
+    // World-anchored build grid, draped over terrain. Lines are computed from
+    // world position in the shader so they never shift; the patch follows the
+    // player in whole-meter steps. Grid snapping reads GridOn/Cell.
     public partial class GlobalGrid : MeshInstance3D
     {
-        [Export] public uint FloorMask = 2;      // your layer 2 = Floor
+        public static bool GridOn { get; private set; }
+        public static float Cell = 0.25f;
+
+        [Export] public uint FloorMask = 2;
         [Export] public float Size = 16f;
         [Export] public int Segments = 16;
 
@@ -22,8 +24,8 @@ namespace Crafting
         const string Code = @"
 shader_type spatial;
 render_mode unshaded, cull_disabled;
-uniform vec4 minor_color : source_color = vec4(1.0, 1.0, 1.0, 0.10);
-uniform vec4 major_color : source_color = vec4(1.0, 1.0, 1.0, 0.25);
+uniform vec4 minor_color : source_color = vec4(1.0, 1.0, 1.0, 0.16);
+uniform vec4 major_color : source_color = vec4(1.0, 1.0, 1.0, 0.5);
 uniform float cell = 0.25;
 uniform float major = 1.0;
 uniform vec2 u_center = vec2(0.0);
@@ -35,7 +37,7 @@ void fragment() {
     float minor_l = 1.0 - min(min(q1.x, q1.y), 1.0);
     vec2 q2 = abs(fract(g / major) - 0.5) / max(fwidth(g / major), vec2(1e-5));
     float major_l = 1.0 - min(min(q2.x, q2.y), 1.0);
-    float fade = 1.0 - smoothstep(4.5, 7.0, distance(g, u_center));
+    float fade = 1.0 - smoothstep(6.0, 8.4, distance(g, u_center));
     float a = max(minor_l * minor_color.a, major_l * major_color.a) * fade;
     if (a < 0.004) discard;
     ALBEDO = major_l > minor_l ? major_color.rgb : minor_color.rgb;
@@ -69,7 +71,18 @@ void fragment() {
             _mesh = new ArrayMesh();
             BuildSurface();
             Mesh = _mesh;
-            Visible = false;
+            Visible = true;          // grid is the default now
+            GridOn = true;
+            CraftingHud.ToggleGrid += Toggle;
+        }
+
+        public override void _ExitTree() => CraftingHud.ToggleGrid -= Toggle;
+
+        public void Toggle()
+        {
+            Visible = !Visible;
+            GridOn = Visible;
+            CraftingHud.Toast?.Invoke(Visible ? "Build grid ON" : "Build grid OFF");
         }
 
         void BuildSurface()
@@ -90,12 +103,10 @@ void fragment() {
             var p = CraftingSim.Instance?.Player as Node3D;
             if (p == null || !GodotObject.IsInstanceValid(p)) return;
 
-            float snap = Size / Segments;
+            float snap = 1f;   // patch follows in whole meters — lines stay world-fixed
             var cellPos = new Vector3(Mathf.Floor(p.GlobalPosition.X / snap) * snap, 0f, Mathf.Floor(p.GlobalPosition.Z / snap) * snap);
             if (cellPos != _lastCell || cellPos != GlobalPosition)
             {
-                _lastCell = cellPos;
-                GlobalPosition = cellPos;
                 _lastCell = cellPos;
                 GlobalPosition = cellPos;
                 Drape(p.GlobalPosition.Y + 0.05f);
@@ -103,18 +114,29 @@ void fragment() {
             _mat.Set("u_center", new Vector2(p.GlobalPosition.X, p.GlobalPosition.Z));
         }
 
+        bool _diag;
+
         void Drape(float fallbackY)
         {
             var space = GetWorld3D().DirectSpaceState;
+            int hits = 0;
             for (int i = 0; i < _verts.Length; i++)
             {
                 var wp = GlobalPosition + _verts[i];
                 var hit = space.IntersectRay(PhysicsRayQueryParameters3D.Create(
                     new Vector3(wp.X, 500f, wp.Z), new Vector3(wp.X, -500f, wp.Z), FloorMask));
-                // miss → keep the grid at the player's feet instead of burying it
-                _verts[i].Y = hit.Count > 0 ? hit["position"].AsVector3().Y : fallbackY;
+                if (hit.Count > 0)
+                {
+                    hits++;
+                    // +0.05 above the surface: vertices exactly ON the terrain
+                    // z-fight with it and the grid loses every pixel — this
+                    // was the invisibility bug.
+                    _verts[i].Y = hit["position"].AsVector3().Y + 0.05f;
+                }
+                else _verts[i].Y = fallbackY;
             }
             BuildSurface();
+            if (!_diag) { _diag = true; GD.Print($"[Crafting] grid drape: {hits}/{_verts.Length} verts grounded"); }
         }
     }
 }

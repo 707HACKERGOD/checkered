@@ -136,6 +136,15 @@ namespace Crafting
                     Add(new Vector3(-h.X, 0, 0), Vector3.Left, Vector3.Back, "side-");
                     Add(new Vector3(0, 0, h.Z), Vector3.Back, Vector3.Right, "end+");
                     Add(new Vector3(0, 0, -h.Z), Vector3.Forward, Vector3.Right, "end-");
+                    // corners — for legs-at-corners and tabletop-on-legs builds
+                    Add(new Vector3(h.X, -h.Y, h.Z), Vector3.Down, Vector3.Right, "corner");
+                    Add(new Vector3(-h.X, -h.Y, h.Z), Vector3.Down, Vector3.Left, "corner");
+                    Add(new Vector3(h.X, -h.Y, -h.Z), Vector3.Down, Vector3.Right, "corner");
+                    Add(new Vector3(-h.X, -h.Y, -h.Z), Vector3.Down, Vector3.Left, "corner");
+                    Add(new Vector3(h.X, h.Y, h.Z), Vector3.Up, Vector3.Right, "corner");
+                    Add(new Vector3(-h.X, h.Y, h.Z), Vector3.Up, Vector3.Left, "corner");
+                    Add(new Vector3(h.X, h.Y, -h.Z), Vector3.Up, Vector3.Right, "corner");
+                    Add(new Vector3(-h.X, h.Y, -h.Z), Vector3.Up, Vector3.Left, "corner");
                     break;
                 case ShapeKind.Rod:
                     Add(new Vector3(0, h.Y, 0), Vector3.Up, Vector3.Right, "end+");
@@ -394,6 +403,9 @@ namespace Crafting
         public ShapeDef Shape = new();
         public Transform3D Local = Transform3D.Identity;
         public float TempC = 20f;
+        public string Role = "";   // vehicle role: chassis, wheel, engine, door, seat, control, glass...
+        public string Fit = "";    // compatibility tag: "copcar", "sedan", "universal"
+        public float Power;        // engines: output (also their waste-heat load)
         public List<SubstanceStack> Contents = new();
 
         public bool IsContainer => Shape.CapacityM3 > 0.001f;
@@ -404,6 +416,7 @@ namespace Crafting
         public Part Clone() => new()
         {
             Id = Id, MaterialId = MaterialId, Shape = Shape.Clone(), Local = Local, TempC = TempC,
+            Role = Role, Fit = Fit, Power = Power,
             Contents = Contents.Select(c => new SubstanceStack { MaterialId = c.MaterialId, M3 = c.M3 }).ToList()
         };
     }

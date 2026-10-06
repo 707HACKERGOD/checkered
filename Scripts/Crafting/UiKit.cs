@@ -13,6 +13,11 @@ namespace Crafting
         public static Action<bool> StormChanged;
         public static Action ZapFx;
         public static Action ToggleGrid;
+        // Player-input gates. In YOUR player script:
+        //   actions (LMB etc.):  if (Crafting.CraftingHud.InputLocked) return;
+        //   mouse look:          if (Crafting.CraftingHud.LookLocked) return;
+        public static bool InputLocked;
+        public static bool LookLocked;
     }
 
     // Modal stack. Wire into YOUR input locking from your game bootstrap:
@@ -30,7 +35,12 @@ namespace Crafting
         {
             _stack.Add(c);
             Input.MouseMode = Input.MouseModeEnum.Visible;
-            if (_stack.Count == 1) OpenChanged?.Invoke(true);
+            if (_stack.Count == 1)
+            {
+                CraftingHud.InputLocked = true;
+                CraftingHud.LookLocked = true;
+                OpenChanged?.Invoke(true);
+            }
         }
 
         public static void Pop(Control c)
@@ -39,6 +49,8 @@ namespace Crafting
             if (_stack.Count == 0)
             {
                 Input.MouseMode = Input.MouseModeEnum.Captured;
+                CraftingHud.InputLocked = false;
+                CraftingHud.LookLocked = false;
                 OpenChanged?.Invoke(false);
             }
         }
