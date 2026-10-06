@@ -1,22 +1,87 @@
 [gd_resource type="Environment" format=3 uid="uid://bld0qarcklxe6"]
 
-[ext_resource type="Sky" uid="uid://drilpxj1xe7ui" path="res://Scenes/World/sky_main.tres" id="1_k8obr"]
+[ext_resource type="Shader" uid="uid://drmbapvyniy3k" path="res://Shaders/new_sky.gdshader" id="1_2axax"]
+[ext_resource type="Texture2D" uid="uid://cfqk60lpl5ljv" path="res://Shaders/SNoise.tres" id="2_k0kar"]
+[ext_resource type="Texture2D" uid="uid://cecwdqjol0ckd" path="res://Shaders/noiseClouds.png" id="3_7phey"]
+[ext_resource type="Texture2D" uid="uid://n7hd4ockb1bs" path="res://Shaders/moon.png" id="4_2bd1q"]
+[ext_resource type="Texture2D" uid="uid://c1vwcdcdvb74a" path="res://Shaders/Milkyway.jpg" id="5_a6vdq"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_a05uw"]
+shader = ExtResource("1_2axax")
+shader_parameter/sky_top_color = Color(0.35135818, 0.30334935, 0.398505, 1)
+shader_parameter/sky_horizon_color = Color(0.99999994, 0.5112164, 0.28432655, 0.8872661)
+shader_parameter/sky_night_color = Color(0.07205845, 0.08434778, 0.103757285, 1)
+shader_parameter/sun_color = Color(0.8942307, 0.4057712, 0.14452963, 1)
+shader_parameter/moon_color = Color(0.6152326, 0.7779078, 0.6901479, 1)
+shader_parameter/cloud_tint = Color(1, 1, 1, 1)
+shader_parameter/sun_dir = Vector3(0.9866235, -0.16301544, 0)
+shader_parameter/moon_dir = Vector3(-0.9866235, 0.16301544, 0)
+shader_parameter/cloud_coverage = 0.4
+shader_parameter/storm_darkness = 0.0
+shader_parameter/horizon_power = 1.6
+shader_parameter/sunset_band_strength = 1.1
+shader_parameter/sun_disc_size = 0.001
+shader_parameter/sun_disc_intensity = 5.0
+shader_parameter/sun_halo_strength = 0.4
+shader_parameter/ground_color = Color(0.28, 0.27, 0.26, 1)
+shader_parameter/moon_texture = ExtResource("4_2bd1q")
+shader_parameter/moon_size = 0.07
+shader_parameter/moon_brightness = 0.6
+shader_parameter/moon_fullness = 0.0
+shader_parameter/cirrus_day_intensity = 2.4
+shader_parameter/cirrus_night_intensity = 11.9
+shader_parameter/cumulus_day_intensity = 4.0
+shader_parameter/cumulus_night_intensity = 7.575
+shader_parameter/starmap_texture = ExtResource("5_a6vdq")
+shader_parameter/starmap_tint = Color(0.75, 0.75, 0.8, 1)
+shader_parameter/starmap_brightness = 1.0
+shader_parameter/star_alignment = Vector3(2.68288, -0.25891, 0.40101)
+shader_parameter/star_rotation = 1.4070501
+shader_parameter/star_tilt = 0.0
+shader_parameter/starmap_flip_u = false
+shader_parameter/starmap_flip_v = false
+shader_parameter/star_brightness = 2.3
+shader_parameter/twinkle_speed = 0.8
+shader_parameter/star_movement = 0.0002
+shader_parameter/cloud_offset = Vector2(733.2321, 0)
+shader_parameter/clouds_night_color = Color(0.21939728, 0.22656229, 0.28930324, 1)
+shader_parameter/cumulus_moon_intensity = 2.2
+shader_parameter/cirrus_moon_intensity = 1.6
+shader_parameter/cirrus_visible = true
+shader_parameter/cirrus_thickness = 2.0
+shader_parameter/cirrus_absorption = 2.0
+shader_parameter/cirrus_coverage_scale = 0.85
+shader_parameter/cirrus_size = 1.0
+shader_parameter/cirrus_uv = Vector2(0.16, 0.11)
+shader_parameter/cirrus_sky_tint_fade = 0.5
+shader_parameter/cirrus_texture = ExtResource("2_k0kar")
+shader_parameter/cumulus_visible = true
+shader_parameter/cumulus_thickness = 0.0243
+shader_parameter/cumulus_absorption = 1.045
+shader_parameter/cumulus_noise_freq = 2.7
+shader_parameter/cumulus_size = 0.5
+shader_parameter/cumulus_mie_intensity = 1.0
+shader_parameter/cumulus_sky_tint_fade = 0.4970000236075
+shader_parameter/cumulus_texture = ExtResource("3_7phey")
+shader_parameter/lightning_color = Color(0.8, 0.9, 1, 1)
+
+[sub_resource type="Sky" id="Sky_n2ugt"]
+sky_material = SubResource("ShaderMaterial_a05uw")
 
 [resource]
 background_mode = 2
-sky = ExtResource("1_k8obr")
-ambient_light_color = Color(0.23515597, 0.27890673, 0.35, 1)
-ambient_light_sky_contribution = 0.7
-tonemap_mode = 4
-ssr_enabled = true
-ssao_enabled = true
-ssao_radius = 4.57
+sky = SubResource("Sky_n2ugt")
+ambient_light_source = 3
+tonemap_mode = 3
+tonemap_white = 6.0
 glow_enabled = true
 glow_normalized = true
-glow_blend_mode = 0
+glow_bloom = 0.14
+fog_light_color = Color(1, 0.8536996, 0.5332225, 1)
+fog_density = 0.0004
+fog_sky_affect = 0.0
 volumetric_fog_enabled = true
-volumetric_fog_density = 0.005
-volumetric_fog_ambient_inject = 0.1
-volumetric_fog_sky_affect = 0.455
+volumetric_fog_density = 0.0037
+volumetric_fog_length = 3.3
 adjustment_enabled = true
-adjustment_contrast = 1.08
+adjustment_saturation = 1.3

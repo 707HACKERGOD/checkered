@@ -4,6 +4,17 @@ using System.Collections.Generic;
 
 namespace Crafting
 {
+    
+    // Rigid weld between two SEPARATE WorldObjects. Used when gluing onto an
+    // anchored/static object: the anchored one stays static, the glued-on one
+    // stays a live rigid body, joint-locked at the socket point.
+    public class CrossLink
+    {
+        public Generic6DofJoint3D Joint;
+        public WorldObject A, B;
+        public System.Guid PartA, PartB;
+    }
+
     // Global simulation: thermal ticks, phase transitions, fluids, storm.
     // Add as autoload later; for the prototype the lab scene owns it.
     public partial class CraftingSim : Node
@@ -12,6 +23,8 @@ namespace Crafting
         public readonly List<WorldObject> Objects = new();
         public readonly List<FluidBlob> Blobs = new();
         public readonly List<FluidCloud> Clouds = new();
+        public readonly List<Rope> Ropes = new();
+        public readonly List<CrossLink> Links = new();
         public readonly List<HeatEmitter> Emitters = new();
         public Node3D WorldRoot;
         public ICraftingPlayer Player;
@@ -34,6 +47,15 @@ namespace Crafting
 
         public override void _PhysicsProcess(double delta)
         {
+            for (int i = Links.Count - 1; i >= 0; i--)
+            {
+                var l = Links[i];
+                if (!GodotObject.IsInstanceValid(l.A) || !GodotObject.IsInstanceValid(l.B) || !GodotObject.IsInstanceValid(l.Joint))
+                {
+                    if (GodotObject.IsInstanceValid(l.Joint)) l.Joint.QueueFree();
+                    Links.RemoveAt(i);
+                }
+            }            
             float d = (float)delta;
             _t += d;
             if (_t >= 0.2f) { _t = 0f; ThermalTick(0.2f); }
@@ -43,7 +65,54 @@ namespace Crafting
                 if (_zapT <= 0f) { _zapT = (float)GD.RandRange(4.0, 9.0); }
             }
         }
+        public static CrossLink Weld(WorldObject a, WorldObject b, Vector3 worldPos,
+                                    System.Guid partA, System.Guid partB)
+        {
+            var j = new Generic6DofJoint3D();
+            Instance.WorldRoot.AddChild(j);
+            j.GlobalPosition = worldPos;
+            j.NodeA = a.GetPath();
+            j.NodeB = b.GetPath();
 
+            // Enable the limit constraints on all six axes.
+            j.SetFlagX(Generic6DofJoint3D.Flag.EnableLinearLimit, true);
+            j.SetFlagY(Generic6DofJoint3D.Flag.EnableLinearLimit, true);
+            j.SetFlagZ(Generic6DofJoint3D.Flag.EnableLinearLimit, true);
+            j.SetFlagX(Generic6DofJoint3D.Flag.EnableAngularLimit, true);
+            j.SetFlagY(Generic6DofJoint3D.Flag.EnableAngularLimit, true);
+            j.SetFlagZ(Generic6DofJoint3D.Flag.EnableAngularLimit, true);
+
+            // Lock all six degrees of freedom to zero = rigid weld.
+            // Godot 4 API: SetParamX/Y/Z(Param, value). The old SetLowerLinearLimitX
+            // and friends from Godot 3 no longer exist.
+            void LockAll(Generic6DofJoint3D.Param lower, Generic6DofJoint3D.Param upper)
+            {
+                j.SetParamX(lower, 0f); j.SetParamX(upper, 0f);
+                j.SetParamY(lower, 0f); j.SetParamY(upper, 0f);
+                j.SetParamZ(lower, 0f); j.SetParamZ(upper, 0f);
+            }
+            LockAll(Generic6DofJoint3D.Param.LinearLowerLimit,
+                    Generic6DofJoint3D.Param.LinearUpperLimit);
+            LockAll(Generic6DofJoint3D.Param.AngularLowerLimit,
+                    Generic6DofJoint3D.Param.AngularUpperLimit);
+
+            var link = new CrossLink { Joint = j, A = a, B = b, PartA = partA, PartB = partB };
+            Instance.Links.Add(link);
+            return link;
+        }
+
+        public static void BreakLinks(WorldObject o)
+        {
+            for (int i = Instance.Links.Count - 1; i >= 0; i--)
+            {
+                var l = Instance.Links[i];
+                if (l.A == o || l.B == o)
+                {
+                    if (GodotObject.IsInstanceValid(l.Joint)) l.Joint.QueueFree();
+                    Instance.Links.RemoveAt(i);
+                }
+            }
+        }
         void ThermalTick(float h)
         {
             foreach (var em in Emitters.ToArray())
@@ -91,6 +160,7 @@ namespace Crafting
         // Splits data into one body per bonded component (so unbonded parts fall apart).
         public static WorldObject SpawnObject(CraftedObjectData d, Vector3 pos, float yawRad = 0f, bool frozen = false)
         {
+            pos = LiftAboveGround(d, pos);
             WorldObject first = null;
             var rot = new Basis(Vector3.Up, yawRad);
             foreach (var comp in Structure.PartitionData(d))
@@ -105,6 +175,22 @@ namespace Crafting
                 first ??= o;
             }
             return first;
+        }
+        // Never spawn inside terrain: on slopes the ground can be higher than
+        // the requested point — lift the spawn to sit on top of it instead.
+        static Vector3 LiftAboveGround(CraftedObjectData d, Vector3 pos)
+        {
+            var space = Instance?.WorldRoot?.GetWorld3D().DirectSpaceState;
+            if (space == null) return pos;
+            float half = 0.25f;
+            foreach (var p in d.Parts) half = Mathf.Max(half, p.Shape.Size.Y * 0.5f);
+            // Origin well above (slope/cliff safety: a ray starting inside the
+            // terrain never hits it going down), mask excludes the player.
+            var hit = space.IntersectRay(PhysicsRayQueryParameters3D.Create(
+                pos + Vector3.Up * (half + 10f), pos + Vector3.Down * (half + 2f), 126));
+            if (hit.Count == 0) return pos;
+            float minY = hit["position"].AsVector3().Y + half + 0.02f;
+            return pos.Y < minY ? new Vector3(pos.X, minY, pos.Z) : pos;
         }
 
         public static WorldObject SpawnObjectAtXf(CraftedObjectData d, Transform3D xf, bool frozen = false) =>

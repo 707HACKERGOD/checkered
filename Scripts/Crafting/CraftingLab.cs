@@ -161,6 +161,7 @@ namespace Crafting
 
             _carry = new CarrySystem { Name = "CarrySystem" };
             AddChild(_carry);
+            AddChild(new ResizeEditor { Name = "ResizeEditor" });
             _grid = new GlobalGrid();
             AddChild(_grid);
         }
@@ -297,6 +298,16 @@ namespace Crafting
             }
             if (UiStack.Blocking) return;
             if (key == Key.K) { GetViewport().SetInputAsHandled(); _sim.ToggleStorm(); return; }
+            if (key == Key.Key6)
+            {
+                GetViewport().SetInputAsHandled();
+                var p6 = _player;
+                if (p6?.Cam == null || p6 is not Node3D node6) return;
+                var fwd6 = -p6.Cam.GlobalTransform.Basis.Z;
+                Rope.Spawn(node6.GlobalPosition + fwd6 * 1.7f + Vector3.Up * 0.6f);
+                Toast("Rope — grab an end with E, tie it to a white dot.");
+                return;
+            }            
 
             int spawn = key switch { Key.Key1 => 0, Key.Key2 => 1, Key.Key3 => 2, Key.Key4 => 3, Key.Key5 => 4, _ => -1 };
             if (spawn >= 0 && spawn < PartCatalog.All.Count)
@@ -304,8 +315,9 @@ namespace Crafting
                 GetViewport().SetInputAsHandled();
                 var c = PartCatalog.All[spawn];
                 var fwd = -_player.GlobalTransform.Basis.Z;
+                var jitter = new Vector3((float)GD.RandRange(-0.3, 0.3), (float)GD.RandRange(0.0, 0.2), (float)GD.RandRange(-0.3, 0.3));
                 CraftingSim.SpawnObject(Single(c.Name, c.MaterialId, c.Kind, c.DefaultSize),
-                                        _player.GlobalPosition + fwd * 1.7f + Vector3.Up * 1.1f);
+                                        _player.GlobalPosition + fwd * 1.7f + Vector3.Up * 1.1f + jitter);
                 Toast($"Spawned {c.Name}.");
             }
         }

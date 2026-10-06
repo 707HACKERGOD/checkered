@@ -64,6 +64,8 @@ namespace Crafting
         public override void _PhysicsProcess(double delta)
         {
             float d = (float)delta;
+            if (Input.IsMouseButtonPressed(MouseButton.Left) && !Crafting.ResizeEditor.DragActive) RayHeat(70f * d);
+            if (Input.IsMouseButtonPressed(MouseButton.Right) && !Crafting.ResizeEditor.DragActive) RayHeat(70f * d);
 
             if (_shakeT > 0f)
             {
@@ -100,6 +102,7 @@ namespace Crafting
 
         public override void _UnhandledInput(InputEvent e)
         {
+            if (Crafting.ResizeEditor.DragActive) return;
             if (UiStack.Blocking) return;
 
             if (e is InputEventMouseMotion mm && Input.MouseMode == Input.MouseModeEnum.Captured)

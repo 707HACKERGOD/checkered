@@ -13,7 +13,7 @@ namespace Crafting
         [Export] public bool AddHud = true;
         [Export] public bool AddOwnGrid = true;             // false if you use your Terrain3D grid
         [Export] public bool EnableCraftingInventory = true;
-        [Export] public Key InventoryKey = Key.Tab;
+        [Export] public Key InventoryKey = Key.I;
         [Export] public bool DebugKeys = false;             // K = storm, 1-5 = spawn parts
 
         public CraftingSim Sim => _sim;
@@ -38,9 +38,16 @@ namespace Crafting
             else if (GetParent() is Node3D par) worldRoot = par;
             _sim.WorldRoot = worldRoot;
 
-            _carry = new CarrySystem { Name = "CarrySystem" };
-            AddChild(_carry);
-            if (AddOwnGrid) { _grid = new GlobalGrid(); AddChild(_grid); }
+            // Pre-added children (you dragged the .cs onto nodes in your scene)
+            // are reused, so their exports persist in the scene file.
+            _carry = GetNodeOrNull<CarrySystem>("CarrySystem");
+            if (_carry == null) { _carry = new CarrySystem { Name = "CarrySystem" }; AddChild(_carry); }
+
+            _grid = GetNodeOrNull<GlobalGrid>("GlobalGrid");
+            if (AddOwnGrid && _grid == null) { _grid = new GlobalGrid(); AddChild(_grid); }
+
+            if (GetNodeOrNull<ResizeEditor>("ResizeEditor") == null)
+                AddChild(new ResizeEditor { Name = "ResizeEditor" });
 
             CraftingHud.Toast += Toast;
             CraftingHud.SetHint += SetHint;
@@ -117,7 +124,12 @@ namespace Crafting
 
         public void Toast(string msg) { if (_toast == null) return; _toast.Text = msg; _toast.Modulate = Colors.White; _toastCd = 2.6f; }
         public void SetHint(string text) { if (_hint != null) _hint.Text = text; }
-        public void ToggleGrid() { if (_grid != null) _grid.Visible = !_grid.Visible; }
+        public void ToggleGrid()
+        {
+            if (_grid == null) { Toast("Build grid is disabled (AddOwnGrid is off)"); return; }
+            _grid.Visible = !_grid.Visible;
+            Toast(_grid.Visible ? "Build grid ON" : "Build grid OFF");
+        }
         void OnStorm(bool on) => Toast(on ? "Thunderstorm ON" : "Thunderstorm off");
         void OnZap() => Toast("ZAPPED — conductive material overhead in a storm.");
 
@@ -145,6 +157,16 @@ namespace Crafting
             }
             if (UiStack.Blocking || !DebugKeys) return;
             if (key == Key.K) { GetViewport().SetInputAsHandled(); _sim.ToggleStorm(); return; }
+            if (key == Key.Key6)
+            {
+                GetViewport().SetInputAsHandled();
+                var p6 = _sim.Player;
+                if (p6?.Cam == null || p6 is not Node3D node6) return;
+                var fwd6 = -p6.Cam.GlobalTransform.Basis.Z;
+                Rope.Spawn(node6.GlobalPosition + fwd6 * 1.7f + Vector3.Up * 0.6f);
+                Toast("Rope — grab an end with E, tie it to a white dot.");
+                return;
+            }
             int spawn = key switch { Key.Key1 => 0, Key.Key2 => 1, Key.Key3 => 2, Key.Key4 => 3, Key.Key5 => 4, _ => -1 };
             if (spawn >= 0 && spawn < PartCatalog.All.Count)
             {
@@ -155,7 +177,8 @@ namespace Crafting
                 var fwd = -p.Cam.GlobalTransform.Basis.Z;
                 var d = new CraftedObjectData { Name = c.Name };
                 d.Parts.Add(new Part { MaterialId = c.MaterialId, Shape = new ShapeDef { Kind = c.Kind, Size = c.DefaultSize } });
-                CraftingSim.SpawnObject(d, node.GlobalPosition + fwd * 1.7f + Vector3.Up * 1.1f);
+                var jitter = new Vector3((float)GD.RandRange(-0.3, 0.3), (float)GD.RandRange(0.0, 0.2), (float)GD.RandRange(-0.3, 0.3));
+                CraftingSim.SpawnObject(d, node.GlobalPosition + fwd * 1.7f + Vector3.Up * 1.1f + jitter);
                 Toast($"Spawned {c.Name}.");
             }
         }

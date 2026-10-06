@@ -67,6 +67,7 @@ namespace Crafting
             Register(new MaterialDef { Id = "glass",  DisplayName = "Glass",  Color = new Color(0.65f, 0.80f, 0.85f), Density = 2500, MeltC = 1500, BoilC = 2200, Conductivity = 0.05f, Electrical = 0.00f, Hardness = 0.20f, Roughness = 0.10f });
             Register(new MaterialDef { Id = "rubber", DisplayName = "Rubber", Color = new Color(0.15f, 0.15f, 0.17f), Density = 1100, MeltC = 200,  BoilC = 500,  Conductivity = 0.02f, Electrical = 0.00f, Hardness = 0.20f, Roughness = 0.95f });
             Register(new MaterialDef { Id = "water",  DisplayName = "Water",  Color = new Color(0.35f, 0.55f, 0.85f), Density = 1000, MeltC = 0,    BoilC = 100,  Conductivity = 0.30f, Electrical = 0.05f, Hardness = 0.05f, Roughness = 0.10f });
+            Register(new MaterialDef { Id = "rope", DisplayName = "Rope", Color = new Color(0.54f, 0.43f, 0.25f), Density = 500, MeltC = 250, BoilC = 500, Conductivity = 0.02f, Electrical = 0.00f, Hardness = 0.10f, Roughness = 1f });
         }
         public static void Register(MaterialDef m) => _all[m.Id] = m;
         public static MaterialDef Get(string id) => _all.TryGetValue(id, out var m) ? m : _all["wood"];
@@ -141,7 +142,8 @@ namespace Crafting
                     Add(new Vector3(0, -h.Y, 0), Vector3.Down, Vector3.Right, "end-");
                     break;
                 case ShapeKind.Sphere:
-                    Add(new Vector3(0, -h.Y, 0), Vector3.Down, Vector3.Right, "seat"); // built-in preferred point
+                    Add(new Vector3(0, -h.Y, 0), Vector3.Down, Vector3.Right, "seat");
+                    Add(new Vector3(0, h.Y, 0), Vector3.Up, Vector3.Right, "top");
                     break;
                 case ShapeKind.OpenBox:
                     Add(new Vector3(0, h.Y + 0.06f, 0), Vector3.Up, Vector3.Right, "handle");
@@ -278,6 +280,7 @@ namespace Crafting
     // BuildMeshes uses it, scaled from BaseSize to the part's Size.
     public static class CustomMeshes
     {
+        static readonly string[] TriplanarNames = { "uv1_triplanar", "triplanar_enabled", "triplanar" };
         public class Entry { public string Path; public string MaterialId; public List<(Mesh Mesh, Transform3D Xf)> Cached; public Vector3 BaseSize = Vector3.One; }
 
         public static readonly Dictionary<ShapeKind, Entry> Map = new();
@@ -310,7 +313,32 @@ namespace Crafting
                     inst.Free();
                 }
                 if (e.Cached.Count == 0) return null;
-                e.BaseSize = Measure(e.Cached);   // auto-fit: model at ANY size works
+
+                // Auto-fit AND auto-recenter: measure the imported mesh's real
+                // bounds, then bake out its offset from the origin. The visual
+                // then always sits exactly on the physics box and the sockets,
+                // no matter how the origin was set in Blender. (This is why the
+                // stone was perfect and the plank/bucket levitated.)
+                e.BaseSize = Measure(e.Cached, out var center);
+                for (int i = 0; i < e.Cached.Count; i++)
+                {
+                    var (m, xf) = e.Cached[i];
+                    e.Cached[i] = (m, new Transform3D(xf.Basis, xf.Origin - center));
+                }
+
+                // Compensate non-uniform stretching: triplanar keeps texel
+                // density constant regardless of how long/wide the part is.
+                foreach (var (mesh, _) in e.Cached)
+                    for (int si = 0; si < mesh.GetSurfaceCount(); si++)
+                        if (mesh.SurfaceGetMaterial(si) is StandardMaterial3D sm)
+                            foreach (var prop in TriplanarNames)
+                            {
+                                if (sm.Get(prop).VariantType == Variant.Type.Bool)
+                                {
+                                    sm.Set(prop, true);
+                                    break;
+                                }
+                            }
             }
             Vector3 s = new(
                 Mathf.Max(targetSize.X / Mathf.Max(e.BaseSize.X, 0.001f), 0.001f),
@@ -320,7 +348,7 @@ namespace Crafting
             return e.Cached.ConvertAll(c => (c.Mesh, new Transform3D(scale * c.Xf.Basis, scale * c.Xf.Origin)));
         }
 
-        static Vector3 Measure(List<(Mesh Mesh, Transform3D Xf)> list)
+        static Vector3 Measure(List<(Mesh Mesh, Transform3D Xf)> list, out Vector3 center)
         {
             var mn = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
             var mx = new Vector3(float.MinValue, float.MinValue, float.MinValue);
@@ -335,6 +363,7 @@ namespace Crafting
                     mx = new Vector3(Mathf.Max(mx.X, p.X), Mathf.Max(mx.Y, p.Y), Mathf.Max(mx.Z, p.Z));
                 }
             }
+            center = (mn + mx) * 0.5f;
             var size = mx - mn;
             return new Vector3(Mathf.Max(size.X, 0.01f), Mathf.Max(size.Y, 0.01f), Mathf.Max(size.Z, 0.01f));
         }
@@ -388,6 +417,7 @@ namespace Crafting
     public class CraftedObjectData
     {
         public string Name = "Object";
+        public bool Anchored;
         public List<Part> Parts = new();
         public List<Bond> Bonds = new();
 
@@ -423,6 +453,7 @@ namespace Crafting
         public CraftedObjectData Clone() => new()
         {
             Name = Name,
+            Anchored = Anchored,
             Parts = Parts.Select(p => p.Clone()).ToList(),
             Bonds = Bonds.Select(b => new Bond { A = b.A, B = b.B, Strength = b.Strength }).ToList()
         };
@@ -451,6 +482,8 @@ namespace Crafting
 
     // Structural mutations: partition the part graph into connected components,
     // each becomes its own rigid body positioned at its own center of mass.
+    // Structural mutations: partition the part graph into connected components,
+    // each becomes its own rigid body positioned at its own center of mass.
     public static class Structure
     {
         public static void RemovePartDeferred(WorldObject obj, Guid id) =>
@@ -472,6 +505,7 @@ namespace Crafting
         {
             if (!GodotObject.IsInstanceValid(obj)) return;
             var snap = obj.SnapshotPartWorld();
+            snap[part.Id] = obj.GlobalTransform * part.Local;   // FIX: newcomer must be in the snapshot or RebuildFromWorld throws KeyNotFound (water freezing in a bucket)
             obj.Data.Parts.Add(part);
             RebuildFromWorld(obj, snap);
         }
@@ -484,8 +518,35 @@ namespace Crafting
             var basis = obj.GlobalTransform.Basis;
             var parent = obj.GetParent();
             var lv = obj.LinearVelocity;
-            var comps = Partition(data);
+            var comps = PartitionData(data);
+            for (int ci = 0; ci < comps.Count; ci++)
+            {
+                var comp = comps[ci];
+                float m = 0; var com = Vector3.Zero;
+                foreach (var p in comp) { float pm = p.MassKg; m += pm; com += world[p.Id].Origin * pm; }
+                if (m > 0) com /= m;
+                var newXf = new Transform3D(basis, com);
+                var nd = new CraftedObjectData { Name = data.Name };
+                foreach (var p in comp) { p.Local = newXf.AffineInverse() * world[p.Id]; nd.Parts.Add(p); }
+                nd.Bonds.AddRange(data.Bonds.Where(b => comp.Any(p => p.Id == b.A) && comp.Any(p => p.Id == b.B)));
+                if (ci == 0)
+                {
+                    obj.Data = nd;
+                    obj.GlobalTransform = newXf;
+                    obj.LinearVelocity = lv;
+                    obj.RebuildBody();
+                }
+                else
+                {
+                    var n = new WorldObject { Data = nd };
+                    parent?.AddChild(n);
+                    n.GlobalTransform = newXf;
+                    n.LinearVelocity = lv;
+                    n.RebuildBody();
+                }
+            }
         }
+
         // Fuses source into target (source is freed). Position source first.
         public static WorldObject Merge(WorldObject target, WorldObject source, Bond newBond = null)
         {
@@ -519,7 +580,5 @@ namespace Crafting
             return d.Parts.Select((p, i) => (p, r: Find(i))).GroupBy(t => t.r)
                           .Select(g => g.Select(t => t.p).ToList()).ToList();
         }
-
-        static List<List<Part>> Partition(CraftedObjectData d) => PartitionData(d);
     }
 }

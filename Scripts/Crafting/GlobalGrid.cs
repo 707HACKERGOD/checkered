@@ -2,14 +2,22 @@ using Godot;
 
 namespace Crafting
 {
-    // World-anchored build grid (G). Lines are computed from world position in
-    // the shader, so the plane can follow the player (and terrain height)
-    // without the grid ever shifting.
+    // World-anchored build grid that drapes over terrain. The mesh snaps in
+    // 1 m cells under the player and its vertices are raycast onto the floor
+    // layer; visible lines are computed from world position in the shader, so
+    // the grid never shifts as you move.
     public partial class GlobalGrid : MeshInstance3D
     {
-        [Export] public uint FloorMask = 2;   // your layer 2 = Floor
+        [Export] public uint FloorMask = 2;      // your layer 2 = Floor
+        [Export] public float Size = 16f;
+        [Export] public int Segments = 16;
 
         ShaderMaterial _mat;
+        Vector3[] _verts;
+        int[] _indices;
+        ArrayMesh _mesh;
+        Vector3 _lastCell = new(float.MaxValue, 0f, float.MaxValue);
+        bool _wasVisible;
 
         const string Code = @"
 shader_type spatial;
@@ -39,23 +47,74 @@ void fragment() {
         {
             _mat = new ShaderMaterial { Shader = new Shader { Code = Code } };
             MaterialOverride = _mat;
-            Mesh = new PlaneMesh { Size = new Vector2(16, 16) };
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+
+            int n = Segments + 1;
+            float cellSize = Size / Segments;
+            _verts = new Vector3[n * n];
+            for (int z = 0; z < n; z++)
+                for (int x = 0; x < n; x++)
+                    _verts[z * n + x] = new Vector3((x - Segments * 0.5f) * cellSize, 0f, (z - Segments * 0.5f) * cellSize);
+
+            _indices = new int[Segments * Segments * 6];
+            int ii = 0;
+            for (int z = 0; z < Segments; z++)
+                for (int x = 0; x < Segments; x++)
+                {
+                    int a = z * n + x, b = a + 1, c = a + n, d = c + 1;
+                    _indices[ii++] = a; _indices[ii++] = c; _indices[ii++] = b;
+                    _indices[ii++] = b; _indices[ii++] = c; _indices[ii++] = d;
+                }
+
+            _mesh = new ArrayMesh();
+            BuildSurface();
+            Mesh = _mesh;
             Visible = false;
+        }
+
+        void BuildSurface()
+        {
+            while (_mesh.GetSurfaceCount() > 0) _mesh.SurfaceRemove(0);
+            var arrays = new Godot.Collections.Array();
+            arrays.Resize((int)Mesh.ArrayType.Max);
+            arrays[(int)Mesh.ArrayType.Vertex] = _verts;
+            arrays[(int)Mesh.ArrayType.Index] = _indices;
+            _mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
         }
 
         public override void _Process(double delta)
         {
-            if (!Visible) return;
+            if (!Visible) { _wasVisible = false; return; }
+            if (!_wasVisible) { _lastCell = new Vector3(float.MaxValue, 0f, float.MaxValue); _wasVisible = true; }
+
             var p = CraftingSim.Instance?.Player as Node3D;
             if (p == null || !GodotObject.IsInstanceValid(p)) return;
-            float y = 0.03f;
-            var from = p.GlobalPosition + Vector3.Up * 2f;
-            var hit = GetWorld3D().DirectSpaceState.IntersectRay(
-                PhysicsRayQueryParameters3D.Create(from, from + Vector3.Down * 80f, FloorMask));
-            if (hit.Count > 0) y = hit["position"].AsVector3().Y + 0.03f;
-            GlobalPosition = new Vector3(p.GlobalPosition.X, y, p.GlobalPosition.Z);
+
+            float snap = Size / Segments;
+            var cellPos = new Vector3(Mathf.Floor(p.GlobalPosition.X / snap) * snap, 0f, Mathf.Floor(p.GlobalPosition.Z / snap) * snap);
+            if (cellPos != _lastCell || cellPos != GlobalPosition)
+            {
+                _lastCell = cellPos;
+                GlobalPosition = cellPos;
+                _lastCell = cellPos;
+                GlobalPosition = cellPos;
+                Drape(p.GlobalPosition.Y + 0.05f);
+            }
             _mat.Set("u_center", new Vector2(p.GlobalPosition.X, p.GlobalPosition.Z));
+        }
+
+        void Drape(float fallbackY)
+        {
+            var space = GetWorld3D().DirectSpaceState;
+            for (int i = 0; i < _verts.Length; i++)
+            {
+                var wp = GlobalPosition + _verts[i];
+                var hit = space.IntersectRay(PhysicsRayQueryParameters3D.Create(
+                    new Vector3(wp.X, 500f, wp.Z), new Vector3(wp.X, -500f, wp.Z), FloorMask));
+                // miss → keep the grid at the player's feet instead of burying it
+                _verts[i].Y = hit.Count > 0 ? hit["position"].AsVector3().Y : fallbackY;
+            }
+            BuildSurface();
         }
     }
 }

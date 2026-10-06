@@ -10,6 +10,8 @@ namespace Crafting
     {
         public CraftedObjectData Data = new();
         public bool IsCarried;
+        [Export] public bool RescueFallenThrough = true;
+        float _rescueCd;
         public Dictionary<Guid, List<MeshInstance3D>> PartMeshes = new();
 
         readonly List<Node> _built = new();
@@ -44,6 +46,7 @@ namespace Crafting
             CenterOfMassMode = CenterOfMassModeEnum.Custom;
             CenterOfMass = mass > 0 ? com / mass : Vector3.Zero;
             ContactMonitor = true; MaxContactsReported = 6;
+            ContinuousCd = true;   // swept collision: thin parts can't tunnel through terrain
             LinearDamp = 0.05f; AngularDamp = 0.6f;
             CollisionLayer = 1u << 6;   // your layer 7 = Items
             CollisionMask = 127;        // collides with layers 1-7 (player, floor, buildings, doors, NPC, vehicles, items)
@@ -82,7 +85,31 @@ namespace Crafting
 
         public override void _PhysicsProcess(double delta)
         {
-            if (_breakCd > 0f) _breakCd -= (float)delta;
+            float d = (float)delta;
+            if (_breakCd > 0f) _breakCd -= d;
+            if (_rescueCd > 0f) _rescueCd -= d;
+            // Anti-explosion: cap speeds so overlap pops (spawn piles, attach)
+            // stay tame instead of launching parts through the terrain.
+            if (LinearVelocity.LengthSquared() > 225f) LinearVelocity = LinearVelocity.Normalized() * 15f;
+            if (AngularVelocity.LengthSquared() > 100f) AngularVelocity = AngularVelocity.Normalized() * 10f;
+            
+            // Safety net while Terrain3D + thin parts get tuned: if we somehow
+            // ended up far below the world, raycast from the sky and put the
+            // object back on the first solid surface instead of losing it.
+            if (RescueFallenThrough && !IsCarried && _rescueCd <= 0f
+                && GlobalPosition.Y < -20f && LinearVelocity.Y < -1f)
+            {
+                _rescueCd = 4f;
+                var from = new Vector3(GlobalPosition.X, 1000f, GlobalPosition.Z);
+                var hit = GetWorld3D().DirectSpaceState.IntersectRay(
+                    PhysicsRayQueryParameters3D.Create(from, new Vector3(GlobalPosition.X, -1000f, GlobalPosition.Z), CollisionMask));
+                if (hit.Count > 0)
+                {
+                    GlobalPosition = hit["position"].AsVector3() + Vector3.Up * 0.3f;
+                    LinearVelocity = Vector3.Zero;
+                    AngularVelocity = Vector3.Zero;
+                }
+            }
         }
 
         // Impact = relative momentum. BodyEntered + velocities is stable across versions.
