@@ -5,7 +5,7 @@
 
 ## Download
 
-[![Windows](https://img.shields.io/badge/Windows-v0.1.1--alpha-blue?logo=windows&style=for-the-badge)](https://github.com/707HACKERGOD/checkered/releases/tag/v0.1.1)  
+[![Windows](https://img.shields.io/badge/Windows-v0.2.1--alpha-blue?logo=windows&style=for-the-badge)](https://github.com/707HACKERGOD/checkered/releases/tag/v0.2.1)  
 [![Android](https://img.shields.io/badge/Android-v0.1.1--alpha--android-green?logo=android&style=for-the-badge)](https://github.com/707HACKERGOD/checkered/releases/tag/v0.1.1-alpha-android)
 
 System requirements (WIP):
