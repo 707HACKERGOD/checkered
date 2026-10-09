@@ -1,5 +1,7 @@
 ![Gameplay Screenshot](builds/screenshots/v0.1.3/Recording%202026-09-13%20125343.gif)
-![Gameplay Screenshot](builds/screenshots/v0.1.3/Screenshot%202026-10-09%20183511.png)
+<p align="center">
+  <img src="builds/screenshots/v0.1.3/Screenshot%202026-10-09%20183511.png" alt="Gameplay Screenshot" />
+</p>
 
 ## Download
 
