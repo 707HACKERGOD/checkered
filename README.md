@@ -111,8 +111,8 @@ Demo:
 - Abandon society, fight the whole city and then the military, or fail the college infiltration - the game won't give a game over, the curse is hungry for destruction of all, and you can only stop it if you show your own initiative.
 
 ![Gameplay Screenshot](builds/screenshots/v0.1.3/Screenshot%202026-10-09%20184625.png)
-![Gameplay Screenshot]()
+![Gameplay Screenshot](builds/screenshots/v0.1.3/ezgif-4d929e63a9e1339c.gif)
 ![Gameplay Screenshot](builds/screenshots/v0.1.3/Screenshot%202026-10-09%20185316.png)
-![Gameplay Screenshot]()
+![Gameplay Screenshot](builds/screenshots/v0.1.3/Screenshot%202026-09-21%20125343.png)
 ![Gameplay Screenshot](builds/screenshots/v0.1.3/Screenshot%202026-08-01%20213002.png)
 ![Gameplay Screenshot](builds/screenshots/v0.1.3/5303547474372928713.jpg)
