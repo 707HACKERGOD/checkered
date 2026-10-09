@@ -1,4 +1,5 @@
-![Gameplay Screenshot](builds/screenshots/v0.1.2/Screenshot%202026-08-14%20223830.png)
+![Gameplay Screenshot](builds/screenshots/v0.1.3/Recording%202026-09-13%20125343.gif)
+![Gameplay Screenshot](builds/screenshots/v0.1.3/Screenshot%202026-10-09%20183511.png)
 
 ## Download
 
@@ -9,6 +10,7 @@ System requirements (WIP):
 - 5GB storage
 - Windows 10+, x64
 - Android version 15
+- 120FPS
 
 Checkered (wip title) is a Godot 3d open world game for Windows and Android where you are an immortal cursed cryptid infiltrating a trade school.
 
@@ -37,14 +39,13 @@ Demo:
 - 🚧 Combat and health system with limb health
         ✅ you fight NPCs
         ✅ can kill NPCs
-        🚧 NPCs fight back
+        🚧 NPCs AI and navigation
 - ✅ Debug menu
 - ✅ NPC aggressive and defensive behavior
 - ✅ Possession system
-- 🚧 Sanity system (control over districts)
+- ✅ Sanity system (control over districts)
         ✅ detection of districts
         ✅ debug sanity controls
-        🚧 gameplay
 - 🚧 Open world map with 2 key buildings in demo: roadhouse, trade school
         ✅ measuring scale, drawing the 2D map, installing plugin
         ✅ making textures library for ground painting
@@ -54,9 +55,7 @@ Demo:
         ✅ adding lamps and 3d roads
         ✅ adding trees and foliage
         ✅ adding water
-        🚧 blocking out buildings
-        🚧 roadhouse
-        🚧 college
+        🚧 GN buildings
 - ✅ Dialogue UI
         ✅ linear dialogue
         ✅ conditional dialogue
@@ -79,13 +78,16 @@ Demo:
         ✅ ambient sounds in different locations (bar music, waves at beach)
 - 🚧 Animation and movement system: idle, walk, sprint, jump, crouch, crawl, turning around, climb, swim
         ✅ basic state machine
+        🚧 new double state machine
         🚧 IK and merging
         🚧 combat integration
+        🚧 frame matching for legs
 - 🚧 Crafting system version 1: a list of presets; 3-deep menu for lattice manipulation on every material for the presets + on every material of the 2 buildings
-        🚧 UI on a wall
-        🚧 apply to all 3d materials
-        🚧 apply to items
-        🚧 allow combining items
+        ✅ apply to all 3d materials
+        ✅ apply to items
+        ✅ allow combining items
+        🚧 integrate into buildings + everything destrucatable
+        🚧 limb health integration
 - 🚧 Saving and loading
         - remember time
         - remember sanity, health, etc
@@ -97,11 +99,9 @@ Demo:
         🚧 the UI and visuals
         🚧 slow down time and clone MC into a transparent phantom with special visuals
 
-Future plans:
-
-- Dialogue:
-        - persistent memory
-        - polishing UI to differentiate between MC and NPC; progress ring
+- 🚧 Dialogue:
+        🚧 persistent memory
+        🚧 polishing UI to differentiate between MC and NPC; progress ring
 
 - 4 key supported playstyles: Pacifist / Insanity / Criminal / Engineer
 - Thaumaturgy lore and magic system - learn to control the curse, start chemical reactions in real time in the world around you with no equipment but your mind. Transmute walls into gas and then solidify them back while the curse AI is sprinting through to trap it sealed in concrete.
@@ -110,9 +110,9 @@ Future plans:
 - Customize your home laboratory/factory - whether you  prefer the bar attic, the woods or the junkyard.
 - Abandon society, fight the whole city and then the military, or fail the college infiltration - the game won't give a game over, the curse is hungry for destruction of all, and you can only stop it if you show your own initiative.
 
-![Gameplay Screenshot](builds/screenshots/v0.1.2/Screenshot%202026-05-11%20002943.png)
-![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20160620.png)
-![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20160827.png)
-![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20160931.png)
-![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-19%20153814.png)
-![Gameplay Screenshot](builds/screenshots/v0.1.1/Screenshot%202026-04-21%20160551.png)
+![Gameplay Screenshot](builds/screenshots/v0.1.3/Screenshot%202026-10-09%20184625.png)
+![Gameplay Screenshot]()
+![Gameplay Screenshot](builds/screenshots/v0.1.3/Screenshot%202026-10-09%20185316.png)
+![Gameplay Screenshot]()
+![Gameplay Screenshot](builds/screenshots/v0.1.3/Screenshot%202026-08-01%20213002.png)
+![Gameplay Screenshot](builds/screenshots/v0.1.3/5303547474372928713.jpg)
