@@ -10,9 +10,8 @@
 
 System requirements (WIP):
 - 5GB storage
-- Windows 10+, x64
+- Windows 10+, x64 (120FPS cap)
 - Android version 15
-- 120FPS
 
 Checkered (wip title) is a Godot 3d open world game for Windows and Android where you are an immortal cursed cryptid infiltrating a trade school.
 
